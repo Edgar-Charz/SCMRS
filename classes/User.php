@@ -524,11 +524,12 @@ class User
         $del->execute();
         $del->close();
 
-        $token     = bin2hex(random_bytes(32));
-        $expiresAt = date('Y-m-d H:i:s', strtotime('+1 hour'));
+        $token = bin2hex(random_bytes(32));
 
-        $ins = $this->conn->prepare("INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, ?)");
-        $ins->bind_param('sss', $email, $token, $expiresAt);
+        $ins = $this->conn->prepare(
+            "INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, NOW() + INTERVAL 1 HOUR)"
+        );
+        $ins->bind_param('ss', $email, $token);
         $ins->execute();
         $ins->close();
 

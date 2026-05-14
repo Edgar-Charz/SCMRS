@@ -81,6 +81,20 @@ class Admin extends User
         return $total_rejected_result->fetch_assoc()['total_rejected'];
     }
 
+    public function getUserCountsByRole()
+    {
+        $stmt = $this->conn->prepare(
+            "SELECT user_role, COUNT(*) AS total FROM users GROUP BY user_role"
+        );
+        $stmt->execute();
+        $rows   = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $counts = ['student' => 0, 'staff' => 0, 'admin' => 0];
+        foreach ($rows as $row) {
+            $counts[$row['user_role']] = (int) $row['total'];
+        }
+        return $counts;
+    }
+
     public function getPendingStaffCount()
     {
         $stmt = $this->conn->prepare("SELECT COUNT(*) AS cnt FROM staffs WHERE staff_approval_status = 0");
