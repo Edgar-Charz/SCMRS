@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/Notification.php';
+
 class Admin extends User
 {
 
@@ -114,7 +116,8 @@ class Admin extends User
                 JOIN students s ON c.student_id = s.student_id
                 JOIN users u ON s.student_user_id = u.user_id
                 LEFT JOIN departments d ON c.department_id = d.department_id
-                LEFT JOIN staffs sf ON c.assigned_staff_id = sf.staff_id
+                LEFT JOIN complaint_assignments ca_lead ON c.complaint_id = ca_lead.complaint_id AND ca_lead.status = 'active' AND ca_lead.is_lead = 1
+                LEFT JOIN staffs sf ON ca_lead.staff_id = sf.staff_id
                 LEFT JOIN users su ON sf.staff_user_id = su.user_id
                 ORDER BY c.created_at DESC";
         $result = $this->conn->query($sql);
@@ -155,11 +158,16 @@ class Admin extends User
     // Get pending staff approvals
     public function getPendingStaffApprovals()
     {
-        $sql = "SELECT users.user_id, users.username, users.user_email, staffs.staff_id, staffs.staff_approval_status
-                    FROM users
-                    JOIN staffs ON users.user_id = staffs.staff_user_id
-                    WHERE staffs.staff_approval_status = '0'
-                    ORDER BY users.created_at ASC";
+        $sql = "SELECT users.user_id, users.username, users.user_email,
+                       users.user_phone_number, users.created_at,
+                       staffs.staff_id, staffs.staff_approval_status,
+                       staffs.staff_department_id,
+                       departments.department_name
+                FROM users
+                JOIN staffs ON users.user_id = staffs.staff_user_id
+                LEFT JOIN departments ON staffs.staff_department_id = departments.department_id
+                WHERE staffs.staff_approval_status = '0'
+                ORDER BY users.created_at ASC";
         $result = $this->conn->query($sql);
 
         return $result->fetch_all(MYSQLI_ASSOC);
@@ -194,32 +202,43 @@ class Admin extends User
     }
 
     // Approve staff
-    public function approveStaff($userId, $departmentId)
+    public function approveStaff($userId, $departmentId, $roleId = null)
     {
         try {
             $this->conn->begin_transaction();
 
-            // Update user status to active
             $user_stmt = $this->conn->prepare("UPDATE users SET user_status = 'active' WHERE user_id = ?");
             $user_stmt->bind_param("i", $userId);
             $user_stmt->execute();
             $user_stmt->close();
 
-            // Update staff approval status
             $staff_stmt = $this->conn->prepare("UPDATE staffs SET staff_approval_status = '1' WHERE staff_user_id = ?");
             $staff_stmt->bind_param("i", $userId);
             $staff_stmt->execute();
             $staff_stmt->close();
 
-            // Update staff department
             if (!empty($departmentId)) {
-                $staff_stmt = $this->conn->prepare("UPDATE staffs SET staff_department_id = ? WHERE staff_user_id = ?");
-                $staff_stmt->bind_param("ii", $departmentId, $userId);
-                $staff_stmt->execute();
-                $staff_stmt->close();
+                $dept_stmt = $this->conn->prepare("UPDATE staffs SET staff_department_id = ? WHERE staff_user_id = ?");
+                $dept_stmt->bind_param("ii", $departmentId, $userId);
+                $dept_stmt->execute();
+                $dept_stmt->close();
+            }
+
+            if (!empty($roleId)) {
+                $role_stmt = $this->conn->prepare("UPDATE staffs SET staff_role_id = ? WHERE staff_user_id = ?");
+                $role_stmt->bind_param("ii", $roleId, $userId);
+                $role_stmt->execute();
+                $role_stmt->close();
             }
 
             $this->conn->commit();
+
+            (new Notification($this->conn))->create(
+                $userId,
+                "Your staff account has been approved. You can now access your dashboard.",
+                'staff_approved',
+                'staff_dashboard.php'
+            );
 
             return true;
         } catch (Exception $e) {
@@ -372,7 +391,8 @@ class Admin extends User
              JOIN students s ON c.student_id = s.student_id
              JOIN users u ON s.student_user_id = u.user_id
              LEFT JOIN departments d ON c.department_id = d.department_id
-             LEFT JOIN staffs sf ON c.assigned_staff_id = sf.staff_id
+             LEFT JOIN complaint_assignments ca_lead ON c.complaint_id = ca_lead.complaint_id AND ca_lead.status = 'active' AND ca_lead.is_lead = 1
+             LEFT JOIN staffs sf ON ca_lead.staff_id = sf.staff_id
              LEFT JOIN users su ON sf.staff_user_id = su.user_id
              WHERE c.complaint_id = ?
              LIMIT 1"
@@ -470,11 +490,11 @@ class Admin extends User
             $deactivateStmt->close();
 
             $stmt = $this->conn->prepare(
-                "UPDATE complaints SET assigned_staff_id = ?, priority = ?,
+                "UPDATE complaints SET priority = ?,
                  complaint_status = 'in_progress', routed_at = NOW()
                  WHERE complaint_id = ?"
             );
-            $stmt->bind_param("ssi", $staffId, $priority, $complaintId);
+            $stmt->bind_param("si", $priority, $complaintId);
             $stmt->execute();
             $stmt->close();
 
@@ -510,6 +530,34 @@ class Admin extends User
             }
 
             $this->conn->commit();
+
+            $notif = new Notification($this->conn);
+
+            // Notify the assigned staff member
+            $sStmt = $this->conn->prepare("SELECT staff_user_id FROM staffs WHERE staff_id = ? LIMIT 1");
+            $sStmt->bind_param('s', $staffId);
+            $sStmt->execute();
+            $sRow = $sStmt->get_result()->fetch_assoc();
+            $sStmt->close();
+            if ($sRow) {
+                $notif->create($sRow['staff_user_id'], "Complaint #$complaintId has been assigned to you.", 'new_assignment', "assigned_complaint_details.php?id=$complaintId", $complaintId);
+            }
+
+            // Notify the student their complaint is being handled
+            $studStmt = $this->conn->prepare(
+                "SELECT u.user_id FROM complaints c
+                 JOIN students s ON c.student_id = s.student_id
+                 JOIN users u ON s.student_user_id = u.user_id
+                 WHERE c.complaint_id = ? LIMIT 1"
+            );
+            $studStmt->bind_param('i', $complaintId);
+            $studStmt->execute();
+            $studRow = $studStmt->get_result()->fetch_assoc();
+            $studStmt->close();
+            if ($studRow) {
+                $notif->create($studRow['user_id'], "Your complaint #$complaintId is now being reviewed by a staff member.", 'status_change', "student_complaint_details.php?id=$complaintId", $complaintId);
+            }
+
             return true;
         } catch (Exception $e) {
             $this->conn->rollback();
@@ -571,6 +619,26 @@ class Admin extends User
             $logStmt->close();
 
             $this->conn->commit();
+
+            // Notify the student
+            $studStmt = $this->conn->prepare(
+                "SELECT u.user_id FROM complaints c
+                 JOIN students s ON c.student_id = s.student_id
+                 JOIN users u ON s.student_user_id = u.user_id
+                 WHERE c.complaint_id = ? LIMIT 1"
+            );
+            $studStmt->bind_param('i', $complaintId);
+            $studStmt->execute();
+            $studRow = $studStmt->get_result()->fetch_assoc();
+            $studStmt->close();
+            if ($studRow) {
+                $type = $newStatus === 'resolved' ? 'complaint_resolved' : 'complaint_rejected';
+                $msg  = $newStatus === 'resolved'
+                    ? "Your complaint #$complaintId has been resolved."
+                    : "Your complaint #$complaintId has been rejected.";
+                (new Notification($this->conn))->create($studRow['user_id'], $msg, $type, "student_complaint_details.php?id=$complaintId", $complaintId);
+            }
+
             return true;
         } catch (Exception $e) {
             $this->conn->rollback();
@@ -578,9 +646,30 @@ class Admin extends User
         }
     }
 
-    // Delete a complaint and its uploaded files
-    public function deleteComplaint($complaintId)
+    // Delete a pending complaint and its uploaded files
+    public function deleteComplaint($complaintId, $reason = '')
     {
+        $checkStmt = $this->conn->prepare(
+            "SELECT c.complaint_status, u.user_id
+             FROM complaints c
+             JOIN students s ON c.student_id = s.student_id
+             JOIN users u ON s.student_user_id = u.user_id
+             WHERE c.complaint_id = ?"
+        );
+        $checkStmt->bind_param("i", $complaintId);
+        $checkStmt->execute();
+        $row = $checkStmt->get_result()->fetch_assoc();
+        $checkStmt->close();
+
+        if (!$row) {
+            throw new Exception("Complaint not found.");
+        }
+        if ($row['complaint_status'] !== 'pending') {
+            throw new Exception("Only pending complaints can be deleted.");
+        }
+
+        $studentUserId = $row['user_id'];
+
         $pathStmt = $this->conn->prepare(
             "SELECT file_path FROM complaint_attachments WHERE complaint_id = ?"
         );
@@ -604,6 +693,11 @@ class Admin extends User
             if (is_dir($dir) && count(scandir($dir)) === 2) {
                 rmdir($dir);
             }
+
+            $notif       = new Notification($this->conn);
+            $reasonText  = $reason ? " Reason: $reason" : '';
+            $notif->create($studentUserId, "Your complaint #$complaintId has been deleted by an administrator.$reasonText", 'complaint_deleted', 'track_complaints.php', null);
+            $notif->notifyAllAdmins("Complaint #$complaintId was deleted by an administrator.$reasonText", 'complaint_deleted', 'manage_complaints.php', null);
         }
 
         return $ok;
@@ -775,12 +869,13 @@ class Admin extends User
                         THEN TIMESTAMPDIFF(HOUR, c.created_at, c.resolved_at) END), 1) AS avg_resolution_hours,
                     ROUND(SUM(c.complaint_status = 'resolved') / COUNT(*) * 100, 1) AS resolution_rate
                 FROM complaints c
-                JOIN staffs s ON c.assigned_staff_id = s.staff_id
+                JOIN complaint_assignments ca_lead ON c.complaint_id = ca_lead.complaint_id AND ca_lead.status = 'active' AND ca_lead.is_lead = 1
+                JOIN staffs s ON ca_lead.staff_id = s.staff_id
                 JOIN users u ON s.staff_user_id = u.user_id
                 LEFT JOIN departments d ON s.staff_department_id = d.department_id
                 LEFT JOIN staff_roles sr ON s.staff_role_id = sr.role_id
                 $where
-                GROUP BY c.assigned_staff_id, u.username, d.department_name, sr.role_name
+                GROUP BY ca_lead.staff_id, u.username, d.department_name, sr.role_name
                 ORDER BY total DESC";
 
         $stmt = $this->conn->prepare($sql);
@@ -1106,23 +1201,27 @@ class Admin extends User
 
     // ── Add user accounts (admin-created) ────────────────────────────────────
 
-    public function addStudent($username, $email, $password, $regNumber, $collegeId)
+    public function addStudent($username, $email, $password, $regNumber, $collegeId, $phone = null, $program = null)
     {
         $this->conn->begin_transaction();
         try {
             $hash = password_hash($password, PASSWORD_DEFAULT);
             $u = $this->conn->prepare(
-                "INSERT INTO users (username, user_email, user_password, user_role, user_status) VALUES (?, ?, ?, 'student', 'active')"
+                "INSERT INTO users (username, user_email, user_phone_number, user_password, user_role, user_status)
+                 VALUES (?, ?, ?, ?, 'student', 'active')"
             );
-            $u->bind_param("sss", $username, $email, $hash);
+            $u->bind_param("ssss", $username, $email, $phone, $hash);
             $u->execute();
             $userId = $this->conn->insert_id;
             $u->close();
 
+            $prog = $program ?: null;
+            $col  = $collegeId ?: null;
             $s = $this->conn->prepare(
-                "INSERT INTO students (student_user_id, student_registration_number, student_college_id) VALUES (?, ?, ?)"
+                "INSERT INTO students (student_user_id, student_registration_number, student_college_id, student_program)
+                 VALUES (?, ?, ?, ?)"
             );
-            $s->bind_param("isi", $userId, $regNumber, $collegeId);
+            $s->bind_param("isis", $userId, $regNumber, $col, $prog);
             $s->execute();
             $s->close();
 
@@ -1134,24 +1233,28 @@ class Admin extends User
         }
     }
 
-    public function addStaffAccount($username, $email, $password, $departmentId)
+    public function addStaffAccount($username, $email, $password, $departmentId, $staffId = null, $phone = null, $roleId = null)
     {
         $this->conn->begin_transaction();
         try {
             $hash = password_hash($password, PASSWORD_DEFAULT);
             $u = $this->conn->prepare(
-                "INSERT INTO users (username, user_email, user_password, user_role, user_status) VALUES (?, ?, ?, 'staff', 'active')"
+                "INSERT INTO users (username, user_email, user_phone_number, user_password, user_role, user_status)
+                 VALUES (?, ?, ?, ?, 'staff', 'active')"
             );
-            $u->bind_param("sss", $username, $email, $hash);
+            $u->bind_param("ssss", $username, $email, $phone, $hash);
             $u->execute();
             $userId = $this->conn->insert_id;
             $u->close();
 
             $deptId = $departmentId ?: null;
+            $rId    = $roleId ?: null;
+            $sId    = $staffId ?: null;
             $s = $this->conn->prepare(
-                "INSERT INTO staffs (staff_user_id, staff_department_id, staff_approval_status) VALUES (?, ?, 1)"
+                "INSERT INTO staffs (staff_id, staff_user_id, staff_department_id, staff_role_id, staff_approval_status)
+                 VALUES (?, ?, ?, ?, 1)"
             );
-            $s->bind_param("ii", $userId, $deptId);
+            $s->bind_param("siii", $sId, $userId, $deptId, $rId);
             $s->execute();
             $s->close();
 
@@ -1161,6 +1264,24 @@ class Admin extends User
             $this->conn->rollback();
             throw new Exception("Add staff error: " . $e->getMessage());
         }
+    }
+
+    // Get student feedback for a resolved complaint
+    public function getComplaintFeedback($complaintId)
+    {
+        $stmt = $this->conn->prepare(
+            "SELECT cf.*, u.username AS student_name
+             FROM complaint_feedback cf
+             JOIN students s ON cf.student_id = s.student_id
+             JOIN users u ON s.student_user_id = u.user_id
+             WHERE cf.complaint_id = ?
+             LIMIT 1"
+        );
+        $stmt->bind_param("i", $complaintId);
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return $data;
     }
 
     // ── Collaboration / info ──────────────────────────────────────────────────
