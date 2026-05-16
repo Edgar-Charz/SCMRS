@@ -62,9 +62,9 @@ class Complaint
 
                     if (move_uploaded_file($tmp_name, $target_path)) {
                         $attach_stmt = $this->conn->prepare(
-                            "INSERT INTO complaint_attachments (complaint_id, uploaded_by, file_name, file_path, file_type) VALUES (?, ?, ?, ?, ?)"
+                            "INSERT INTO complaint_attachments (complaint_id, uploaded_by, file_name, file_path, file_type, file_size) VALUES (?, ?, ?, ?, ?, ?)"
                         );
-                        $attach_stmt->bind_param("issss", $complaintId, $user_id, $file_name, $target_path, $file_type);
+                        $attach_stmt->bind_param("issssi", $complaintId, $user_id, $file_name, $target_path, $file_type, $file_size);
                         $attach_stmt->execute();
                         $attach_stmt->close();
                     }
@@ -88,7 +88,7 @@ class Complaint
             // Commit transaction
             $this->conn->commit();
 
-            return true;
+            return $complaintId;
         } catch (Exception $e) {
             // Rollback transaction
             $this->conn->rollBack();

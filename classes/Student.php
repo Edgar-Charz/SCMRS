@@ -310,7 +310,7 @@ class Student extends User
     }
 
     // Delete a pending complaint (only allowed while status is pending)
-    public function deleteComplaint($complaintId, $studentId)
+    public function deleteComplaint($complaintId, $studentId, $reason = '')
     {
         $stmt = $this->conn->prepare(
             "DELETE FROM complaints WHERE complaint_id = ? AND student_id = ? AND complaint_status = 'pending'"
@@ -318,6 +318,19 @@ class Student extends User
         $stmt->bind_param("ii", $complaintId, $studentId);
         $ok = $stmt->execute();
         $stmt->close();
-        return $ok && $this->conn->affected_rows > 0;
+
+        if ($ok && $this->conn->affected_rows > 0) {
+            require_once __DIR__ . '/Notification.php';
+            $reasonText = $reason ? " Reason: $reason" : '';
+            (new Notification($this->conn))->notifyAllAdmins(
+                "Complaint #$complaintId was deleted by the student.$reasonText",
+                'complaint_deleted',
+                'manage_complaints.php',
+                null
+            );
+            return true;
+        }
+
+        return false;
     }
 }

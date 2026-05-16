@@ -1,5 +1,7 @@
 <?php
-class Staff 
+require_once __DIR__ . '/Notification.php';
+
+class Staff
 {
 
     private $conn;
@@ -67,7 +69,7 @@ class Staff
                     SUM(CASE WHEN complaint_status = 'resolved' THEN 1 ELSE 0 END) as resolved,
                     SUM(CASE WHEN complaint_status = 'rejected' THEN 1 ELSE 0 END) as rejected
                 FROM complaints
-                WHERE assigned_staff_id = ?";
+                JOIN complaint_assignments ca ON complaints.complaint_id = ca.complaint_id AND ca.staff_id = ? AND ca.status = 'active'";
 
         $stmt = $this->conn->prepare($sql);
         if (!$stmt) {
@@ -99,8 +101,8 @@ class Staff
         $sql = "SELECT complaints.complaint_id, complaints.complaint_title, complaints.complaint_status, complaints.created_at,
                        complaint_categories.category_name
                 FROM complaints
+                JOIN complaint_assignments ca ON complaints.complaint_id = ca.complaint_id AND ca.staff_id = ? AND ca.status = 'active'
                 LEFT JOIN complaint_categories ON complaints.category_id = complaint_categories.category_id
-                WHERE complaints.assigned_staff_id = ?
                 ORDER BY complaints.created_at DESC
                 LIMIT ?";
 
@@ -126,9 +128,9 @@ class Staff
         $sql = "SELECT complaints.complaint_id, complaints.complaint_title, complaints.complaint_status, complaints.created_at,
                        users.username AS student_name, complaint_categories.category_name
                 FROM complaints
+                JOIN complaint_assignments ca ON complaints.complaint_id = ca.complaint_id AND ca.staff_id = ? AND ca.status = 'active'
                 LEFT JOIN users ON complaints.student_id = users.user_id
                 LEFT JOIN complaint_categories ON complaints.category_id = complaint_categories.category_id
-                WHERE complaints.assigned_staff_id = ?
                 ORDER BY complaints.created_at DESC";
 
         $stmt = $this->conn->prepare($sql);
@@ -223,20 +225,6 @@ class Staff
             $newAssignStmt->execute();
             $newAssignStmt->close();
 
-            // Get destination staff's user_id for the complaints table
-            $uidStmt = $this->conn->prepare("SELECT staff_user_id FROM staffs WHERE staff_id = ? LIMIT 1");
-            $uidStmt->bind_param('s', $toStaffId);
-            $uidStmt->execute();
-            $toUserId = $uidStmt->get_result()->fetch_assoc()['staff_user_id'];
-            $uidStmt->close();
-
-            $updStmt = $this->conn->prepare(
-                "UPDATE complaints SET assigned_staff_id = ? WHERE complaint_id = ?"
-            );
-            $updStmt->bind_param('si', $toStaffId, $complaintId);
-            $updStmt->execute();
-            $updStmt->close();
-
             // Status log
             $oldStmt = $this->conn->prepare("SELECT complaint_status FROM complaints WHERE complaint_id = ?");
             $oldStmt->bind_param('i', $complaintId);
@@ -325,15 +313,16 @@ class Staff
                 LEFT JOIN users u ON c.student_id = u.user_id
                 LEFT JOIN complaint_categories cc ON c.category_id = cc.category_id
                 LEFT JOIN departments d ON c.department_id = d.department_id
-                LEFT JOIN staffs st ON c.assigned_staff_id = st.staff_id
+                JOIN complaint_assignments ca ON c.complaint_id = ca.complaint_id AND ca.staff_id = ? AND ca.status = 'active'
+                LEFT JOIN staffs st ON ca.staff_id = st.staff_id
                 LEFT JOIN users su ON st.staff_user_id = su.user_id
                 LEFT JOIN staff_roles sr ON st.staff_role_id = sr.role_id
-                WHERE c.complaint_id = ? AND c.assigned_staff_id = ?
+                WHERE c.complaint_id = ?
                 LIMIT 1";
 
         $stmt = $this->conn->prepare($sql);
         if (!$stmt) return null;
-        $stmt->bind_param('is', $complaintId, $staffId);
+        $stmt->bind_param('si', $staffId, $complaintId);
         $stmt->execute();
         return $stmt->get_result()->fetch_assoc();
     }
@@ -439,6 +428,28 @@ class Staff
             $logStmt->close();
 
             $this->conn->commit();
+
+            // Notify the student
+            $studStmt = $this->conn->prepare(
+                "SELECT u.user_id FROM complaints c
+                 JOIN students s ON c.student_id = s.student_id
+                 JOIN users u ON s.student_user_id = u.user_id
+                 WHERE c.complaint_id = ? LIMIT 1"
+            );
+            $studStmt->bind_param('i', $complaintId);
+            $studStmt->execute();
+            $studRow = $studStmt->get_result()->fetch_assoc();
+            $studStmt->close();
+            if ($studRow) {
+                (new Notification($this->conn))->create(
+                    $studRow['user_id'],
+                    "A staff member needs more information about your complaint #$complaintId. Please respond.",
+                    'request_info',
+                    "student_complaint_details.php?id=$complaintId",
+                    $complaintId
+                );
+            }
+
             return true;
         } catch (Exception $e) {
             $this->conn->rollback();
@@ -493,12 +504,83 @@ class Staff
             $logStmt->execute();
             $logStmt->close();
 
+            $closeStmt = $this->conn->prepare(
+                "UPDATE information_requests SET status = 'closed' WHERE complaint_id = ? AND status = 'responded'"
+            );
+            $closeStmt->bind_param('i', $complaintId);
+            $closeStmt->execute();
+            $closeStmt->close();
+
             $this->conn->commit();
+
+            // Notify the student
+            $studStmt = $this->conn->prepare(
+                "SELECT u.user_id FROM complaints c
+                 JOIN students s ON c.student_id = s.student_id
+                 JOIN users u ON s.student_user_id = u.user_id
+                 WHERE c.complaint_id = ? LIMIT 1"
+            );
+            $studStmt->bind_param('i', $complaintId);
+            $studStmt->execute();
+            $studRow = $studStmt->get_result()->fetch_assoc();
+            $studStmt->close();
+            if ($studRow) {
+                if ($newStatus === 'resolved') {
+                    $msg  = "Your complaint #$complaintId has been resolved.";
+                    $type = 'complaint_resolved';
+                } elseif ($newStatus === 'rejected') {
+                    $msg  = "Your complaint #$complaintId has been rejected.";
+                    $type = 'complaint_rejected';
+                } else {
+                    $msg  = "Your complaint #$complaintId is being actively worked on.";
+                    $type = 'status_change';
+                }
+                (new Notification($this->conn))->create(
+                    $studRow['user_id'], $msg, $type,
+                    "student_complaint_details.php?id=$complaintId", $complaintId
+                );
+            }
+
             return true;
         } catch (Exception $e) {
             $this->conn->rollback();
             throw new Exception($e->getMessage());
         }
+    }
+
+    // Count complaints assigned to this staff where the student has responded to an info request
+    public function getStudentRespondedCount($staffId)
+    {
+        $stmt = $this->conn->prepare(
+            "SELECT COUNT(DISTINCT ir.complaint_id) AS cnt
+             FROM information_requests ir
+             JOIN complaint_assignments ca ON ir.complaint_id = ca.complaint_id
+                 AND ca.staff_id = ? AND ca.status = 'active'
+             WHERE ir.status = 'responded'"
+        );
+        $stmt->bind_param("s", $staffId);
+        $stmt->execute();
+        $cnt = (int) $stmt->get_result()->fetch_assoc()['cnt'];
+        $stmt->close();
+        return $cnt;
+    }
+
+    // Get student feedback for a resolved complaint
+    public function getComplaintFeedback($complaintId)
+    {
+        $stmt = $this->conn->prepare(
+            "SELECT cf.*, u.username AS student_name
+             FROM complaint_feedback cf
+             JOIN students s ON cf.student_id = s.student_id
+             JOIN users u ON s.student_user_id = u.user_id
+             WHERE cf.complaint_id = ?
+             LIMIT 1"
+        );
+        $stmt->bind_param("i", $complaintId);
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return $data;
     }
 
 }

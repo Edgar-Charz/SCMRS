@@ -467,12 +467,13 @@ class User
     public function getAttachmentById($attachmentId, $userId, $userRole)
     {
         $sql = "SELECT ca.attachment_id, ca.complaint_id, ca.file_path, ca.file_name, ca.file_type,
-                       c.student_id, c.assigned_staff_id,
+                       c.student_id,
                        s.student_user_id, st.staff_user_id
                 FROM complaint_attachments ca
                 JOIN complaints c ON ca.complaint_id = c.complaint_id
                 LEFT JOIN students s ON c.student_id = s.student_id
-                LEFT JOIN staffs st ON c.assigned_staff_id = st.staff_id
+                LEFT JOIN complaint_assignments ca_lead ON c.complaint_id = ca_lead.complaint_id AND ca_lead.status = 'active' AND ca_lead.is_lead = 1
+                LEFT JOIN staffs st ON ca_lead.staff_id = st.staff_id
                 WHERE ca.attachment_id = ?
                 LIMIT 1";
 
