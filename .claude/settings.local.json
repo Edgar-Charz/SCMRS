@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php -r \"echo password_hash\\('1234', PASSWORD_DEFAULT\\);\")",
+      "PowerShell(& \"C:\\\\xampp\\\\php\\\\php.exe\" -r \"echo password_hash\\('1234', PASSWORD_DEFAULT\\);\")",
+      "Bash(git config *)",
+      "Bash(git commit *)",
+      "Bash(git rebase *)"
+    ]
+  }
+}

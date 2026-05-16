@@ -106,7 +106,7 @@ function formatStatusLabel($status)
                     <i class="fas fa-user me-2"></i>
                 </div>
                 <div class="flex-grow-1 ms-3">
-                    <p class="mb-0 small fw-bold"><?= htmlspecialchars($staffName) ?></p>
+                    <p class="mb-0 small fw-bold"><?= strtoupper($_SESSION['user_role']); ?></p>
                 </div>
             </div>
 

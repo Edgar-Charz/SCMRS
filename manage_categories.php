@@ -30,9 +30,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
 
 // Handle Edit
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_category'])) {
-    $id     = (int)($_POST['category_id'] ?? 0);
-    $name   = trim($_POST['category_name'] ?? '');
-    $desc   = trim($_POST['category_description'] ?? '');
+    $id = (int) ($_POST['category_id'] ?? 0);
+    $name = trim($_POST['category_name'] ?? '');
+    $desc = trim($_POST['category_description'] ?? '');
     $status = in_array($_POST['status'] ?? '', ['active', 'inactive']) ? $_POST['status'] : 'active';
     if ($id && $name !== '') {
         $admin->updateCategory($id, $name, $desc, $status);
@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_category'])) {
 
 // Handle Delete
 if (isset($_GET['delete_category']) && is_numeric($_GET['delete_category'])) {
-    $id = (int)$_GET['delete_category'];
+    $id = (int) $_GET['delete_category'];
     try {
         $admin->deleteCategory($id);
         $_SESSION['message'] = "Category deleted successfully.";
@@ -59,9 +59,9 @@ if (isset($_GET['delete_category']) && is_numeric($_GET['delete_category'])) {
 
 // Handle Add Subcategory
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subcategory'])) {
-    $catId = (int)($_POST['subcategory_category_id'] ?? 0);
-    $name  = trim($_POST['subcategory_name'] ?? '');
-    $desc  = trim($_POST['subcategory_description'] ?? '');
+    $catId = (int) ($_POST['subcategory_category_id'] ?? 0);
+    $name = trim($_POST['subcategory_name'] ?? '');
+    $desc = trim($_POST['subcategory_description'] ?? '');
     if ($catId && $name !== '') {
         try {
             $admin->addSubcategory($catId, $name, $desc, $_SESSION['user_id']);
@@ -78,9 +78,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subcategory'])) {
 
 // Handle Edit Subcategory
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_subcategory'])) {
-    $id     = (int)($_POST['subcategory_id'] ?? 0);
-    $name   = trim($_POST['subcategory_name'] ?? '');
-    $desc   = trim($_POST['subcategory_description'] ?? '');
+    $id = (int) ($_POST['subcategory_id'] ?? 0);
+    $name = trim($_POST['subcategory_name'] ?? '');
+    $desc = trim($_POST['subcategory_description'] ?? '');
     $status = in_array($_POST['subcategory_status'] ?? '', ['active', 'inactive']) ? $_POST['subcategory_status'] : 'active';
     if ($id && $name !== '') {
         try {
@@ -98,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_subcategory'])) 
 
 // Handle Delete Subcategory
 if (isset($_GET['delete_subcategory']) && is_numeric($_GET['delete_subcategory'])) {
-    $id = (int)$_GET['delete_subcategory'];
+    $id = (int) $_GET['delete_subcategory'];
     try {
         $admin->deleteSubcategory($id);
         $_SESSION['message'] = "Subcategory deleted successfully.";
@@ -109,7 +109,7 @@ if (isset($_GET['delete_subcategory']) && is_numeric($_GET['delete_subcategory']
     exit;
 }
 
-$categories            = $admin->getAllCategoriesWithStats();
+$categories = $admin->getAllCategoriesWithStats();
 $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
 ?>
 <!DOCTYPE html>
@@ -130,7 +130,7 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
 </head>
 
 <body>
-<?php require_once 'includes/flash_toast.php'; ?>
+    <?php require_once 'includes/flash_toast.php'; ?>
 
     <div id="loader">
         <div class="loader-content">
@@ -223,8 +223,7 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
                         </li>
                         <li class="breadcrumb-item active">Admin / Manage Categories</li>
                     </ol>
-                    <button type="button" class="btn btn-add" data-bs-toggle="modal"
-                        data-bs-target="#addCategoryModal">
+                    <button type="button" class="btn btn-add" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
                         <i class="fas fa-plus"></i> Add New Category
                     </button>
                 </nav>
@@ -247,50 +246,53 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
                             </thead>
                             <tbody>
                                 <?php if (!empty($categories)): ?>
-                                    <?php $n = 1; foreach ($categories as $cat): ?>
-                                    <tr>
-                                        <td><?= $n++ ?></td>
-                                        <td><?= htmlspecialchars($cat['category_name']) ?></td>
-                                        <td class="text-muted small"><?= htmlspecialchars($cat['category_description'] ?? '—') ?></td>
-                                        <td class="text-center">
-                                            <span class="badge bg-primary"><?= $cat['complaint_count'] ?></span>
-                                        </td>
-                                        <td class="text-center">
-                                            <?php if ($cat['status'] === 'active'): ?>
-                                                <span class="badge bg-success">Active</span>
-                                            <?php else: ?>
-                                                <span class="badge bg-secondary">Inactive</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td class="text-center">
-                                            <?php $subCount = count($subcategories_grouped[$cat['category_id']] ?? []); ?>
-                                            <button type="button" class="btn btn-sm btn-outline-info"
-                                                onclick="openSubcategories(<?= $cat['category_id'] ?>, '<?= htmlspecialchars($cat['category_name'], ENT_QUOTES) ?>')"
-                                                data-bs-toggle="modal" data-bs-target="#subcategoriesModal"
-                                                title="manage subcategories">
-                                                <i class="fas fa-list-ul me-1"></i><?= $subCount ?>
-                                            </button>
-                                        </td>
-                                        <td class="text-center">
-                                            <div class="d-flex justify-content-center">
-                                                <button type="button" class="btn btn-status btn-outline-secondary me-2"
-                                                    onclick="openEditCategory(<?= htmlspecialchars(json_encode($cat)) ?>)"
-                                                    data-bs-toggle="modal" data-bs-target="#editCategoryModal"
-                                                    title="edit">
-                                                    <i class="fas fa-edit text-dark"></i>
+                                    <?php $n = 1;
+                                    foreach ($categories as $cat): ?>
+                                        <tr>
+                                            <td><?= $n++ ?></td>
+                                            <td><?= htmlspecialchars($cat['category_name']) ?></td>
+                                            <td class="text-muted small">
+                                                <?= htmlspecialchars($cat['category_description'] ?? '—') ?>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-primary"><?= $cat['complaint_count'] ?></span>
+                                            </td>
+                                            <td class="text-center">
+                                                <?php if ($cat['status'] === 'active'): ?>
+                                                    <span class="badge bg-success">Active</span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-secondary">Inactive</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-center">
+                                                <?php $subCount = count($subcategories_grouped[$cat['category_id']] ?? []); ?>
+                                                <button type="button" class="btn btn-sm btn-outline-info"
+                                                    onclick="openSubcategories(<?= $cat['category_id'] ?>, '<?= htmlspecialchars($cat['category_name'], ENT_QUOTES) ?>')"
+                                                    data-bs-toggle="modal" data-bs-target="#subcategoriesModal"
+                                                    title="manage subcategories">
+                                                    <i class="fas fa-list-ul me-1"></i><?= $subCount ?>
                                                 </button>
-                                                <button type="button" class="btn btn-status btn-outline-secondary"
-                                                    onclick="confirmDeleteCat(<?= $cat['category_id'] ?>, '<?= htmlspecialchars($cat['category_name'], ENT_QUOTES) ?>')"
-                                                    title="delete">
-                                                    <i class="fas fa-trash text-dark"></i>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="d-flex justify-content-center">
+                                                    <button type="button" class="btn btn-status btn-outline-secondary me-2"
+                                                        onclick="openEditCategory(<?= htmlspecialchars(json_encode($cat)) ?>)"
+                                                        data-bs-toggle="modal" data-bs-target="#editCategoryModal" title="edit">
+                                                        <i class="fas fa-edit text-dark"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-status btn-outline-secondary"
+                                                        onclick="confirmDeleteCat(<?= $cat['category_id'] ?>, '<?= htmlspecialchars($cat['category_name'], ENT_QUOTES) ?>')"
+                                                        title="delete">
+                                                        <i class="fas fa-trash text-dark"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="7" class="text-center py-4 text-muted">No categories found. Add one to get started.</td>
+                                        <td colspan="7" class="text-center py-4 text-muted">No categories found. Add one to
+                                            get started.</td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>
@@ -303,14 +305,19 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
             <div class="modal fade" id="addCategoryModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
-                        <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title fw-bold">ADD CATEGORY</h5>
+                        <div class="modal-header text-white"
+                            style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
+                            <h5 class="modal-title fw-bold">
+                                <i class="fas fa-plus me-2"></i>
+                                ADD CATEGORY
+                            </h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <form action="manage_categories.php" method="POST">
                             <div class="modal-body px-4 py-3">
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold small">Category Name <span class="text-danger">*</span></label>
+                                    <label class="form-label fw-bold small">Category Name <span
+                                            class="text-danger">*</span></label>
                                     <input type="text" name="category_name" class="form-control p-3 shadow-sm"
                                         style="border-radius: 10px;" placeholder="e.g., Academics" required>
                                 </div>
@@ -336,15 +343,20 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
             <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
-                        <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title fw-bold">EDIT CATEGORY</h5>
+                        <div class="modal-header text-white"
+                            style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
+                            <h5 class="modal-title fw-bold">
+                                <i class="fas fa-edit me-2"></i>
+                                EDIT CATEGORY
+                            </h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <form action="manage_categories.php" method="POST">
                             <input type="hidden" name="category_id" id="edit_cat_id">
                             <div class="modal-body px-4 py-3">
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold small">Category Name <span class="text-danger">*</span></label>
+                                    <label class="form-label fw-bold small">Category Name <span
+                                            class="text-danger">*</span></label>
                                     <input type="text" name="category_name" id="edit_cat_name"
                                         class="form-control p-3 shadow-sm" style="border-radius: 10px;" required>
                                 </div>
@@ -372,120 +384,135 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
                 </div>
             </div>
 
-        <!-- Subcategories Modal -->
-        <div class="modal fade" id="subcategoriesModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-                <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
-                    <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title fw-bold" id="sub_modal_title">SUBCATEGORIES</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body px-4 py-3">
-
-                        <!-- Subcategory List -->
-                        <div class="table-responsive mb-4">
-                            <table class="table table-sm table-striped">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>#</th>
-                                        <th>NAME</th>
-                                        <th>DESCRIPTION</th>
-                                        <th class="text-center">STATUS</th>
-                                        <th class="text-center">COMPLAINTS</th>
-                                        <th class="text-center">ACTION</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="subcategoryRows">
-                                    <tr><td colspan="6" class="text-center text-muted py-3">No subcategories yet.</td></tr>
-                                </tbody>
-                            </table>
+            <!-- Subcategories Modal -->
+            <div class="modal fade" id="subcategoriesModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
+                        <div class="modal-header text-white"
+                            style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
+                            <h5 class="modal-title fw-bold" id="sub_modal_title">
+                                <i class="fas fa-list me-2"></i>
+                                SUBCATEGORIES
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
+                        <div class="modal-body px-4 py-3">
 
-                        <!-- Add Subcategory Form -->
-                        <div>
-                            <button class="btn btn-sm btn-outline-primary mb-3" type="button"
-                                data-bs-toggle="collapse" data-bs-target="#addSubForm">
-                                <i class="fas fa-plus me-1"></i> Add New Subcategory
-                            </button>
-                            <div class="collapse" id="addSubForm">
-                                <div class="card card-body border-0 bg-light shadow-sm" style="border-radius:10px;">
-                                    <form action="manage_categories.php" method="POST">
-                                        <input type="hidden" name="subcategory_category_id" id="sub_category_id">
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold small">Subcategory Name <span class="text-danger">*</span></label>
-                                            <input type="text" name="subcategory_name" class="form-control shadow-sm"
-                                                style="border-radius:8px;" placeholder="e.g., Grade Appeal" required>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold small">Description</label>
-                                            <textarea name="subcategory_description" class="form-control shadow-sm"
-                                                rows="2" style="border-radius:8px;"
-                                                placeholder="Brief description..."></textarea>
-                                        </div>
-                                        <button type="submit" name="add_subcategory" class="btn btn-primary btn-sm fw-bold">
-                                            <i class="fas fa-plus me-1"></i> Add Subcategory
-                                        </button>
-                                    </form>
+                            <!-- Subcategory List -->
+                            <div class="table-responsive mb-4">
+                                <table class="table table-sm table-striped">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>#</th>
+                                            <th>NAME</th>
+                                            <th>DESCRIPTION</th>
+                                            <th class="text-center">STATUS</th>
+                                            <th class="text-center">COMPLAINTS</th>
+                                            <th class="text-center">ACTION</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="subcategoryRows">
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted py-3">No subcategories yet.
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Add Subcategory Form -->
+                            <div>
+                                <button class="btn btn-sm btn-outline-primary mb-3" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#addSubForm">
+                                    <i class="fas fa-plus me-1"></i> Add New Subcategory
+                                </button>
+                                <div class="collapse" id="addSubForm">
+                                    <div class="card card-body border-0 bg-light shadow-sm" style="border-radius:10px;">
+                                        <form action="manage_categories.php" method="POST">
+                                            <input type="hidden" name="subcategory_category_id" id="sub_category_id">
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold small">Subcategory Name <span
+                                                        class="text-danger">*</span></label>
+                                                <input type="text" name="subcategory_name"
+                                                    class="form-control shadow-sm" style="border-radius:8px;"
+                                                    placeholder="e.g., Grade Appeal" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold small">Description</label>
+                                                <textarea name="subcategory_description" class="form-control shadow-sm"
+                                                    rows="2" style="border-radius:8px;"
+                                                    placeholder="Brief description..."></textarea>
+                                            </div>
+                                            <button type="submit" name="add_subcategory"
+                                                class="btn btn-primary btn-sm fw-bold">
+                                                <i class="fas fa-plus me-1"></i> Add Subcategory
+                                            </button>
+                                        </form>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Edit Subcategory Modal -->
-        <div class="modal fade" id="editSubcategoryModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
-                    <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title fw-bold">EDIT SUBCATEGORY</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <form action="manage_categories.php" method="POST">
-                        <input type="hidden" name="subcategory_id" id="edit_sub_id">
-                        <div class="modal-body px-4 py-3">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold small">Subcategory Name <span class="text-danger">*</span></label>
-                                <input type="text" name="subcategory_name" id="edit_sub_name"
-                                    class="form-control p-3 shadow-sm" style="border-radius: 10px;" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-bold small">Description</label>
-                                <textarea name="subcategory_description" id="edit_sub_desc"
-                                    class="form-control shadow-sm" rows="3" style="border-radius: 10px;"></textarea>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-bold small">Status</label>
-                                <select name="subcategory_status" id="edit_sub_status" class="form-select">
-                                    <option value="active">Active</option>
-                                    <option value="inactive">Inactive</option>
-                                </select>
-                            </div>
                         </div>
                         <div class="modal-footer">
-                            <button type="submit" name="edit_subcategory" class="btn btn-primary fw-bold">
-                                <i class="fas fa-save me-1"></i> Save Changes
-                            </button>
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         </div>
-                    </form>
+                    </div>
                 </div>
             </div>
-        </div>
+
+            <!-- Edit Subcategory Modal -->
+            <div class="modal fade" id="editSubcategoryModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
+                        <div class="modal-header text-white"
+                            style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
+                            <h5 class="modal-title fw-bold">
+                                <i class="fas fa-edit me-2"></i>
+                                EDIT SUBCATEGORY
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form action="manage_categories.php" method="POST">
+                            <input type="hidden" name="subcategory_id" id="edit_sub_id">
+                            <div class="modal-body px-4 py-3">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Subcategory Name <span
+                                            class="text-danger">*</span></label>
+                                    <input type="text" name="subcategory_name" id="edit_sub_name"
+                                        class="form-control p-3 shadow-sm" style="border-radius: 10px;" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Description</label>
+                                    <textarea name="subcategory_description" id="edit_sub_desc"
+                                        class="form-control shadow-sm" rows="3" style="border-radius: 10px;"></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Status</label>
+                                    <select name="subcategory_status" id="edit_sub_status" class="form-select">
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="submit" name="edit_subcategory" class="btn btn-primary fw-bold">
+                                    <i class="fas fa-save me-1"></i> Save Changes
+                                </button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
 
         </div>
     </div>
 
     <script>
         function openEditCategory(cat) {
-            document.getElementById('edit_cat_id').value     = cat.category_id;
-            document.getElementById('edit_cat_name').value   = cat.category_name;
-            document.getElementById('edit_cat_desc').value   = cat.category_description || '';
+            document.getElementById('edit_cat_id').value = cat.category_id;
+            document.getElementById('edit_cat_name').value = cat.category_name;
+            document.getElementById('edit_cat_desc').value = cat.category_description || '';
             document.getElementById('edit_cat_status').value = cat.status;
         }
 
@@ -548,10 +575,10 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
             // Close subcategories modal, then open edit modal
             const subModal = bootstrap.Modal.getInstance(document.getElementById('subcategoriesModal'));
             if (subModal) subModal.hide();
-            document.getElementById('edit_sub_id').value      = sub.subcategory_id;
-            document.getElementById('edit_sub_name').value    = sub.subcategory_name;
-            document.getElementById('edit_sub_desc').value    = sub.subcategory_description || '';
-            document.getElementById('edit_sub_status').value  = sub.status;
+            document.getElementById('edit_sub_id').value = sub.subcategory_id;
+            document.getElementById('edit_sub_name').value = sub.subcategory_name;
+            document.getElementById('edit_sub_desc').value = sub.subcategory_description || '';
+            document.getElementById('edit_sub_status').value = sub.status;
             new bootstrap.Modal(document.getElementById('editSubcategoryModal')).show();
         }
 
@@ -621,4 +648,5 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
         });
     </script>
 </body>
+
 </html>

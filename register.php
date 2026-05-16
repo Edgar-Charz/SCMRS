@@ -3,6 +3,7 @@ require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/College.php";
 require_once "classes/Department.php";
+require_once "classes/Notification.php";
 
 $db = new Database();
 $conn = $db->connect();
@@ -26,7 +27,11 @@ if (isset($_POST["registerStudentBTN"])) {
         $confirmPassword = $_POST['confirm_password'];
 
         if ($user->studentRegister($username, $reg_no, $email, $phone_number, $password, $confirmPassword)) {
-            $message = "Registration successful. You can log in now.";
+            (new Notification($conn))->notifyAllAdmins(
+                "New student registered: $username",
+                'new_registration',
+                'user_management.php#students'
+            );
             header("Location: login.php");
             exit;
         }
@@ -47,7 +52,11 @@ if (isset($_POST["registerStaffBTN"])) {
         $phoneNumber = trim($_POST['phone_number'] ?? '');
 
         if ($user->staffRegister($username, $email, $password, $confirmPassword, $departmentId, $staffId ?: null, $phoneNumber ?: null)) {
-            $message = "Registration successful. Your account is pending admin approval.";
+            (new Notification($conn))->notifyAllAdmins(
+                "New staff member registered: $username (pending your approval)",
+                'new_registration',
+                'user_management.php#approval'
+            );
             header("Location: login.php");
             exit;
         }

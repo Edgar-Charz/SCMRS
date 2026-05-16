@@ -71,6 +71,7 @@ $attachments  = $admin->getComplaintAttachments($complaintId);
 $notes        = $admin->getCollaborationNotes($complaintId);
 $infoRequests = $admin->getInformationRequests($complaintId);
 $statusLogs   = $admin->getComplaintStatusLogs($complaintId);
+$feedback     = $admin->getComplaintFeedback($complaintId);
 
 $studentName = $complaint['is_anonymous']
     ? 'Anonymous Student'
@@ -397,26 +398,6 @@ $irStatusMap = [
                     </form>
                 </div>
 
-                <!-- ── Request Information ────────────────────────────── -->
-                <div class="container-card shadow-sm">
-                    <h4 class="mb-3 fw-bold">
-                        <i class="fas fa-question-circle me-2"></i>Request Information from Student
-                    </h4>
-                    <form method="POST" action="complaint_details.php?id=<?= $complaintId ?>">
-                        <input type="hidden" name="action" value="request_info">
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Request</label>
-                            <textarea name="request_message" class="form-control" rows="3"
-                                placeholder="Describe what additional information you need from the student..."
-                                required></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100 p-3 fw-bold" 
-                        style="border-radius: 10px; background-color: var(--udsm-blue); width: 100%;">
-                            <i class="fas fa-paper-plane me-1"></i>Send Request
-                        </button>
-                    </form>
-                </div>
-
                 <!-- ── Information Requests Log ───────────────────────── -->
                 <?php if (!empty($infoRequests)): ?>
                     <div class="container-card shadow-sm">
@@ -451,6 +432,26 @@ $irStatusMap = [
                         <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
+
+                <!-- ── Request Information ────────────────────────────── -->
+                <div class="container-card shadow-sm">
+                    <h4 class="mb-3 fw-bold">
+                        <i class="fas fa-question-circle me-2"></i>Request Information from Student
+                    </h4>
+                    <form method="POST" action="complaint_details.php?id=<?= $complaintId ?>">
+                        <input type="hidden" name="action" value="request_info">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Request</label>
+                            <textarea name="request_message" class="form-control" rows="3"
+                                placeholder="Describe what additional information you need from the student..."
+                                required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 p-3 fw-bold" 
+                        style="border-radius: 10px; background-color: var(--udsm-blue); width: 100%;">
+                            <i class="fas fa-paper-plane me-1"></i>Send Request
+                        </button>
+                    </form>
+                </div>
 
                 <!-- ── Status Timeline ────────────────────────────────── -->
                 <div class="container-card shadow-sm">
@@ -497,6 +498,45 @@ $irStatusMap = [
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
+
+                <!-- ── Student Feedback ───────────────────────────────── -->
+                <?php if ($complaint['complaint_status'] === 'resolved'): ?>
+                    <div class="container-card shadow-sm">
+                        <h4 class="mb-3 fw-bold">
+                            <i class="fas fa-star me-2 text-warning"></i>Student Feedback
+                        </h4>
+
+                        <?php if ($feedback): ?>
+                            <div class="p-3 rounded" style="background:#fffbeb; border-left:4px solid #f59e0b;">
+                                <div class="d-flex align-items-center gap-3 mb-2">
+                                    <div>
+                                        <?php for ($i = 1; $i <= 5; $i++): ?>
+                                            <i class="fas fa-star" style="color:<?= $i <= $feedback['rating'] ? '#f59e0b' : '#d1d5db' ?>; font-size:1.3rem;"></i>
+                                        <?php endfor; ?>
+                                    </div>
+                                    <span class="fw-bold fs-5"><?= $feedback['rating'] ?>/5</span>
+                                    <?php if (!$complaint['is_anonymous']): ?>
+                                        <span class="text-muted small">by <?= htmlspecialchars($feedback['student_name']) ?></span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if (!empty($feedback['feedback_text'])): ?>
+                                    <div class="p-2 rounded bg-white border">
+                                        <i class="fas fa-quote-left text-muted me-1"></i>
+                                        <?= htmlspecialchars($feedback['feedback_text']) ?>
+                                    </div>
+                                <?php endif; ?>
+                                <small class="text-muted d-block mt-2">
+                                    Submitted: <?= date('d M Y, H:i', strtotime($feedback['submitted_at'])) ?>
+                                </small>
+                            </div>
+                        <?php else: ?>
+                            <p class="text-muted mb-0">
+                                <i class="fas fa-hourglass-half me-1"></i>
+                                No feedback submitted yet. The student can rate the resolution from their complaint page.
+                            </p>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
 
             </div><!-- /p-4 -->
 

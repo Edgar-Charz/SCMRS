@@ -22,8 +22,9 @@ $studentId = $student->getStudentId($userId);
 
 // Handle Delete (POST only — safer than GET)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_complaint') {
-    $comp_id = (int)($_POST['complaint_id'] ?? 0);
-    if ($comp_id > 0 && $student->deleteComplaint($comp_id, $studentId)) {
+    $comp_id = (int) ($_POST['complaint_id'] ?? 0);
+    $reason = trim($_POST['delete_reason'] ?? '');
+    if ($comp_id > 0 && $student->deleteComplaint($comp_id, $studentId, $reason)) {
         $_SESSION['message'] = "Complaint removed successfully.";
     } else {
         $_SESSION['message_error'] = "Failed to delete complaint. Only pending complaints can be deleted.";
@@ -55,7 +56,7 @@ $counts = $student->getComplaintCounts($student_id);
 // Pending info requests count (for "action needed" highlight)
 $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
 
-?> 
+?>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -75,7 +76,7 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
 </head>
 
 <body>
-<?php require_once 'includes/flash_toast.php'; ?>
+    <?php require_once 'includes/flash_toast.php'; ?>
 
     <div id="loader">
         <div class="loader-content">
@@ -155,19 +156,24 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                 </nav>
 
                 <!-- Alert -->
-                <div aria-live="polite" aria-atomic="true" class="position-fixed top-0 start-50 translate-middle-x p-3 w-100" style="z-index: 1100; max-width: 800px;">
+                <div aria-live="polite" aria-atomic="true"
+                    class="position-fixed top-0 start-50 translate-middle-x p-3 w-100"
+                    style="z-index: 1100; max-width: 800px;">
                     <?php if (!empty($message) || !empty($error)):
                         $type = !empty($message) ? 'success' : 'danger';
                         $text = !empty($message) ? $message : $error;
                         $icon = ($type === 'success') ? 'fa-check-circle' : 'fa-exclamation-circle';
-                    ?>
-                        <div id="livetoast" class="toast show align-items-center text-white bg-<?php echo $type ?> border-0 w-100" role="alert" aria-live="assertive" aria-atomic="true">
+                        ?>
+                        <div id="livetoast"
+                            class="toast show align-items-center text-white bg-<?php echo $type ?> border-0 w-100"
+                            role="alert" aria-live="assertive" aria-atomic="true">
                             <div class="d-flex">
                                 <div class="toast-body">
                                     <i class="fas <?php echo $icon; ?> me-2"></i>
                                     <?php echo htmlspecialchars($text); ?>
                                 </div>
-                                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close">
+                                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+                                    aria-label="Close">
 
                                 </button>
                             </div>
@@ -186,37 +192,45 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                     <div class="card-body pb-0">
                         <ul class="nav nav-tabs custom-tabs" role="tablist">
                             <li class="nav-item" role="presentation">
-                                <a href="track_complaints.php?filter=all" class="nav-link <?php echo $filter === 'all' ? 'active' : ''; ?>">
+                                <a href="track_complaints.php?filter=all"
+                                    class="nav-link <?php echo $filter === 'all' ? 'active' : ''; ?>">
                                     <i class="fas fa-list"></i> All
                                     <span class="badge btn-primary me-2"><?php echo $counts['all']; ?></span>
                                 </a>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <a href="track_complaints.php?filter=awaiting_student_response" class="nav-link <?php echo $filter === 'awaiting_student_response' ? 'active' : ''; ?>" style="<?php echo $action_needed_count > 0 ? 'border-bottom: 2px solid var(--warning);' : ''; ?>">
+                                <a href="track_complaints.php?filter=awaiting_student_response"
+                                    class="nav-link <?php echo $filter === 'awaiting_student_response' ? 'active' : ''; ?>"
+                                    style="<?php echo $action_needed_count > 0 ? 'border-bottom: 2px solid var(--warning);' : ''; ?>">
                                     <i class="fas fa-user-check"></i> Awaiting your response
-                                    <span class="badge btn-primary me-2"><?php echo $counts['awaiting_student_response']; ?></span>
+                                    <span
+                                        class="badge btn-primary me-2"><?php echo $counts['awaiting_student_response']; ?></span>
                                 </a>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <a href="track_complaints.php?filter=pending" class="nav-link <?php echo $filter === 'pending' ? 'active' : ''; ?>">
+                                <a href="track_complaints.php?filter=pending"
+                                    class="nav-link <?php echo $filter === 'pending' ? 'active' : ''; ?>">
                                     <i class="fas fa-clock"></i> Pending
                                     <span class="badge btn-primary me-2"><?php echo $counts['pending']; ?></span>
                                 </a>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <a href="track_complaints.php?filter=in_progress" class="nav-link <?php echo $filter === 'in_progress' ? 'active' : ''; ?>">
+                                <a href="track_complaints.php?filter=in_progress"
+                                    class="nav-link <?php echo $filter === 'in_progress' ? 'active' : ''; ?>">
                                     <i class="fas fa-spinner"></i> In Progress
                                     <span class="badge btn-primary me-2"><?php echo $counts['in_progress']; ?></span>
                                 </a>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <a href="track_complaints.php?filter=resolved" class="nav-link <?php echo $filter === 'resolved' ? 'active' : ''; ?>">
+                                <a href="track_complaints.php?filter=resolved"
+                                    class="nav-link <?php echo $filter === 'resolved' ? 'active' : ''; ?>">
                                     <i class="fas fa-check-circle"></i> Resolved
                                     <span class="badge btn-primary me-2"><?php echo $counts['resolved']; ?></span>
                                 </a>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <a href="track_complaints.php?filter=rejected" class="nav-link <?php echo $filter === 'rejected' ? 'active' : ''; ?>">
+                                <a href="track_complaints.php?filter=rejected"
+                                    class="nav-link <?php echo $filter === 'rejected' ? 'active' : ''; ?>">
                                     <i class="fas fa-times-circle"></i> Rejected
                                     <span class="badge btn-primary me-2"><?php echo $counts['rejected']; ?></span>
                                 </a>
@@ -227,24 +241,32 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
 
                 <?php if (!empty($complaints)): ?>
                     <?php foreach ($complaints as $complaint_row): ?>
-                        <div class="complaint-card <?php echo strtolower(str_replace('_', '-', $complaint_row['complaint_status'])); ?>">
+                        <div
+                            class="complaint-card <?php echo strtolower(str_replace('_', '-', $complaint_row['complaint_status'])); ?>">
                             <div class="complaint-header">
                                 <div class="complaint-title">
                                     <span class="complaint-id">Complaint #<?php echo $complaint_row['complaint_id']; ?></span>
                                     <h3><?php echo htmlspecialchars($complaint_row['complaint_title'] ?? 'No title'); ?></h3>
                                 </div>
-                                <span class="badge <?php echo strtolower(str_replace('_', '-', $complaint_row['complaint_status'])); ?>">
+                                <span
+                                    class="badge <?php echo strtolower(str_replace('_', '-', $complaint_row['complaint_status'])); ?>">
                                     <i class="fas <?php
-                                                    if ($complaint_row['complaint_status'] === 'pending') echo 'fa-clock';
-                                                    elseif ($complaint_row['complaint_status'] === 'in_progress') echo 'fa-spinner';
-                                                    elseif ($complaint_row['complaint_status'] === 'awaiting_student_response') echo 'fa-user-check';
-                                                    elseif ($complaint_row['complaint_status'] === 'resolved') echo 'fa-check-circle';
-                                                    else echo 'fa-times-circle';
-                                                    ?>"></i>
+                                    if ($complaint_row['complaint_status'] === 'pending')
+                                        echo 'fa-clock';
+                                    elseif ($complaint_row['complaint_status'] === 'in_progress')
+                                        echo 'fa-spinner';
+                                    elseif ($complaint_row['complaint_status'] === 'awaiting_student_response')
+                                        echo 'fa-user-check';
+                                    elseif ($complaint_row['complaint_status'] === 'resolved')
+                                        echo 'fa-check-circle';
+                                    else
+                                        echo 'fa-times-circle';
+                                    ?>"></i>
                                     <?php echo ucfirst(str_replace('_', ' ', $complaint_row['complaint_status'])); ?>
                                 </span>
                                 <?php if (($complaint_row['pending_requests'] ?? 0) > 0): ?>
-                                    <span style="margin-left: var(--spacing-sm); padding: 2px 8px; background: var(--warning); color: #78350f; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;">
+                                    <span
+                                        style="margin-left: var(--spacing-sm); padding: 2px 8px; background: var(--warning); color: #78350f; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600;">
                                         <i class="fas fa-exclamation-circle"></i> Response needed
                                     </span>
                                 <?php endif; ?>
@@ -266,7 +288,8 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                                 </div>
                                 <div class="meta-item">
                                     <i class="fas fa-calendar"></i>
-                                    <span>Submitted: <?php echo date('M d, Y', strtotime($complaint_row['created_at'])); ?></span>
+                                    <span>Submitted:
+                                        <?php echo date('M d, Y', strtotime($complaint_row['created_at'])); ?></span>
                                 </div>
                                 <?php if ($complaint_row['updated_at'] && $complaint_row['updated_at'] != $complaint_row['created_at']): ?>
                                     <div class="meta-item">
@@ -278,11 +301,13 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
 
                             <div class="complaint-actions">
                                 <?php if (($complaint_row['pending_requests'] ?? 0) > 0): ?>
-                                    <a href="student_complaint_details.php?id=<?php echo $complaint_row['complaint_id']; ?>#info-requests" class="btn btn-primary" style="background: gold; border-color: var(--warning);">
+                                    <a href="student_complaint_details.php?id=<?php echo $complaint_row['complaint_id']; ?>#info-requests"
+                                        class="btn btn-primary" style="background: gold; border-color: var(--warning);">
                                         <i class="fas fa-reply"></i> Respond
                                     </a>
                                 <?php endif; ?>
-                                <a href="student_complaint_details.php?id=<?php echo $complaint_row['complaint_id']; ?>" class="btn btn-primary">
+                                <a href="student_complaint_details.php?id=<?php echo $complaint_row['complaint_id']; ?>"
+                                    class="btn btn-primary">
                                     <i class="fas fa-eye"></i> View
                                 </a>
                                 <?php if ($complaint_row['complaint_status'] === 'pending' && empty($complaint_row['pending_requests'])): ?>
@@ -303,7 +328,9 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                             <?php if ($filter === 'all'): ?>
                                 You haven't submitted any complaints yet. Start by creating your first complaint!
                             <?php else: ?>
-                                You don't have any <?php echo $filter === 'awaiting_student_response' ? 'complaints awaiting your response' : ucfirst(str_replace('_', ' ', $filter)); ?> complaints at the moment.
+                                You don't have any
+                                <?php echo $filter === 'awaiting_student_response' ? 'complaints awaiting your response' : ucfirst(str_replace('_', ' ', $filter)); ?>
+                                complaints at the moment.
                             <?php endif; ?>
                         </p>
                         <?php if ($filter === 'all'): ?>
@@ -326,29 +353,62 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
     <form id="deleteForm" method="POST" action="track_complaints.php" style="display:none;">
         <input type="hidden" name="action" value="delete_complaint">
         <input type="hidden" name="complaint_id" id="deleteComplaintId" value="">
+        <input type="hidden" name="delete_reason" id="deleteReason" value="">
     </form>
+
+    <!-- Delete Reason Modal -->
+    <div class="modal fade" id="deleteReasonModal" tabindex="-1" aria-labelledby="deleteReasonModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg rounded-3">
+                <div class="modal-header text-white" style="background: linear-gradient(135deg, #dc3545, #c82333);">
+                    <h5 class="modal-title fw-bold" id="deleteReasonModalLabel">
+                        <i class="fas fa-trash me-2"></i>
+                        Delete Complaint
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">Please provide a brief reason for deleting this complaint.</p>
+                    <div class="mb-0">
+                        <label for="deleteReasonText" class="form-label fw-semibold">Reason <span
+                                class="text-danger">*</span></label>
+                        <textarea class="form-control" id="deleteReasonText" rows="3"
+                            placeholder="Enter reason for deletion..." maxlength="500"></textarea>
+                        <div class="invalid-feedback">Please provide a reason before deleting.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                        <i class="fas fa-trash me-1"></i>Confirm Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         function confirmDelete(id) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Delete Complaint?',
-                text: 'This action cannot be undone.',
-                showCancelButton: true,
-                confirmButtonColor: '#dc3545',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Yes, delete it!',
-                cancelButtonText: 'Cancel'
-            }).then(function (result) {
-                if (result.isConfirmed) {
-                    document.getElementById('deleteComplaintId').value = id;
-                    document.getElementById('deleteForm').submit();
-                }
-            });
+            document.getElementById('deleteComplaintId').value = id;
+            document.getElementById('deleteReasonText').value = '';
+            document.getElementById('deleteReasonText').classList.remove('is-invalid');
+            new bootstrap.Modal(document.getElementById('deleteReasonModal')).show();
         }
+
+        document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
+            var reason = document.getElementById('deleteReasonText').value.trim();
+            if (!reason) {
+                document.getElementById('deleteReasonText').classList.add('is-invalid');
+                return;
+            }
+            document.getElementById('deleteReason').value = reason;
+            document.getElementById('deleteForm').submit();
+        });
     </script>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const hash = window.location.hash;
             const storedTab = localStorage.getItem('activeTab');
             const target = hash || storedTab;
@@ -363,7 +423,7 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
 
             // Store tab and update hash without scrolling
             document.querySelectorAll('.nav-link[data-bs-toggle="tab"]').forEach(tab => {
-                tab.addEventListener('shown.bs.tab', function(e) {
+                tab.addEventListener('shown.bs.tab', function (e) {
                     const targetTab = e.target.getAttribute('data-bs-target');
                     localStorage.setItem('activeTab', targetTab);
                     history.replaceState(null, null, targetTab);
@@ -379,7 +439,7 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
-        $(document).ready(function() {
+        $(document).ready(function () {
             if ($("#complaintsTable").length > 0) {
                 if (!$.fn.DataTable.isDataTable("#complaintsTable")) {
                     $("#complaintsTable").DataTable({
@@ -394,7 +454,7 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                             searchPlaceholder: "Search Complaints...",
                             info: "_START_ - _END_ of _TOTAL_ items"
                         },
-                        initComplete: function(settings, json) {
+                        initComplete: function (settings, json) {
                             $(".dataTables_filter").appendTo("#tableSearch");
                             $(".dataTables_filter").appendTo(".search-input");
                         }

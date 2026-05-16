@@ -58,7 +58,7 @@ $pendingStaffCount = $admin->getPendingStaffCount();
 </head>
 
 <body>
-<?php require_once 'includes/flash_toast.php'; ?>
+    <?php require_once 'includes/flash_toast.php'; ?>
 
     <div id="loader">
         <div class="spinner"></div>
@@ -132,45 +132,18 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                     </a>
                 </li>
             </ul>
+            <div class="sidebar-footer">
+                <a href="logout.php" title="Sign Out">
+                    <i class="fas fa-sign-out-alt me-2"></i>
+                    <span class="link-text">Sign Out</span>
+                </a>
+            </div>
         </nav>
 
         <div id="content" class="w-100">
 
             <!-- Topbar -->
-            <nav class="navbar navbar-expand-lg navbar-dark custom-nav">
-                <button id="sidebarCollapse" class="btn btn-dark ms-2">
-                    <i class="fas fa-list"></i>
-                </button>
-
-                <div class="container-fluid">
-                    <div class="dropdown ms-auto">
-                        <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle"
-                            id="profileDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-user"></i>
-                        </a>
-
-                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2"
-                            aria-labelledby="profileDropdown">
-                            <li>
-                                <h6 class="dropdown-header">User Settings</h6>
-                            </li>
-                            <li>
-                                <a class="dropdown-item d-flex align-items-center" href="profile.php">
-                                    <i class="fas fa-user me-2"></i> View Profile
-                                </a>
-                            </li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li>
-                                <a class="dropdown-item d-flex align-items-center text-danger" href="logout.php">
-                                    <i class="fas fa-sign-out-alt me-2"></i> Logout
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </nav>
+            <?php require_once 'includes/topbar.php'; ?>
 
             <div class="p-4">
 
@@ -189,17 +162,18 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                 </div>
 
                 <?php if ($pendingStaffCount > 0): ?>
-                <a href="user_management.php#approval" class="text-decoration-none">
-                    <div class="alert alert-warning d-flex align-items-center mb-4 shadow-sm" role="alert"
-                        style="border-left: 5px solid #f59e0b; border-radius: 10px; cursor: pointer;">
-                        <i class="fas fa-user-clock fa-lg me-3 text-warning"></i>
-                        <div class="flex-grow-1">
-                            <strong><?= $pendingStaffCount ?> staff member<?= $pendingStaffCount > 1 ? 's' : '' ?> awaiting approval.</strong>
-                            <span class="ms-2 text-muted small">Click to review &rarr;</span>
+                    <a href="user_management.php#approval" class="text-decoration-none">
+                        <div class="alert alert-warning d-flex align-items-center mb-4 shadow-sm" role="alert"
+                            style="border-left: 5px solid #f59e0b; border-radius: 10px; cursor: pointer;">
+                            <i class="fas fa-user-clock fa-lg me-3 text-warning"></i>
+                            <div class="flex-grow-1">
+                                <strong><?= $pendingStaffCount ?> staff member<?= $pendingStaffCount > 1 ? 's' : '' ?>
+                                    awaiting approval.</strong>
+                                <span class="ms-2 text-muted small">Click to review &rarr;</span>
+                            </div>
+                            <span class="badge bg-warning text-dark fs-6"><?= $pendingStaffCount ?></span>
                         </div>
-                        <span class="badge bg-warning text-dark fs-6"><?= $pendingStaffCount ?></span>
-                    </div>
-                </a>
+                    </a>
                 <?php endif; ?>
 
                 <div class="row g-3 mb-4">
@@ -214,8 +188,7 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div
-                            class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                             <i class="fas fa-sitemap fa-2x" style="color: black;"></i>
                             <div class="text-end">
                                 <h2 class="mb-0"> <?= $total_departments; ?> </h2>
@@ -225,8 +198,7 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div
-                            class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                             <i class="fas fa-tags fa-2x"></i>
                             <div class="text-end">
                                 <h2 class="mb-0"> <?= $total_categories; ?> </h2>
@@ -250,8 +222,7 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                 <div class="row g-3 mb-4">
 
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div
-                            class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                             <i class="fas fa-clock fa-2x"></i>
                             <div class="text-end">
                                 <h2 class="mb-0"> <?= $total_pending; ?> </h2>
@@ -271,8 +242,7 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div
-                            class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                             <i class="fas fa-check-circle fa-2x"></i>
                             <div class="text-end">
                                 <h2 class="mb-0"> <?= $total_resolved; ?> </h2>
@@ -282,8 +252,7 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div
-                            class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                             <i class="fas fa-times-circle fa-2x"></i>
                             <div class="text-end">
                                 <h2 class="mb-0"> <?= $total_rejected; ?> </h2>
@@ -294,7 +263,7 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                 </div>
 
                 <div class="container-card shadow-sm">
-                    <h5 class="mb-4 fw-bold"><i class="fas fa-chart-line me-2"></i>Quick Actions</h5>
+                    <h4 class="mb-4 fw-bold"><i class="fas fa-chart-line me-2"></i>Quick Actions</h4>
                     <div class="row g-3">
                         <div class="col-12 col-md-6 col-lg-3">
 
@@ -361,7 +330,8 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                                             <td><?= $complaint_row['category_name']; ?></td>
                                             <td><?= date('M d, Y', strtotime($complaint_row['created_at'])); ?></td>
                                             <td>
-                                                <span class="badge bg-<?= $complaint_row['complaint_status']; ?>"><?= ucfirst($complaint_row['complaint_status']); ?></span>
+                                                <span
+                                                    class="badge bg-<?= $complaint_row['complaint_status']; ?>"><?= ucfirst($complaint_row['complaint_status']); ?></span>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -384,7 +354,7 @@ $pendingStaffCount = $admin->getPendingStaffCount();
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
-        $(document).ready(function() {
+        $(document).ready(function () {
             if ($("#complaintsTable").length > 0) {
                 if (!$.fn.DataTable.isDataTable("#complaintsTable")) {
                     $("#complaintsTable").DataTable({
@@ -399,7 +369,7 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                             searchPlaceholder: "Search Complaints...",
                             info: "_START_ - _END_ of _TOTAL_ items"
                         },
-                        initComplete: function(settings, json) {
+                        initComplete: function (settings, json) {
                             $(".dataTables_filter").appendTo("#tableSearch");
                             $(".dataTables_filter").appendTo(".search-input");
                         }
@@ -409,20 +379,21 @@ $pendingStaffCount = $admin->getPendingStaffCount();
         });
     </script>
 
-    <?php if (!empty($_SESSION['login_success'])): unset($_SESSION['login_success']); ?>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            Swal.fire({
-                toast: true,
-                position: 'top-end',
-                icon: 'success',
-                title: 'Welcome back, <?= htmlspecialchars($_SESSION['username']) ?>!',
-                showConfirmButton: false,
-                timer: 4000,
-                timerProgressBar: true,
+    <?php if (!empty($_SESSION['login_success'])):
+        unset($_SESSION['login_success']); ?>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'Welcome back, <?= htmlspecialchars($_SESSION['username']) ?>!',
+                    showConfirmButton: false,
+                    timer: 4000,
+                    timerProgressBar: true,
+                });
             });
-        });
-    </script>
+        </script>
     <?php endif; ?>
 
 </body>

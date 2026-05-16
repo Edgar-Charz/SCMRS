@@ -130,6 +130,7 @@ $infoRequests       = $staff->getInformationRequests($complaintId);
 $statusLogs         = $staff->getComplaintStatusLogs($complaintId);
 $escalationHistory  = $staff->getEscalationHistoryForComplaint($complaintId);
 $staffForEscalation = $staff->getStaffForEscalation($staffId);
+$feedback           = $staff->getComplaintFeedback($complaintId);
 
 $isClosed       = in_array($complaint['complaint_status'], ['resolved', 'rejected']);
 $studentDisplay = $complaint['is_anonymous'] ? 'Anonymous Student' : htmlspecialchars($complaint['student_name'] ?? 'N/A');
@@ -193,7 +194,7 @@ function statusBadge($status)
             <div class="user-info d-flex align-items-center">
                 <div class="flex-shrink-0"><i class="fas fa-user me-2"></i></div>
                 <div class="flex-grow-1 ms-3">
-                    <p class="mb-0 small fw-bold"><?= htmlspecialchars($staffName) ?></p>
+                    <p class="mb-0 small fw-bold"><?= strtoupper($_SESSION['user_role']); ?></p>
                 </div>
             </div>
 
@@ -440,37 +441,6 @@ function statusBadge($status)
                     </form>
                 </div>
 
-                <!-- ── Request Information from Student ──────────────── -->
-                <?php if (!$isClosed): ?>
-                    <div class="container-card shadow-sm">
-                        <h4 class="mb-3 fw-bold">
-                            <i class="fas fa-question-circle me-2"></i>Request Information from Student
-                        </h4>
-
-                        <?php if ($complaint['complaint_status'] === 'awaiting_student_response'): ?>
-                            <div class="alert alert-warning mb-3">
-                                <i class="fas fa-hourglass-half me-2"></i>
-                                Waiting for student response to a previous request.
-                            </div>
-                        <?php endif; ?>
-
-                        <form method="POST" action="assigned_complaint_details.php?id=<?= $complaintId ?>">
-                            <input type="hidden" name="action" value="request_info">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Request Message</label>
-                                <textarea name="question" class="form-control p-3" rows="3"
-                                    style="border-radius:10px; border:1px solid #e0e6ed;"
-                                    placeholder="Describe what information you need from the student..."
-                                    required></textarea>
-                            </div>
-                            <button type="submit" class="btn btn-primary fw-bold w-100 p-3"
-                                style="border-radius:10px; background-color:var(--udsm-blue);">
-                                <i class="fas fa-paper-plane me-1"></i>Send Request
-                            </button>
-                        </form>
-                    </div>
-                <?php endif; ?>
-
                 <!-- ── Information Requests List ─────────────────────── -->
                 <?php if (!empty($infoRequests)): ?>
                     <div class="container-card shadow-sm">
@@ -513,6 +483,37 @@ function statusBadge($status)
                                 </small>
                             </div>
                         <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+
+                <!-- ── Request Information from Student ──────────────── -->
+                <?php if (!$isClosed): ?>
+                    <div class="container-card shadow-sm">
+                        <h4 class="mb-3 fw-bold">
+                            <i class="fas fa-question-circle me-2"></i>Request Information from Student
+                        </h4>
+
+                        <?php if ($complaint['complaint_status'] === 'awaiting_student_response'): ?>
+                            <div class="alert alert-warning mb-3">
+                                <i class="fas fa-hourglass-half me-2"></i>
+                                Waiting for student response to a previous request.
+                            </div>
+                        <?php endif; ?>
+
+                        <form method="POST" action="assigned_complaint_details.php?id=<?= $complaintId ?>">
+                            <input type="hidden" name="action" value="request_info">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Request Message</label>
+                                <textarea name="question" class="form-control p-3" rows="3"
+                                    style="border-radius:10px; border:1px solid #e0e6ed;"
+                                    placeholder="Describe what information you need from the student..."
+                                    required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary fw-bold w-100 p-3"
+                                style="border-radius:10px; background-color:var(--udsm-blue);">
+                                <i class="fas fa-paper-plane me-1"></i>Send Request
+                            </button>
+                        </form>
                     </div>
                 <?php endif; ?>
 
@@ -590,6 +591,45 @@ function statusBadge($status)
                                 </div>
                             </div>
                         <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+
+                <!-- ── Student Feedback ──────────────────────────────── -->
+                <?php if ($complaint['complaint_status'] === 'resolved'): ?>
+                    <div class="container-card shadow-sm">
+                        <h4 class="mb-3 fw-bold">
+                            <i class="fas fa-star me-2 text-warning"></i>Student Feedback
+                        </h4>
+
+                        <?php if ($feedback): ?>
+                            <div class="p-3 rounded" style="background:#fffbeb; border-left:4px solid #f59e0b;">
+                                <div class="d-flex align-items-center gap-3 mb-2">
+                                    <div>
+                                        <?php for ($i = 1; $i <= 5; $i++): ?>
+                                            <i class="fas fa-star" style="color:<?= $i <= $feedback['rating'] ? '#f59e0b' : '#d1d5db' ?>; font-size:1.3rem;"></i>
+                                        <?php endfor; ?>
+                                    </div>
+                                    <span class="fw-bold fs-5"><?= $feedback['rating'] ?>/5</span>
+                                    <?php if (!$complaint['is_anonymous']): ?>
+                                        <span class="text-muted small">by <?= htmlspecialchars($feedback['student_name']) ?></span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if (!empty($feedback['feedback_text'])): ?>
+                                    <div class="p-2 rounded bg-white border">
+                                        <i class="fas fa-quote-left text-muted me-1"></i>
+                                        <?= htmlspecialchars($feedback['feedback_text']) ?>
+                                    </div>
+                                <?php endif; ?>
+                                <small class="text-muted d-block mt-2">
+                                    Submitted: <?= date('d M Y, g:i A', strtotime($feedback['submitted_at'])) ?>
+                                </small>
+                            </div>
+                        <?php else: ?>
+                            <p class="text-muted mb-0">
+                                <i class="fas fa-hourglass-half me-1"></i>
+                                No feedback submitted yet. The student can rate the resolution from their complaint page.
+                            </p>
+                        <?php endif; ?>
                     </div>
                 <?php endif; ?>
 

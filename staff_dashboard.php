@@ -34,7 +34,8 @@ $complaintCounts = $isApproved ? $staff->getStaffComplaintCounts($staffDetails['
     'resolved' => 0,
     'rejected' => 0,
 ];
-$recentComplaints = $isApproved ? $staff->getRecentAssignedComplaints($staffDetails['staff_id']) : [];
+$recentComplaints       = $isApproved ? $staff->getRecentAssignedComplaints($staffDetails['staff_id']) : [];
+$studentRespondedCount  = $isApproved ? $staff->getStudentRespondedCount($staffDetails['staff_id']) : 0;
 
 function formatStatusBadgeClass($status)
 {
@@ -78,7 +79,7 @@ function formatStatusLabel($status)
 </head>
 
 <body>
-<?php require_once 'includes/flash_toast.php'; ?>
+    <?php require_once 'includes/flash_toast.php'; ?>
 
     <div id="loader">
         <div class="spinner"></div>
@@ -104,7 +105,7 @@ function formatStatusLabel($status)
                     <i class="fas fa-user me-2"></i>
                 </div>
                 <div class="flex-grow-1 ms-3">
-                    <p class="mb-0 small fw-bold"><?= htmlspecialchars($staffName) ?></p>
+                    <p class="mb-0 small fw-bold"><?= strtoupper($_SESSION['user_role']); ?></p>
                 </div>
             </div>
 
@@ -122,45 +123,18 @@ function formatStatusLabel($status)
                     </a>
                 </li>
             </ul>
+            <div class="sidebar-footer">
+                <a href="logout.php" title="Sign Out">
+                    <i class="fas fa-sign-out-alt me-2"></i>
+                    <span class="link-text">Sign Out</span>
+                </a>
+            </div>
         </nav>
 
         <div id="content" class="w-100">
 
             <!-- Topbar -->
-            <nav class="navbar navbar-expand-lg navbar-dark custom-nav">
-                <button id="sidebarCollapse" class="btn btn-dark ms-2">
-                    <i class="fas fa-list"></i>
-                </button>
-
-                <div class="container-fluid">
-                    <div class="dropdown ms-auto">
-                        <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle"
-                            id="profileDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-user"></i>
-                        </a>
-
-                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2"
-                            aria-labelledby="profileDropdown">
-                            <li>
-                                <h6 class="dropdown-header">User Settings</h6>
-                            </li>
-                            <li>
-                                <a class="dropdown-item d-flex align-items-center" href="profile.php">
-                                    <i class="fas fa-user me-2"></i> View Profile
-                                </a>
-                            </li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li>
-                                <a class="dropdown-item d-flex align-items-center text-danger" href="logout.php">
-                                    <i class="fas fa-sign-out-alt me-2"></i> Logout
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </nav>
+            <?php require_once 'includes/topbar.php'; ?>
 
             <div class="p-4">
 
@@ -198,6 +172,20 @@ function formatStatusLabel($status)
                         </div>
                     </div>
                 <?php else: ?>
+
+                    <?php if ($studentRespondedCount > 0): ?>
+                        <a href="assigned_complaints.php" class="text-decoration-none">
+                            <div class="alert alert-success d-flex align-items-center mb-4 shadow-sm" role="alert"
+                                style="border-left: 5px solid #16a34a; border-radius: 10px; cursor: pointer;">
+                                <i class="fas fa-reply fa-lg me-3 text-success"></i>
+                                <div class="flex-grow-1">
+                                    <strong><?= $studentRespondedCount ?> complaint<?= $studentRespondedCount > 1 ? 's have' : ' has' ?> a student response waiting.</strong>
+                                    <span class="ms-2 text-muted small">A student has replied to your information request &mdash; click to review &rarr;</span>
+                                </div>
+                                <span class="badge bg-success fs-6"><?= $studentRespondedCount ?></span>
+                            </div>
+                        </a>
+                    <?php endif; ?>
 
                     <div class="row g-3 mb-4">
                         <div class="col-12 col-md-6 col-lg-3">
@@ -334,20 +322,21 @@ function formatStatusLabel($status)
         });
     </script>
 
-    <?php if (!empty($_SESSION['login_success'])): unset($_SESSION['login_success']); ?>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            Swal.fire({
-                toast: true,
-                position: 'top-end',
-                icon: 'success',
-                title: 'Welcome back, <?= htmlspecialchars($_SESSION['username']) ?>!',
-                showConfirmButton: false,
-                timer: 4000,
-                timerProgressBar: true,
+    <?php if (!empty($_SESSION['login_success'])):
+        unset($_SESSION['login_success']); ?>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'Welcome back, <?= htmlspecialchars($_SESSION['username']) ?>!',
+                    showConfirmButton: false,
+                    timer: 4000,
+                    timerProgressBar: true,
+                });
             });
-        });
-    </script>
+        </script>
     <?php endif; ?>
 
     <!-- <script>

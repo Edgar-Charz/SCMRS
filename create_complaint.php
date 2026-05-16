@@ -13,6 +13,7 @@ require_once "classes/User.php";
 require_once "classes/Student.php";
 require_once "classes/Category.php";
 require_once "classes/Complaint.php";
+require_once "classes/Notification.php";
 
 $db = new Database();
 $conn = $db->connect();
@@ -39,8 +40,17 @@ if (isset($_POST["submitComplaintBTN"])) {
         $student_id     = $studentId;
         $user_id        = $_SESSION['user_id'];
 
-        if ($complaint->createComplaint($title, $description, $category_id, $department_id, $is_anonymous, $student_id, $user_id, $subcategory_id)) {
-
+        $newComplaintId = $complaint->createComplaint($title, $description, $category_id, $department_id, $is_anonymous, $student_id, $user_id, $subcategory_id);
+        if ($newComplaintId) {
+            $notifMsg = $is_anonymous
+                ? "A new anonymous complaint has been submitted."
+                : "New complaint from " . htmlspecialchars($_SESSION['username']) . ": \"$title\"";
+            (new Notification($conn))->notifyAllAdmins(
+                $notifMsg,
+                'new_complaint',
+                "complaint_details.php?id=$newComplaintId",
+                $newComplaintId
+            );
             $_SESSION['message'] = "Complaint submitted successfully.";
             header("Location: track_complaints.php");
         }
@@ -248,7 +258,7 @@ if (isset($_SESSION['message'])) {
                                     style="border-radius: 8px; border: 1px solid #e0e6ed;"
                                     placeholder="Please descibe your complaint in detail..."></textarea>
                                 <small class="form-hint">
-                                    Provide a detailed description of your complaint. The more information you provide, the better we can help you.
+                                   <i class="fas fa-info-circle"></i> Provide a detailed description of your complaint. The more information you provide, the better we can help you.
                                 </small>
                             </div>
 
@@ -326,59 +336,100 @@ if (isset($_SESSION['message'])) {
             titleCount.textContent = titleInput.value.length;
         }
 
-        // File upload preview
-        const fileInput = document.getElementById('attachments');
-        const fileList = document.getElementById('fileList');
+        // File upload with remove buttons, format & size validation
+        const fileInput   = document.getElementById('attachments');
+        const fileList    = document.getElementById('fileList');
+        const MAX_SIZE    = 5 * 1024 * 1024;
+        const ALLOWED     = ['application/pdf', 'image/jpeg', 'image/png'];
+        const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png'];
+        let selectedFiles = [];
+
+        function formatBytes(bytes) {
+            return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+        }
+
+        function syncInput() {
+            const dt = new DataTransfer();
+            selectedFiles.forEach(f => dt.items.add(f));
+            fileInput.files = dt.files;
+        }
+
+        function renderList() {
+            fileList.innerHTML = '';
+            if (selectedFiles.length === 0) return;
+
+            const ul = document.createElement('ul');
+            ul.style.cssText = 'list-style:none;padding:0;margin:0;';
+
+            selectedFiles.forEach((file, idx) => {
+                const li = document.createElement('li');
+                li.style.cssText = 'padding:8px 12px;background:#e3e8f3;border-radius:8px;margin-bottom:6px;display:flex;align-items:center;gap:8px;';
+
+                const icon = document.createElement('i');
+                icon.className = file.type === 'application/pdf' ? 'fas fa-file-pdf' : 'fas fa-file-image';
+                icon.style.color = file.type === 'application/pdf' ? '#dc2626' : '#10b981';
+                icon.style.flexShrink = '0';
+
+                const name = document.createElement('span');
+                name.textContent = file.name;
+                name.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.9rem;';
+
+                const size = document.createElement('span');
+                size.textContent = formatBytes(file.size);
+                size.style.cssText = 'color:#6b7280;font-size:0.8rem;white-space:nowrap;flex-shrink:0;';
+
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.title = 'Remove file';
+                removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+                removeBtn.style.cssText = 'background:none;border:none;color:#dc2626;cursor:pointer;padding:2px 6px;font-size:0.95rem;flex-shrink:0;line-height:1;';
+                removeBtn.addEventListener('click', function () {
+                    selectedFiles.splice(idx, 1);
+                    renderList();
+                    syncInput();
+                });
+
+                li.appendChild(icon);
+                li.appendChild(name);
+                li.appendChild(size);
+                li.appendChild(removeBtn);
+                ul.appendChild(li);
+            });
+
+            fileList.appendChild(ul);
+        }
 
         if (fileInput && fileList) {
-            fileInput.addEventListener('change', function() {
-                fileList.innerHTML = '';
-                const files = this.files;
+            fileInput.addEventListener('change', function () {
+                const errors = [];
 
-                if (files.length > 0) {
-                    const list = document.createElement('ul');
-                    list.style.listStyle = 'none';
-                    list.style.padding = '0';
-                    list.style.margin = '0';
+                Array.from(this.files).forEach(file => {
+                    const ext = '.' + file.name.split('.').pop().toLowerCase();
+                    if (!ALLOWED_EXT.includes(ext) || !ALLOWED.includes(file.type)) {
+                        errors.push(`"${file.name}" — invalid format. Only PDF, JPG, JPEG, PNG are allowed.`);
+                        return;
+                    }
+                    if (file.size > MAX_SIZE) {
+                        errors.push(`"${file.name}" — exceeds the 5 MB limit (${formatBytes(file.size)}).`);
+                        return;
+                    }
+                    const isDuplicate = selectedFiles.some(f => f.name === file.name && f.size === file.size);
+                    if (!isDuplicate) {
+                        selectedFiles.push(file);
+                    }
+                });
 
-                    Array.from(files).forEach((file, index) => {
-                        const li = document.createElement('li');
-                        li.style.padding = '5px';
-                        li.style.background = '#e3e8f3ff';
-                        li.style.borderRadius = '8px';
-                        li.style.marginBottom = '5px';
-                        li.style.display = 'flex';
-                        li.style.alignItems = 'center';
-                        li.style.gap = '2px';
+                this.value = '';
+                renderList();
+                syncInput();
 
-                        const icon = document.createElement('i');
-                        if (file.type === 'application/pdf') {
-                            icon.className = 'fas fa-file-pdf';
-                            icon.style.color = '#dc2626';
-                        } else if (file.type.startsWith('image/')) {
-                            icon.className = 'fas fa-file-image';
-                            icon.style.color = '#10b981';
-                        } else {
-                            icon.className = 'fas fa-file';
-                            icon.style.color = '#6b7280';
-                        }
-
-                        const name = document.createElement('span');
-                        name.textContent = file.name;
-                        name.style.flex = '1';
-
-                        const size = document.createElement('span');
-                        size.textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
-                        size.style.color = '#646668ff';
-                        size.style.fontSize = '0.875rem';
-
-                        li.appendChild(icon);
-                        li.appendChild(name);
-                        li.appendChild(size);
-                        list.appendChild(li);
+                if (errors.length) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Some files were rejected',
+                        html: errors.map(e => `<div class="text-start small mb-1">${e}</div>`).join(''),
+                        confirmButtonColor: '#1e3a5f'
                     });
-
-                    fileList.appendChild(list);
                 }
             });
         }

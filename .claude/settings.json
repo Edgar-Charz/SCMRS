@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(& \"C:\\\\xampp\\\\mysql\\\\bin\\\\mysql.exe\" -u root scmrs -e \"ALTER TABLE notifications ADD COLUMN link VARCHAR\\(255\\) DEFAULT NULL AFTER type, MODIFY COLUMN type ENUM\\('status_change','new_assignment','request_info','new_complaint','new_registration','staff_approved','info_responded','complaint_rejected','complaint_resolved','staff_rejected'\\) NOT NULL DEFAULT 'status_change'; SELECT 'Done' AS result;\")",
+      "PowerShell(& \"C:\\\\xampp\\\\mysql\\\\bin\\\\mysql.exe\" -u root scmrs -e \"DESCRIBE notifications;\")",
+      "Read(//c/xampp/**)",
+      "Bash(./mysql/bin/mysql.exe -u root scmrs -e \"ALTER TABLE notifications MODIFY COLUMN type ENUM\\('status_change','new_assignment','request_info','new_complaint','new_registration','staff_approved','info_responded','complaint_rejected','complaint_resolved','staff_rejected','complaint_deleted'\\) NOT NULL DEFAULT 'status_change';\")",
+      "Bash(/c/xampp/mysql/bin/mysql.exe -u root scmrs -e \"ALTER TABLE notifications MODIFY COLUMN type ENUM\\('status_change','new_assignment','request_info','new_complaint','new_registration','staff_approved','info_responded','complaint_rejected','complaint_resolved','staff_rejected','complaint_deleted'\\) NOT NULL DEFAULT 'status_change';\")",
+      "Bash(echo \"exit: $?\")"
+    ]
+  }
+}

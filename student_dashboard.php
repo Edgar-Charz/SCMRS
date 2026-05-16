@@ -51,7 +51,7 @@ if (isset($_SESSION['message'])) {
 </head>
 
 <body>
-<?php require_once 'includes/flash_toast.php'; ?>
+    <?php require_once 'includes/flash_toast.php'; ?>
 
     <div id="loader">
         <div class="spinner"></div>
@@ -103,45 +103,18 @@ if (isset($_SESSION['message'])) {
                     </a>
                 </li>
             </ul>
+            <div class="sidebar-footer">
+                <a href="logout.php" title="Sign Out">
+                    <i class="fas fa-sign-out-alt me-2"></i>
+                    <span class="link-text">Sign Out</span>
+                </a>
+            </div>
         </nav>
 
         <div id="content" class="w-100">
 
             <!-- Topbar -->
-            <nav class="navbar navbar-expand-lg navbar-dark custom-nav">
-                <button id="sidebarCollapse" class="btn btn-dark ms-2">
-                    <i class="fas fa-list"></i>
-                </button>
-
-                <div class="container-fluid">
-                    <div class="dropdown ms-auto">
-                        <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle"
-                            id="profileDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-user"></i>
-                        </a>
-
-                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2"
-                            aria-labelledby="profileDropdown">
-                            <li>
-                                <h6 class="dropdown-header">User Settings</h6>
-                            </li>
-                            <li>
-                                <a class="dropdown-item d-flex align-items-center" href="profile.php">
-                                    <i class="fas fa-user me-2"></i> View Profile
-                                </a>
-                            </li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li>
-                                <a class="dropdown-item d-flex align-items-center text-danger" href="logout.php">
-                                    <i class="fas fa-sign-out-alt me-2"></i> Logout
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </nav>
+            <?php require_once 'includes/topbar.php'; ?>
 
             <div class="p-4">
 
@@ -160,31 +133,35 @@ if (isset($_SESSION['message'])) {
                 </div>
 
                 <?php if ($pendingInfoCount > 0): ?>
-                <a href="track_complaints.php?filter=awaiting_student_response" class="text-decoration-none">
-                    <div class="alert alert-warning d-flex align-items-center mb-3 shadow-sm" role="alert"
-                        style="border-left: 5px solid #f59e0b; border-radius: 10px; cursor: pointer;">
-                        <i class="fas fa-exclamation-circle fa-lg me-3 text-warning"></i>
-                        <div class="flex-grow-1">
-                            <strong><?= $pendingInfoCount ?> complaint<?= $pendingInfoCount > 1 ? 's require' : ' requires' ?> your response.</strong>
-                            <span class="ms-2 text-muted small">A staff member has requested more information &mdash; click to respond &rarr;</span>
+                    <a href="track_complaints.php?filter=awaiting_student_response" class="text-decoration-none">
+                        <div class="alert alert-warning d-flex align-items-center mb-3 shadow-sm" role="alert"
+                            style="border-left: 5px solid #f59e0b; border-radius: 10px; cursor: pointer;">
+                            <i class="fas fa-exclamation-circle fa-lg me-3 text-warning"></i>
+                            <div class="flex-grow-1">
+                                <strong><?= $pendingInfoCount ?>
+                                    complaint<?= $pendingInfoCount > 1 ? 's require' : ' requires' ?> your
+                                    response.</strong>
+                                <span class="ms-2 text-muted small">A staff member has requested more information &mdash;
+                                    click to respond &rarr;</span>
+                            </div>
+                            <span class="badge bg-warning text-dark fs-6"><?= $pendingInfoCount ?></span>
                         </div>
-                        <span class="badge bg-warning text-dark fs-6"><?= $pendingInfoCount ?></span>
-                    </div>
-                </a>
+                    </a>
                 <?php endif; ?>
 
                 <?php if ($total_resolved > 0): ?>
-                <a href="track_complaints.php?filter=resolved" class="text-decoration-none">
-                    <div class="alert alert-success d-flex align-items-center mb-4 shadow-sm" role="alert"
-                        style="border-left: 5px solid #10b981; border-radius: 10px; cursor: pointer;">
-                        <i class="fas fa-check-circle fa-lg me-3 text-success"></i>
-                        <div class="flex-grow-1">
-                            <strong><?= $total_resolved ?> complaint<?= $total_resolved > 1 ? 's have' : ' has' ?> been resolved.</strong>
-                            <span class="ms-2 text-muted small">Click to view resolutions &rarr;</span>
+                    <a href="track_complaints.php?filter=resolved" class="text-decoration-none">
+                        <div class="alert alert-success d-flex align-items-center mb-4 shadow-sm" role="alert"
+                            style="border-left: 5px solid #10b981; border-radius: 10px; cursor: pointer;">
+                            <i class="fas fa-check-circle fa-lg me-3 text-success"></i>
+                            <div class="flex-grow-1">
+                                <strong><?= $total_resolved ?> complaint<?= $total_resolved > 1 ? 's have' : ' has' ?> been
+                                    resolved.</strong>
+                                <span class="ms-2 text-muted small">Click to view resolutions &rarr;</span>
+                            </div>
+                            <span class="badge bg-success fs-6"><?= $total_resolved ?></span>
                         </div>
-                        <span class="badge bg-success fs-6"><?= $total_resolved ?></span>
-                    </div>
-                </a>
+                    </a>
                 <?php endif; ?>
 
                 <div class="row g-3 mb-4">
@@ -202,8 +179,7 @@ if (isset($_SESSION['message'])) {
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div
-                            class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
                             <i class="fas fa-clock fa-2x"></i>
                             <div class="text-end">
                                 <h2 class="mb-0">
@@ -215,8 +191,7 @@ if (isset($_SESSION['message'])) {
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div
-                            class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
                             <i class="fas fa-spinner fa-spin fa-2x" style="color: black;"></i>
                             <div class="text-end">
                                 <h2 class="mb-0">
@@ -228,8 +203,7 @@ if (isset($_SESSION['message'])) {
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div
-                            class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
                             <i class="fas fa-check-circle fa-2x"></i>
                             <div class="text-end">
                                 <h2 class="mb-0">
@@ -299,7 +273,8 @@ if (isset($_SESSION['message'])) {
                                             <td><?= $complaint_row['category_name']; ?></td>
                                             <td><?= date('M d, Y', strtotime($complaint_row['created_at'])); ?></td>
                                             <td>
-                                                <span class="badge bg-<?= $complaint_row['complaint_status']; ?>"><?= ucfirst($complaint_row['complaint_status']); ?></span>
+                                                <span
+                                                    class="badge bg-<?= $complaint_row['complaint_status']; ?>"><?= ucfirst($complaint_row['complaint_status']); ?></span>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -338,7 +313,7 @@ if (isset($_SESSION['message'])) {
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
-        $(document).ready(function() {
+        $(document).ready(function () {
             if ($("#complaintsTable").length > 0) {
                 if (!$.fn.DataTable.isDataTable("#complaintsTable")) {
                     $("#complaintsTable").DataTable({
@@ -353,7 +328,7 @@ if (isset($_SESSION['message'])) {
                             searchPlaceholder: "Search Complaints...",
                             info: "_START_ - _END_ of _TOTAL_ items"
                         },
-                        initComplete: function(settings, json) {
+                        initComplete: function (settings, json) {
                             $(".dataTables_filter").appendTo("#tableSearch");
                             $(".dataTables_filter").appendTo(".search-input");
                         }
@@ -363,20 +338,21 @@ if (isset($_SESSION['message'])) {
         });
     </script>
 
-    <?php if (!empty($_SESSION['login_success'])): unset($_SESSION['login_success']); ?>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            Swal.fire({
-                toast: true,
-                position: 'top-end',
-                icon: 'success',
-                title: 'Welcome back, <?= htmlspecialchars($_SESSION['username']) ?>!',
-                showConfirmButton: false,
-                timer: 6000,
-                timerProgressBar: true,
+    <?php if (!empty($_SESSION['login_success'])):
+        unset($_SESSION['login_success']); ?>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'Welcome back, <?= htmlspecialchars($_SESSION['username']) ?>!',
+                    showConfirmButton: false,
+                    timer: 6000,
+                    timerProgressBar: true,
+                });
             });
-        });
-    </script>
+        </script>
     <?php endif; ?>
 
 </body>

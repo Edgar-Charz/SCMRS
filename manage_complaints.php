@@ -12,20 +12,20 @@ require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/Admin.php";
 
-$db    = new Database();
-$conn  = $db->connect();
+$db = new Database();
+$conn = $db->connect();
 $admin = new Admin($conn);
 
 $message = $error = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action      = $_POST['action'] ?? '';
+    $action = $_POST['action'] ?? '';
     $complaintId = isset($_POST['complaint_id']) ? (int) $_POST['complaint_id'] : 0;
 
     if ($action === 'assign' && $complaintId > 0) {
-        $staffId  = trim($_POST['staff_id'] ?? '');
+        $staffId = trim($_POST['staff_id'] ?? '');
         $priority = in_array($_POST['priority'] ?? '', ['low', 'medium', 'high']) ? $_POST['priority'] : 'medium';
-        $note     = trim($_POST['note'] ?? '');
+        $note = trim($_POST['note'] ?? '');
 
         if (empty($staffId)) {
             $error = "Please select a staff member.";
@@ -40,8 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } elseif ($action === 'delete' && $complaintId > 0) {
+        $reason = trim($_POST['delete_reason'] ?? '');
         try {
-            $admin->deleteComplaint($complaintId);
+            $admin->deleteComplaint($complaintId, $reason);
             $_SESSION['message'] = "Complaint #$complaintId deleted successfully.";
             header("Location: manage_complaints.php");
             exit;
@@ -57,16 +58,16 @@ if (isset($_SESSION['message'])) {
 }
 
 $complaints = $admin->getComplaints();
-$staffList  = $admin->getApprovedStaff();
+$staffList = $admin->getApprovedStaff();
 
 function statusBadge($status)
 {
     $map = [
-        'pending'                   => ['bg-warning text-dark', 'Pending'],
-        'in_progress'               => ['bg-info text-white',   'In Progress'],
+        'pending' => ['bg-warning text-dark', 'Pending'],
+        'in_progress' => ['bg-info text-white', 'In Progress'],
         'awaiting_student_response' => ['bg-primary text-white', 'Awaiting Response'],
-        'resolved'                  => ['bg-success text-white', 'Resolved'],
-        'rejected'                  => ['bg-danger text-white',  'Rejected'],
+        'resolved' => ['bg-success text-white', 'Resolved'],
+        'rejected' => ['bg-danger text-white', 'Rejected'],
     ];
     [$class, $label] = $map[$status] ?? ['bg-secondary text-white', ucfirst(str_replace('_', ' ', $status))];
     return "<span class=\"badge $class\">$label</span>";
@@ -90,7 +91,7 @@ function statusBadge($status)
 </head>
 
 <body>
-<?php require_once 'includes/flash_toast.php'; ?>
+    <?php require_once 'includes/flash_toast.php'; ?>
 
     <div id="loader">
         <div class="loader-content">
@@ -175,22 +176,22 @@ function statusBadge($status)
             <?php require_once 'includes/topbar.php'; ?>
 
             <!-- Toast Notifications -->
-            <div aria-live="polite" aria-atomic="true"
-                class="position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 1100;">
+            <div aria-live="polite" aria-atomic="true" class="position-fixed top-0 start-50 translate-middle-x p-3"
+                style="z-index: 1100;">
                 <?php if (!empty($message) || !empty($error)):
                     $type = !empty($message) ? 'success' : 'danger';
                     $text = !empty($message) ? $message : $error;
                     $icon = ($type === 'success') ? 'fa-check-circle' : 'fa-exclamation-circle';
-                ?>
-                    <div class="toast show align-items-center text-white bg-<?= $type ?> border-0"
-                        role="alert" aria-live="assertive" aria-atomic="true">
+                    ?>
+                    <div class="toast show align-items-center text-white bg-<?= $type ?> border-0" role="alert"
+                        aria-live="assertive" aria-atomic="true">
                         <div class="d-flex">
                             <div class="toast-body">
                                 <i class="fas <?= $icon ?> me-2"></i>
                                 <?= htmlspecialchars($text) ?>
                             </div>
-                            <button type="button" class="btn-close btn-close-white me-2 m-auto"
-                                data-bs-dismiss="toast" aria-label="Close"></button>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+                                aria-label="Close"></button>
                         </div>
                     </div>
                 <?php endif; ?>
@@ -236,9 +237,9 @@ function statusBadge($status)
                                             ? '<em class="text-muted">Anonymous</em>'
                                             : htmlspecialchars($c['student_name']);
                                         $priorityMap = [
-                                            'low'    => 'bg-success',
+                                            'low' => 'bg-success',
                                             'medium' => 'bg-warning text-dark',
-                                            'high'   => 'bg-danger',
+                                            'high' => 'bg-danger',
                                         ];
                                         $priClass = $priorityMap[$c['priority']] ?? 'bg-secondary';
                                         ?>
@@ -269,16 +270,15 @@ function statusBadge($status)
                                                     <button type="button"
                                                         class="btn btn-status btn-outline-secondary btn-assign"
                                                         data-bs-toggle="modal" data-bs-target="#assignModal"
-                                                        data-complaint-id="<?= $c['complaint_id'] ?>"
-                                                        title="Assign to Staff">
+                                                        data-complaint-id="<?= $c['complaint_id'] ?>" title="Assign to Staff">
                                                         <i class="fas fa-user-tag text-dark"></i>
                                                     </button>
-                                                    <button type="button"
-                                                        class="btn btn-status btn-outline-secondary"
-                                                        onclick="confirmDelete(<?= $c['complaint_id'] ?>)"
-                                                        title="Delete">
-                                                        <i class="fas fa-trash text-dark"></i>
-                                                    </button>
+                                                    <?php if ($c['complaint_status'] === 'pending'): ?>
+                                                        <button type="button" class="btn btn-status btn-outline-secondary"
+                                                            onclick="confirmDelete(<?= $c['complaint_id'] ?>)" title="Delete">
+                                                            <i class="fas fa-trash text-dark"></i>
+                                                        </button>
+                                                    <?php endif; ?>
                                                 </div>
                                             </td>
                                         </tr>
@@ -299,9 +299,10 @@ function statusBadge($status)
     <div class="modal fade" id="assignModal" tabindex="-1" aria-labelledby="assignModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content shadow-lg rounded-3">
-                <div class="modal-header bg-primary text-white">
+                <div class="modal-header text-white" style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
                     <h5 class="modal-title fw-bold" id="assignModalLabel">
-                        <i class="fas fa-user-tag me-2"></i>Assign Complaint to Staff
+                        <i class="fas fa-user-tag me-2"></i>
+                        Assign Complaint to Staff
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
@@ -333,7 +334,8 @@ function statusBadge($status)
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Note <span class="text-muted fw-normal">(optional)</span></label>
+                            <label class="form-label fw-bold">Note <span
+                                    class="text-muted fw-normal">(optional)</span></label>
                             <textarea name="note" class="form-control" rows="3"
                                 placeholder="Add instructions or details for the staff member..."></textarea>
                         </div>
@@ -353,7 +355,41 @@ function statusBadge($status)
     <form id="deleteForm" method="POST" action="manage_complaints.php">
         <input type="hidden" name="action" value="delete">
         <input type="hidden" name="complaint_id" id="deleteComplaintId">
+        <input type="hidden" name="delete_reason" id="deleteReason">
     </form>
+
+    <!-- Delete Reason Modal -->
+    <div class="modal fade" id="deleteReasonModal" tabindex="-1" aria-labelledby="deleteReasonModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg rounded-3">
+                <div class="modal-header text-white" style="background: linear-gradient(135deg, #dc3545, #c82333);">
+                    <h5 class="modal-title fw-bold" id="deleteReasonModalLabel">
+                        <i class="fas fa-trash me-2"></i>Delete Complaint
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">Please provide a reason for deleting this complaint. The student will be
+                        notified.</p>
+                    <div class="mb-0">
+                        <label for="deleteReasonText" class="form-label fw-semibold">Reason <span
+                                class="text-danger">*</span></label>
+                        <textarea class="form-control" id="deleteReasonText" rows="3"
+                            placeholder="Enter reason for deletion..." maxlength="500"></textarea>
+                        <div class="invalid-feedback">Please provide a reason before deleting.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                        <i class="fas fa-trash me-1"></i>Confirm Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="assets/js/jquery-3.6.0.min.js"></script>
     <script src="assets/js/bootstrap.bundle.min.js"></script>
@@ -370,24 +406,23 @@ function statusBadge($status)
             document.getElementById('assignComplaintId').value = btn.getAttribute('data-complaint-id');
         });
 
-        // Delete with SweetAlert confirmation
+        // Open delete reason modal
         function confirmDelete(complaintId) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Delete Complaint?',
-                text: 'Complaint #' + complaintId + ' and all its attachments will be permanently deleted.',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Yes, delete!',
-                cancelButtonText: 'Cancel'
-            }).then(function (result) {
-                if (result.isConfirmed) {
-                    document.getElementById('deleteComplaintId').value = complaintId;
-                    document.getElementById('deleteForm').submit();
-                }
-            });
+            document.getElementById('deleteComplaintId').value = complaintId;
+            document.getElementById('deleteReasonText').value = '';
+            document.getElementById('deleteReasonText').classList.remove('is-invalid');
+            new bootstrap.Modal(document.getElementById('deleteReasonModal')).show();
         }
+
+        document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
+            var reason = document.getElementById('deleteReasonText').value.trim();
+            if (!reason) {
+                document.getElementById('deleteReasonText').classList.add('is-invalid');
+                return;
+            }
+            document.getElementById('deleteReason').value = reason;
+            document.getElementById('deleteForm').submit();
+        });
 
         // DataTable init
         $(document).ready(function () {
@@ -413,4 +448,5 @@ function statusBadge($status)
     </script>
 
 </body>
+
 </html>

@@ -50,8 +50,9 @@ if (isset($_GET['delete_staff']) && is_numeric($_GET['delete_staff'])) {
 if (isset($_POST['approve_staff']) && is_numeric($_POST['approve_staff'])) {
     $staff_id = (int) $_POST['approve_staff'];
     $department_id = isset($_POST['staff_department']) ? (int) $_POST['staff_department'] : null;
+    $role_id = isset($_POST['staff_role']) ? (int) $_POST['staff_role'] : null;
     try {
-        if ($admin->approveStaff($staff_id, $department_id)) {
+        if ($admin->approveStaff($staff_id, $department_id ?: null, $role_id ?: null)) {
             $_SESSION['message'] = "Staff approved successfully.";
             header("Location: user_management.php#approval");
             exit;
@@ -94,17 +95,22 @@ if (isset($_GET['demote_staff']) && is_numeric($_GET['demote_staff'])) {
 
 // Handle Add Student
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['addStudentBTN'])) {
-    $username  = trim($_POST['student_username'] ?? '');
-    $email     = trim($_POST['student_email'] ?? '');
-    $regNum    = trim($_POST['student_reg_number'] ?? '');
-    $collegeId = (int)($_POST['student_college_id'] ?? 0);
-    $password  = $_POST['student_password'] ?? '';
+    $username = trim($_POST['student_username'] ?? '');
+    $email = trim($_POST['student_email'] ?? '');
+    $regNum = trim($_POST['student_reg_number'] ?? '');
+    $collegeId = (int) ($_POST['student_college_id'] ?? 0);
+    $phone = trim($_POST['student_phone'] ?? '') ?: null;
+    $program = trim($_POST['student_program'] ?? '') ?: null;
+    $password = $_POST['student_password'] ?? '';
+    $confirm = $_POST['student_confirm_password'] ?? '';
     try {
-        if ($username && $email && $regNum && $password) {
-            $admin->addStudent($username, $email, $password, $regNum, $collegeId);
-            $_SESSION['message'] = "Student '{$username}' added successfully.";
+        if (!$username || !$email || !$regNum || !$password) {
+            $_SESSION['message_error'] = "Name, email, registration number and password are required.";
+        } elseif ($password !== $confirm) {
+            $_SESSION['message_error'] = "Passwords do not match.";
         } else {
-            $_SESSION['message_error'] = "All fields are required.";
+            $admin->addStudent($username, $email, $password, $regNum, $collegeId ?: null, $phone, $program);
+            $_SESSION['message'] = "Student '{$username}' added successfully.";
         }
     } catch (Exception $e) {
         $_SESSION['message_error'] = $e->getMessage();
@@ -115,16 +121,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['addStudentBTN'])) {
 
 // Handle Add Staff
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['addStaffBTN'])) {
-    $username   = trim($_POST['staff_username'] ?? '');
-    $email      = trim($_POST['staff_email'] ?? '');
-    $deptId     = (int)($_POST['staff_dept_id'] ?? 0);
-    $password   = $_POST['staff_password'] ?? '';
+    $username = trim($_POST['staff_username'] ?? '');
+    $email = trim($_POST['staff_email'] ?? '');
+    $staffIdNum = trim($_POST['staff_id_number'] ?? '') ?: null;
+    $phone = trim($_POST['staff_phone'] ?? '') ?: null;
+    $deptId = (int) ($_POST['staff_dept_id'] ?? 0);
+    $roleId = (int) ($_POST['staff_role_id'] ?? 0);
+    $password = $_POST['staff_password'] ?? '';
+    $confirm = $_POST['staff_confirm_password'] ?? '';
     try {
-        if ($username && $email && $password) {
-            $admin->addStaffAccount($username, $email, $password, $deptId ?: null);
-            $_SESSION['message'] = "Staff '{$username}' added and approved successfully.";
+        if (!$username || !$email || !$password) {
+            $_SESSION['message_error'] = "Name, email and password are required.";
+        } elseif ($password !== $confirm) {
+            $_SESSION['message_error'] = "Passwords do not match.";
         } else {
-            $_SESSION['message_error'] = "Username, email and password are required.";
+            $admin->addStaffAccount($username, $email, $password, $deptId ?: null, $staffIdNum, $phone, $roleId ?: null);
+            $_SESSION['message'] = "Staff '{$username}' added and approved successfully.";
         }
     } catch (Exception $e) {
         $_SESSION['message_error'] = $e->getMessage();
@@ -136,7 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['addStaffBTN'])) {
 // Handle Add Role
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_role'])) {
     $name = trim($_POST['role_name'] ?? '');
-    $rank = (int)($_POST['role_rank'] ?? 0);
+    $rank = (int) ($_POST['role_rank'] ?? 0);
     try {
         if ($name && $rank > 0) {
             $admin->addStaffRole($name, $rank);
@@ -153,9 +165,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_role'])) {
 
 // Handle Edit Role
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_role'])) {
-    $id   = (int)($_POST['role_id'] ?? 0);
+    $id = (int) ($_POST['role_id'] ?? 0);
     $name = trim($_POST['role_name'] ?? '');
-    $rank = (int)($_POST['role_rank'] ?? 0);
+    $rank = (int) ($_POST['role_rank'] ?? 0);
     try {
         if ($id && $name && $rank > 0) {
             $admin->updateStaffRole($id, $name, $rank);
@@ -173,7 +185,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_role'])) {
 // Handle Delete Role
 if (isset($_GET['delete_role']) && is_numeric($_GET['delete_role'])) {
     try {
-        $admin->deleteStaffRole((int)$_GET['delete_role']);
+        $admin->deleteStaffRole((int) $_GET['delete_role']);
         $_SESSION['message'] = "Role deleted successfully.";
     } catch (Exception $e) {
         $_SESSION['message_error'] = $e->getMessage();
@@ -184,8 +196,8 @@ if (isset($_GET['delete_role']) && is_numeric($_GET['delete_role'])) {
 
 // Handle Assign Role
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_role'])) {
-    $staffUserId = (int)($_POST['assign_staff_user_id'] ?? 0);
-    $roleId      = (int)($_POST['assign_role_id'] ?? 0) ?: null;
+    $staffUserId = (int) ($_POST['assign_staff_user_id'] ?? 0);
+    $roleId = (int) ($_POST['assign_role_id'] ?? 0) ?: null;
     try {
         if ($staffUserId) {
             $admin->assignStaffRole($staffUserId, $roleId);
@@ -203,11 +215,11 @@ $registered_students = $admin->getAllStudents();
 $registered_staffs = $admin->getAllStaff();
 $pending_staffs = $admin->getPendingStaffApprovals();
 $approved_staffs = $admin->getApprovedStaff();
-$pending_count  = $admin->getPendingApprovalsCount();
+$pending_count = $admin->getPendingApprovalsCount();
 $approved_count = count($approved_staffs);
-$departments    = $admin->getAllDepartments();
-$colleges       = $admin->getAllColleges();
-$staff_roles    = $admin->getAllStaffRolesWithCount();
+$departments = $admin->getAllDepartments();
+$colleges = $admin->getAllColleges();
+$staff_roles = $admin->getAllStaffRolesWithCount();
 
 // Get message from session
 if (isset($_SESSION['message'])) {
@@ -234,7 +246,7 @@ if (isset($_SESSION['message'])) {
 </head>
 
 <body>
-<?php require_once 'includes/flash_toast.php'; ?>
+    <?php require_once 'includes/flash_toast.php'; ?>
 
     <div id="loader">
         <div class="loader-content">
@@ -349,10 +361,12 @@ if (isset($_SESSION['message'])) {
                     </li>
 
                     <li class="nav-item me-2" role="presentation">
-                        <button class="nav-link fw-bold position-relative" onclick="switchTab('approval')" id="tab-approval">
+                        <button class="nav-link fw-bold position-relative" onclick="switchTab('approval')"
+                            id="tab-approval">
                             <i class="fas fa-check me-2"></i>
                             Staff Approvals
-                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"><?= !empty($pending_count) ? $pending_count : 0 ?></span>
+                            <span
+                                class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"><?= !empty($pending_count) ? $pending_count : 0 ?></span>
                         </button>
                     </li>
 
@@ -393,7 +407,8 @@ if (isset($_SESSION['message'])) {
 
                                 <tbody>
                                     <?php if (!empty($registered_students)): ?>
-                                        <?php $n = 1; foreach ($registered_students as $student): ?>
+                                        <?php $n = 1;
+                                        foreach ($registered_students as $student): ?>
                                             <tr>
                                                 <td><?php echo $n++; ?></td>
                                                 <td class="text-center">
@@ -433,8 +448,10 @@ if (isset($_SESSION['message'])) {
                                         aria-labelledby="viewStudentModalLabel" aria-hidden="true">
                                         <div class="modal-dialog modal-lg">
                                             <div class="modal-content shadow-lg rounded-3">
-                                                <div class="modal-header bg-secondary text-white">
+                                                <div class="modal-header text-white"
+                                                    style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
                                                     <h5 class="modal-title fw-bold" id="viewStudentModalLabel">
+                                                        <i class="fas fa-user-graduate me-2"></i>
                                                         STUDENT INFORMATION
                                                     </h5>
                                                     <button type="button" class="btn-close btn-close-white"
@@ -484,8 +501,10 @@ if (isset($_SESSION['message'])) {
                                         aria-labelledby="editStudentModalLabel" aria-hidden="true">
                                         <div class="modal-dialog modal-lg">
                                             <div class="modal-content shadow-lg rounded-3">
-                                                <div class="modal-header bg-secondary text-white">
+                                                <div class="modal-header text-white"
+                                                    style="background: linear-gradient(135deg, #007bff, #0056b3);">
                                                     <h5 class="modal-title fw-bold" id="editStudentModalLabel">
+                                                        <i class="fas fa-user-edit me-2"></i>
                                                         EDIT STUDENT INFORMATION
                                                     </h5>
                                                     <button type="button" class="btn-close btn-close-white"
@@ -551,56 +570,89 @@ if (isset($_SESSION['message'])) {
                     <!-- Add Student Modal -->
                     <div class="modal fade" id="addStudentModal" tabindex="-1" aria-labelledby="addStudentModalLabel"
                         aria-hidden="true">
-                        <div class="modal-dialog">
-                            <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
-                                <div class="modal-header bg-primary text-white">
-                                    <h5 class="modal-title fw-bold" id="addStudentModalLabel">ADD NEW STUDENT</h5>
+                        <div class="modal-dialog modal-lg modal-dialog-centered">
+                            <div class="modal-content border-0 shadow-lg" style="border-radius:12px; overflow:hidden;">
+                                <div class="modal-header text-white"
+                                    style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
+                                    <h5 class="modal-title fw-bold" id="addStudentModalLabel">
+                                        <i class="fas fa-user-graduate me-2"></i>
+                                        Add New Student
+                                    </h5>
                                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
                                         aria-label="Close"></button>
                                 </div>
 
                                 <form action="user_management.php" method="POST">
-                                    <div class="modal-body">
-                                        <div class="container-fluid">
-                                            <div class="row g-2">
-                                                <div class="mb-2">
-                                                    <label class="form-label fw-bold">Full Name <span class="text-danger">*</span></label>
-                                                    <input type="text" name="student_username" class="form-control" required>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label fw-bold">Registration Number <span class="text-danger">*</span></label>
-                                                    <input type="text" name="student_reg_number" class="form-control" required>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label fw-bold">Email Address <span class="text-danger">*</span></label>
-                                                    <input type="email" name="student_email" class="form-control" required>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label fw-bold">College</label>
-                                                    <select name="student_college_id" class="form-select">
-                                                        <option value="">-- Select College --</option>
-                                                        <?php foreach ($colleges as $col): ?>
-                                                            <option value="<?= $col['college_id'] ?>"><?= htmlspecialchars($col['college_name']) ?></option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label fw-bold">Password <span class="text-danger">*</span></label>
-                                                    <input type="password" name="student_password" class="form-control" required>
-                                                </div>
+                                    <div class="modal-body p-4">
+                                        <div class="row g-3">
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label fw-bold small">Full Name <span
+                                                        class="text-danger">*</span></label>
+                                                <input type="text" name="student_username" class="form-control"
+                                                    placeholder="Enter full name" required>
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label fw-bold small">Registration Number <span
+                                                        class="text-danger">*</span></label>
+                                                <input type="text" name="student_reg_number" class="form-control"
+                                                    placeholder="202X-04-XXXXX" pattern="^202[0-9]-04-[0-9]{5}$"
+                                                    title="Format: 202X-04-XXXXX" maxlength="13" required
+                                                    oninput="this.value=this.value.toUpperCase().replace(/[^0-9-]/g,'').slice(0,13)">
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label fw-bold small">Email Address <span
+                                                        class="text-danger">*</span></label>
+                                                <input type="email" name="student_email" class="form-control"
+                                                    placeholder="email@udsm.ac.tz" required>
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label fw-bold small">Phone Number</label>
+                                                <input type="text" name="student_phone" class="form-control"
+                                                    placeholder="0XXXXXXXXX" pattern="^0[0-9]{9}$"
+                                                    title="10 digits starting with 0" maxlength="10"
+                                                    oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)">
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label fw-bold small">College</label>
+                                                <select name="student_college_id" class="form-select">
+                                                    <option value="">-- Select College --</option>
+                                                    <?php foreach ($colleges as $col): ?>
+                                                        <option value="<?= $col['college_id'] ?>">
+                                                            <?= htmlspecialchars($col['college_name']) ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label fw-bold small">Programme / Course</label>
+                                                <input type="text" name="student_program" class="form-control"
+                                                    placeholder="e.g. BSc Computer Science">
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label fw-bold small">Password <span
+                                                        class="text-danger">*</span></label>
+                                                <input type="password" name="student_password" id="addStudentPwd"
+                                                    class="form-control" placeholder="Min 8 characters" required>
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label fw-bold small">Confirm Password <span
+                                                        class="text-danger">*</span></label>
+                                                <input type="password" name="student_confirm_password"
+                                                    id="addStudentPwdConfirm" class="form-control"
+                                                    placeholder="Re-enter password" required>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="modal-footer">
-                                        <button type="submit" name="addStudentBTN" class="btn btn-success me-2">
-                                            <i class="fas fa-plus me-1"></i> Add Student
+                                    <div class="modal-footer" style="background:#f8f9fa;">
+                                        <button type="button" class="btn btn-outline-secondary"
+                                            data-bs-dismiss="modal">Cancel</button>
+                                        <button type="submit" name="addStudentBTN" class="btn btn-success fw-bold px-4"
+                                            onclick="return checkPasswords('addStudentPwd','addStudentPwdConfirm')">
+                                            <i class="fas fa-user-plus me-1"></i>Add Student
                                         </button>
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                     </div>
                                 </form>
-
                             </div>
-
                         </div>
                     </div>
                     <!-- / Add Student modal -->
@@ -645,7 +697,8 @@ if (isset($_SESSION['message'])) {
                                                 </td>
                                                 <td class="text-center">
                                                     <?php if (!empty($staff['role_name'])): ?>
-                                                        <span class="badge bg-primary"><?= htmlspecialchars($staff['role_name']) ?></span>
+                                                        <span
+                                                            class="badge bg-primary"><?= htmlspecialchars($staff['role_name']) ?></span>
                                                     <?php else: ?>
                                                         <span class="badge bg-secondary">Unassigned</span>
                                                     <?php endif; ?>
@@ -690,8 +743,10 @@ if (isset($_SESSION['message'])) {
                                         aria-labelledby="viewStaffModalLabel" aria-hidden="true">
                                         <div class="modal-dialog modal-lg">
                                             <div class="modal-content shadow-lg rounded-3">
-                                                <div class="modal-header bg-secondary text-white">
+                                                <div class="modal-header text-white"
+                                                    style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
                                                     <h5 class="modal-title fw-bold" id="viewStaffModalLabel">
+                                                        <i class="fas fa-user-tie me-2"></i>
                                                         STAFF INFORMATION
                                                     </h5>
                                                     <button type="button" class="btn-close btn-close-white"
@@ -801,52 +856,101 @@ if (isset($_SESSION['message'])) {
                     <!-- Add Staff Modal -->
                     <div class="modal fade" id="addStaffModal" tabindex="-1" aria-labelledby="addStaffModalLabel"
                         aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
-                                <div class="modal-header bg-primary text-white">
-                                    <h5 class="modal-title fw-bold" id="addStaffModalLabel">ADD NEW STAFF</h5>
+                        <div class="modal-dialog modal-lg modal-dialog-centered">
+                            <div class="modal-content border-0 shadow-lg" style="border-radius:12px; overflow:hidden;">
+                                <div class="modal-header text-white"
+                                    style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
+                                    <h5 class="modal-title fw-bold" id="addStaffModalLabel">
+                                        <i class="fas fa-user-tie me-2"></i>
+                                        Add New Staff
+                                    </h5>
                                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
                                         aria-label="Close"></button>
                                 </div>
 
                                 <form action="user_management.php" method="POST">
-                                    <div class="modal-body">
-                                        <div class="container-fluid">
-                                            <div class="row g-2">
-                                                <div class="mb-2">
-                                                    <label class="form-label fw-bold">Full Name <span class="text-danger">*</span></label>
-                                                    <input type="text" name="staff_username" class="form-control" required>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label fw-bold">Email Address <span class="text-danger">*</span></label>
-                                                    <input type="email" name="staff_email" class="form-control" required>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label fw-bold">Department</label>
-                                                    <select name="staff_dept_id" class="form-select">
-                                                        <option value="">-- Select Department --</option>
-                                                        <?php foreach ($departments as $dept): ?>
-                                                            <option value="<?= $dept['department_id'] ?>"><?= htmlspecialchars($dept['department_name']) ?></option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label fw-bold">Password <span class="text-danger">*</span></label>
-                                                    <input type="password" name="staff_password" class="form-control" required>
-                                                </div>
+                                    <div class="modal-body p-4">
+                                        <div class="row g-3">
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label fw-bold small">Full Name <span
+                                                        class="text-danger">*</span></label>
+                                                <input type="text" name="staff_username" class="form-control"
+                                                    placeholder="Enter full name" required>
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label fw-bold small">Staff ID <span
+                                                        class="text-danger">*</span></label>
+                                                <input type="text" name="staff_id_number" class="form-control"
+                                                    placeholder="UDSM-STAFF-XXXXX" pattern="^UDSM-STAFF-[0-9]{5}$"
+                                                    title="Format: UDSM-STAFF-XXXXX" maxlength="16" minlength="16"
+                                                    oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,16)"
+                                                    required>
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label fw-bold small">Email Address <span
+                                                        class="text-danger">*</span></label>
+                                                <input type="email" name="staff_email" class="form-control"
+                                                    placeholder="staff@udsm.ac.tz" required>
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label fw-bold small">Phone Number</label>
+                                                <input type="text" name="staff_phone" class="form-control"
+                                                    placeholder="0XXXXXXXXX" pattern="^0[0-9]{9}$"
+                                                    title="10 digits starting with 0" maxlength="10"
+                                                    oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)">
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label fw-bold small">Department</label>
+                                                <select name="staff_dept_id" class="form-select">
+                                                    <option value="">-- Select Department --</option>
+                                                    <?php foreach ($departments as $dept): ?>
+                                                        <option value="<?= $dept['department_id'] ?>">
+                                                            <?= htmlspecialchars($dept['department_name']) ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label fw-bold small">Role</label>
+                                                <select name="staff_role_id" class="form-select">
+                                                    <option value="">-- Select Role --</option>
+                                                    <?php foreach ($staff_roles as $role): ?>
+                                                        <option value="<?= $role['role_id'] ?>">
+                                                            <?= htmlspecialchars($role['role_name']) ?>
+                                                            (Rank <?= $role['role_rank'] ?>)
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label fw-bold small">Password <span
+                                                        class="text-danger">*</span></label>
+                                                <input type="password" name="staff_password" id="addStaffPwd"
+                                                    class="form-control" placeholder="Min 8 characters" required>
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label fw-bold small">Confirm Password <span
+                                                        class="text-danger">*</span></label>
+                                                <input type="password" name="staff_confirm_password"
+                                                    id="addStaffPwdConfirm" class="form-control"
+                                                    placeholder="Re-enter password" required>
                                             </div>
                                         </div>
+                                        <p class="text-muted small mt-3 mb-0">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Staff accounts added here are automatically approved and active.
+                                        </p>
                                     </div>
-                                    <div class="modal-footer">
-                                        <button type="submit" name="addStaffBTN" class="btn btn-success me-2">
-                                            <i class="fas fa-plus me-1"></i> Add Staff
+                                    <div class="modal-footer" style="background:#f8f9fa;">
+                                        <button type="button" class="btn btn-outline-secondary"
+                                            data-bs-dismiss="modal">Cancel</button>
+                                        <button type="submit" name="addStaffBTN" class="btn btn-success fw-bold px-4"
+                                            onclick="return checkPasswords('addStaffPwd','addStaffPwdConfirm')">
+                                            <i class="fas fa-user-plus me-1"></i>Add Staff
                                         </button>
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                     </div>
                                 </form>
-
                             </div>
-
                         </div>
                     </div>
                     <!-- / Add Staff modal -->
@@ -890,48 +994,114 @@ if (isset($_SESSION['message'])) {
                     </div>
 
                     <div class="container-card shadow-sm mb-4">
-                        <h4 class="mb-2 fw-bold"><i class="fas fa-clock me-2"></i>Pending Approval</h4>
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <h4 class="mb-0 fw-bold"><i class="fas fa-clock me-2"></i>Pending Approval</h4>
+                            <?php if (!empty($pending_staffs)): ?>
+                                <span class="badge bg-warning text-dark fs-6"><?= count($pending_staffs) ?></span>
+                            <?php endif; ?>
+                        </div>
+
                         <?php if (!empty($pending_staffs)): ?>
                             <?php foreach ($pending_staffs as $pending_staff): ?>
-                                <form action="" method="POST" id="approvalForm">
-                                    <div class="row">
-                                        <div class="col-12 col-md-6 col-lg-6 mb-4">
-                                            <label for="" class="form-label fw-bold">Username</label>
-                                            <input type="text" name="staff_username" class="form-control p-3 shadow-sm"
-                                                style="border-radius: 10px; border: 1px solid #e0e6ed;"
-                                                value="<?php echo htmlspecialchars($pending_staff['username']); ?>" readonly>
+                                <div class="border rounded-3 mb-4 overflow-hidden shadow-sm">
+
+                                    <!-- Profile header -->
+                                    <div class="d-flex align-items-center gap-3 p-3"
+                                        style="background:#f8f9fa; border-bottom:1px solid #e9ecef;">
+                                        <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
+                                            style="width:52px; height:52px; background:var(--udsm-blue); font-size:1.1rem; letter-spacing:1px;">
+                                            <?= strtoupper(substr($pending_staff['username'], 0, 2)) ?>
+                                        </div>
+                                        <div class="flex-grow-1 min-w-0">
+                                            <div class="fw-bold fs-6"><?= htmlspecialchars($pending_staff['username']) ?></div>
+                                            <div class="text-muted small font-monospace">
+                                                <?= htmlspecialchars($pending_staff['staff_id']) ?>
+                                            </div>
+                                        </div>
+                                        <span class="badge bg-warning text-dark flex-shrink-0">Pending</span>
+                                    </div>
+
+                                    <!-- Registration details -->
+                                    <div class="p-3">
+                                        <div class="row g-3 mb-3">
+                                            <div class="col-12 col-sm-4">
+                                                <div class="small text-muted fw-semibold mb-1"><i
+                                                        class="fas fa-envelope me-1"></i>Email</div>
+                                                <div class="small"><?= htmlspecialchars($pending_staff['user_email']) ?></div>
+                                            </div>
+                                            <div class="col-12 col-sm-4">
+                                                <div class="small text-muted fw-semibold mb-1"><i
+                                                        class="fas fa-phone me-1"></i>Phone</div>
+                                                <div class="small">
+                                                    <?= !empty($pending_staff['user_phone_number'])
+                                                        ? htmlspecialchars($pending_staff['user_phone_number'])
+                                                        : '<span class="text-muted fst-italic">Not provided</span>' ?>
+                                                </div>
+                                            </div>
+                                            <div class="col-12 col-sm-4">
+                                                <div class="small text-muted fw-semibold mb-1"><i
+                                                        class="fas fa-calendar-alt me-1"></i>Registered</div>
+                                                <div class="small">
+                                                    <?= date('d M Y, g:i A', strtotime($pending_staff['created_at'])) ?>
+                                                </div>
+                                            </div>
                                         </div>
 
-                                        <div class="col-12 col-md-6 col-lg-6 mb-4">
-                                            <label for="" class="form-label fw-bold">Department</label>
-                                            <select name="staff_department" class="form-select p-3 shadow-sm"
-                                                style="border-radius: 10px; border: 1px solid #e0e6ed;">
-                                                <option value="">-- Select Department --</option>
-                                                <?php foreach ($departments as $dept): ?>
-                                                    <option value="<?php echo $dept['department_id']; ?>">
-                                                        <?php echo htmlspecialchars($dept['department_name']); ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
+                                        <?php if (!empty($pending_staff['department_name'])): ?>
+                                            <div class="alert alert-info py-2 px-3 mb-3 small mb-0">
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                Requested department during registration:
+                                                <strong><?= htmlspecialchars($pending_staff['department_name']) ?></strong>
+                                            </div>
+                                        <?php endif; ?>
+
+                                        <!-- Approval form -->
+                                        <form action="" method="POST" class="mt-3">
+                                            <div class="row g-3 mb-3">
+                                                <div class="col-12 col-md-6">
+                                                    <label class="form-label fw-bold small">Assign Department</label>
+                                                    <select name="staff_department" class="form-select">
+                                                        <option value="">-- Select Department --</option>
+                                                        <?php foreach ($departments as $dept): ?>
+                                                            <option value="<?= $dept['department_id'] ?>" <?= (int) ($pending_staff['staff_department_id'] ?? 0) === (int) $dept['department_id'] ? 'selected' : '' ?>>
+                                                                <?= htmlspecialchars($dept['department_name']) ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </div>
+                                                <div class="col-12 col-md-6">
+                                                    <label class="form-label fw-bold small">Assign Role</label>
+                                                    <select name="staff_role" class="form-select">
+                                                        <option value="">-- Select Role --</option>
+                                                        <?php foreach ($staff_roles as $role): ?>
+                                                            <option value="<?= $role['role_id'] ?>">
+                                                                <?= htmlspecialchars($role['role_name']) ?>
+                                                                (Rank <?= $role['role_rank'] ?>)
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="d-flex gap-2">
+                                                <button type="submit" name="approve_staff"
+                                                    value="<?= $pending_staff['user_id'] ?>"
+                                                    class="btn btn-success fw-bold flex-fill p-2" style="border-radius:8px;">
+                                                    <i class="fas fa-check me-1"></i>Approve
+                                                </button>
+                                                <a href="?reject_staff=<?= $pending_staff['user_id'] ?>"
+                                                    class="btn btn-danger fw-bold flex-fill p-2" style="border-radius:8px;"
+                                                    onclick="return confirm('Reject this staff member? Their account will be permanently deleted.')">
+                                                    <i class="fas fa-times me-1"></i>Reject
+                                                </a>
+                                            </div>
+                                        </form>
                                     </div>
-                                    <div class="d-flex gap-2 pb-1">
-                                        <button type="submit" name="approve_staff"
-                                            value="<?php echo $pending_staff['user_id']; ?>" class="btn btn-primary p-3 fw-bold"
-                                            style="border-radius: 10px;">
-                                            Approve
-                                        </button>
-                                        <a href="?reject_staff=<?php echo $pending_staff['user_id']; ?>"
-                                            class="btn btn-danger p-3 fw-bold" style="border-radius: 10px;"
-                                            onclick="return confirm('Are you sure you want to reject this staff?')">
-                                            Reject
-                                        </a>
-                                    </div>
-                                </form>
-                                <hr class="my-3">
+                                </div>
                             <?php endforeach; ?>
                         <?php else: ?>
-                            <p class="text-center text-muted py-4">No pending staff approvals</p>
+                            <p class="text-center text-muted py-4">
+                                <i class="fas fa-check-circle me-2 text-success"></i>No pending staff approvals
+                            </p>
                         <?php endif; ?>
                     </div>
 
@@ -990,8 +1160,10 @@ if (isset($_SESSION['message'])) {
                                         aria-labelledby="viewApprovedStaffModalLabel" aria-hidden="true">
                                         <div class="modal-dialog modal-lg">
                                             <div class="modal-content shadow-lg rounded-3">
-                                                <div class="modal-header bg-secondary text-white">
+                                                <div class="modal-header text-white"
+                                                    style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
                                                     <h5 class="modal-title fw-bold" id="viewApprovedStaffModalLabel">
+                                                        <i class="fas fa-user-tie me-2"></i>
                                                         STAFF INFORMATION
                                                     </h5>
                                                     <button type="button" class="btn-close btn-close-white"
@@ -1048,8 +1220,11 @@ if (isset($_SESSION['message'])) {
                                         aria-labelledby="editStaffModalLabel" aria-hidden="true">
                                         <div class="modal-dialog modal-xl">
                                             <div class="modal-content shadow-lg rounded-3">
-                                                <div class="modal-header bg-secondary text-white">
+                                                <div class="modal-header text-white"
+                                                    style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
                                                     <h5 class="modal-title fw-bold" id="editStaffModalLabel">
+                                                        <i class="fas fa-user-edit me-2"></i>
+                                                        Edit Staff Information
                                                     </h5>
                                                     <button type="button" class="btn-close btn-close-white"
                                                         data-bs-dismiss="modal" aria-label="Close">x</button>
@@ -1098,7 +1273,8 @@ if (isset($_SESSION['message'])) {
                             <h4 class="mb-0 fw-bold" style="color: var(--udsm-blue);">
                                 <i class="fas fa-id-badge me-2"></i>Staff Roles
                             </h4>
-                            <button type="button" class="btn btn-add" data-bs-toggle="modal" data-bs-target="#addRoleModal">
+                            <button type="button" class="btn btn-add" data-bs-toggle="modal"
+                                data-bs-target="#addRoleModal">
                                 <i class="fas fa-plus"></i> Add New Role
                             </button>
                         </div>
@@ -1116,32 +1292,32 @@ if (isset($_SESSION['message'])) {
                                 </thead>
                                 <tbody>
                                     <?php if (!empty($staff_roles)): ?>
-                                        <?php $n = 1; foreach ($staff_roles as $role): ?>
-                                        <tr>
-                                            <td><?= $n++ ?></td>
-                                            <td><?= htmlspecialchars($role['role_name']) ?></td>
-                                            <td class="text-center">
-                                                <span class="badge bg-secondary"><?= $role['role_rank'] ?></span>
-                                            </td>
-                                            <td class="text-center">
-                                                <span class="badge bg-primary"><?= $role['staff_count'] ?></span>
-                                            </td>
-                                            <td class="text-center">
-                                                <div class="d-flex justify-content-center">
-                                                    <button type="button" class="btn btn-status btn-outline-secondary me-2"
-                                                        onclick="openEditRole(<?= htmlspecialchars(json_encode($role)) ?>)"
-                                                        data-bs-toggle="modal" data-bs-target="#editRoleModal"
-                                                        title="edit">
-                                                        <i class="fas fa-edit text-dark"></i>
-                                                    </button>
-                                                    <button type="button" class="btn btn-status btn-outline-secondary"
-                                                        onclick="confirmDeleteRole(<?= $role['role_id'] ?>, '<?= htmlspecialchars($role['role_name'], ENT_QUOTES) ?>')"
-                                                        title="delete">
-                                                        <i class="fas fa-trash text-dark"></i>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
+                                        <?php $n = 1;
+                                        foreach ($staff_roles as $role): ?>
+                                            <tr>
+                                                <td><?= $n++ ?></td>
+                                                <td><?= htmlspecialchars($role['role_name']) ?></td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-secondary"><?= $role['role_rank'] ?></span>
+                                                </td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-primary"><?= $role['staff_count'] ?></span>
+                                                </td>
+                                                <td class="text-center">
+                                                    <div class="d-flex justify-content-center">
+                                                        <button type="button" class="btn btn-status btn-outline-secondary me-2"
+                                                            onclick="openEditRole(<?= htmlspecialchars(json_encode($role)) ?>)"
+                                                            data-bs-toggle="modal" data-bs-target="#editRoleModal" title="edit">
+                                                            <i class="fas fa-edit text-dark"></i>
+                                                        </button>
+                                                        <button type="button" class="btn btn-status btn-outline-secondary"
+                                                            onclick="confirmDeleteRole(<?= $role['role_id'] ?>, '<?= htmlspecialchars($role['role_name'], ENT_QUOTES) ?>')"
+                                                            title="delete">
+                                                            <i class="fas fa-trash text-dark"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
                                         <?php endforeach; ?>
                                     <?php else: ?>
                                         <tr>
@@ -1157,29 +1333,38 @@ if (isset($_SESSION['message'])) {
                     <div class="modal fade" id="addRoleModal" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-dialog-centered">
                             <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
-                                <div class="modal-header bg-primary text-white">
-                                    <h5 class="modal-title fw-bold">ADD STAFF ROLE</h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                <div class="modal-header text-white"
+                                    style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
+                                    <h5 class="modal-title fw-bold">
+                                        <i class="fas fa-id-badge me-2"></i>
+                                        ADD STAFF ROLE
+                                    </h5>
+                                    <button type="button" class="btn-close btn-close-white"
+                                        data-bs-dismiss="modal"></button>
                                 </div>
                                 <form action="user_management.php" method="POST">
                                     <div class="modal-body px-4 py-3">
                                         <div class="mb-3">
-                                            <label class="form-label fw-bold small">Role Name <span class="text-danger">*</span></label>
+                                            <label class="form-label fw-bold small">Role Name <span
+                                                    class="text-danger">*</span></label>
                                             <input type="text" name="role_name" class="form-control p-3 shadow-sm"
                                                 style="border-radius: 10px;" placeholder="e.g., Supervisor" required>
                                         </div>
                                         <div class="mb-3">
-                                            <label class="form-label fw-bold small">Rank <span class="text-danger">*</span></label>
+                                            <label class="form-label fw-bold small">Rank <span
+                                                    class="text-danger">*</span></label>
                                             <input type="number" name="role_rank" class="form-control p-3 shadow-sm"
                                                 style="border-radius: 10px;" placeholder="e.g., 2" min="1" required>
-                                            <small class="text-muted">Higher rank = more authority. Must be unique.</small>
+                                            <small class="text-muted">Higher rank = more authority. Must be
+                                                unique.</small>
                                         </div>
                                     </div>
                                     <div class="modal-footer">
                                         <button type="submit" name="add_role" class="btn btn-primary fw-bold">
                                             <i class="fas fa-plus me-1"></i> Add Role
                                         </button>
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                        <button type="button" class="btn btn-secondary"
+                                            data-bs-dismiss="modal">Cancel</button>
                                     </div>
                                 </form>
                             </div>
@@ -1190,30 +1375,41 @@ if (isset($_SESSION['message'])) {
                     <div class="modal fade" id="editRoleModal" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-dialog-centered">
                             <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
-                                <div class="modal-header bg-primary text-white">
-                                    <h5 class="modal-title fw-bold">EDIT STAFF ROLE</h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                <div class="modal-header text-white"
+                                    style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
+                                    <h5 class="modal-title fw-bold">
+                                        <i class="fas fa-user-edit me-2"></i>
+                                        EDIT STAFF ROLE
+                                    </h5>
+                                    <button type="button" class="btn-close btn-close-white"
+                                        data-bs-dismiss="modal"></button>
                                 </div>
                                 <form action="user_management.php" method="POST">
                                     <input type="hidden" name="role_id" id="edit_role_id">
                                     <div class="modal-body px-4 py-3">
                                         <div class="mb-3">
-                                            <label class="form-label fw-bold small">Role Name <span class="text-danger">*</span></label>
+                                            <label class="form-label fw-bold small">Role Name <span
+                                                    class="text-danger">*</span></label>
                                             <input type="text" name="role_name" id="edit_role_name"
-                                                class="form-control p-3 shadow-sm" style="border-radius: 10px;" required>
+                                                class="form-control p-3 shadow-sm" style="border-radius: 10px;"
+                                                required>
                                         </div>
                                         <div class="mb-3">
-                                            <label class="form-label fw-bold small">Rank <span class="text-danger">*</span></label>
+                                            <label class="form-label fw-bold small">Rank <span
+                                                    class="text-danger">*</span></label>
                                             <input type="number" name="role_rank" id="edit_role_rank"
-                                                class="form-control p-3 shadow-sm" style="border-radius: 10px;" min="1" required>
-                                            <small class="text-muted">Higher rank = more authority. Must be unique.</small>
+                                                class="form-control p-3 shadow-sm" style="border-radius: 10px;" min="1"
+                                                required>
+                                            <small class="text-muted">Higher rank = more authority. Must be
+                                                unique.</small>
                                         </div>
                                     </div>
                                     <div class="modal-footer">
                                         <button type="submit" name="edit_role" class="btn btn-primary fw-bold">
                                             <i class="fas fa-save me-1"></i> Save Changes
                                         </button>
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                        <button type="button" class="btn btn-secondary"
+                                            data-bs-dismiss="modal">Cancel</button>
                                     </div>
                                 </form>
                             </div>
@@ -1225,9 +1421,14 @@ if (isset($_SESSION['message'])) {
                 <div class="modal fade" id="assignRoleModal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-dialog-centered">
                         <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
-                            <div class="modal-header bg-primary text-white">
-                                <h5 class="modal-title fw-bold">ASSIGN ROLE</h5>
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            <div class="modal-header text-white"
+                                style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
+                                <h5 class="modal-title fw-bold">
+                                    <i class="fas fa-user-plus me-2"></i>
+                                    ASSIGN ROLE
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white"
+                                    data-bs-dismiss="modal"></button>
                             </div>
                             <form action="user_management.php" method="POST">
                                 <input type="hidden" name="assign_staff_user_id" id="assign_staff_user_id">
@@ -1235,12 +1436,13 @@ if (isset($_SESSION['message'])) {
                                     <p class="mb-3">Assigning role to: <strong id="assign_staff_name"></strong></p>
                                     <div class="mb-3">
                                         <label class="form-label fw-bold small">Select Role</label>
-                                        <select name="assign_role_id" id="assign_role_id" class="form-select p-3 shadow-sm"
-                                            style="border-radius: 10px;">
+                                        <select name="assign_role_id" id="assign_role_id"
+                                            class="form-select p-3 shadow-sm" style="border-radius: 10px;">
                                             <option value="">-- No Role --</option>
                                             <?php foreach ($staff_roles as $role): ?>
                                                 <option value="<?= $role['role_id'] ?>">
-                                                    <?= htmlspecialchars($role['role_name']) ?> (Rank <?= $role['role_rank'] ?>)
+                                                    <?= htmlspecialchars($role['role_name']) ?> (Rank
+                                                    <?= $role['role_rank'] ?>)
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
@@ -1250,7 +1452,8 @@ if (isset($_SESSION['message'])) {
                                     <button type="submit" name="assign_role" class="btn btn-primary fw-bold">
                                         <i class="fas fa-save me-1"></i> Assign Role
                                     </button>
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="button" class="btn btn-secondary"
+                                        data-bs-dismiss="modal">Cancel</button>
                                 </div>
                             </form>
                         </div>
@@ -1274,9 +1477,9 @@ if (isset($_SESSION['message'])) {
                     if (t) t.classList.remove('active');
                 });
                 var section = document.getElementById(tabName + '-section');
-                var tab     = document.getElementById('tab-' + tabName);
+                var tab = document.getElementById('tab-' + tabName);
                 if (section) section.classList.remove('d-none');
-                if (tab)     tab.classList.add('active');
+                if (tab) tab.classList.add('active');
                 history.replaceState(null, '', '#' + tabName);
                 if (window.$ && $.fn.DataTable) {
                     $($.fn.dataTable.tables(true)).DataTable().columns.adjust();
@@ -1292,6 +1495,20 @@ if (isset($_SESSION['message'])) {
             switchTab(VALID_TABS.indexOf(initHash) !== -1 ? initHash : 'students');
         }());
 
+        function checkPasswords(pwdId, confirmId) {
+            var pwd = document.getElementById(pwdId).value;
+            var confirm = document.getElementById(confirmId).value;
+            if (pwd !== confirm) {
+                alert('Passwords do not match. Please try again.');
+                return false;
+            }
+            if (pwd.length < 8) {
+                alert('Password must be at least 8 characters.');
+                return false;
+            }
+            return true;
+        }
+
         function viewStudent(student) {
             document.getElementById('modal_student_name').textContent = student.username || '-';
             document.getElementById('modal_student_regnum').textContent = student.student_registration_number || '-';
@@ -1300,23 +1517,23 @@ if (isset($_SESSION['message'])) {
         }
 
         function viewStaff(staff) {
-            document.getElementById('modal_staff_name').textContent       = staff.username || '-';
-            document.getElementById('modal_staff_email').textContent      = staff.user_email || '-';
+            document.getElementById('modal_staff_name').textContent = staff.username || '-';
+            document.getElementById('modal_staff_email').textContent = staff.user_email || '-';
             document.getElementById('modal_staff_department').textContent = staff.department_name || '-';
-            document.getElementById('modal_staff_status').textContent     = staff.user_status || '-';
+            document.getElementById('modal_staff_status').textContent = staff.user_status || '-';
         }
 
         function viewApprovedStaff(staff) {
-            document.getElementById('astaff_name').textContent        = staff.username || '-';
-            document.getElementById('astaff_role').textContent        = staff.role_name || 'Officer';
-            document.getElementById('astaff_email').textContent       = staff.user_email || '-';
-            document.getElementById('astaff_dept').textContent        = staff.department_name || 'Unassigned';
+            document.getElementById('astaff_name').textContent = staff.username || '-';
+            document.getElementById('astaff_role').textContent = staff.role_name || 'Officer';
+            document.getElementById('astaff_email').textContent = staff.user_email || '-';
+            document.getElementById('astaff_dept').textContent = staff.department_name || 'Unassigned';
             document.getElementById('astaff_approved_at').textContent = staff.staff_approved_at
-                ? new Date(staff.staff_approved_at).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'})
+                ? new Date(staff.staff_approved_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
                 : '-';
-            document.getElementById('astaff_status').textContent      = staff.user_status || '-';
+            document.getElementById('astaff_status').textContent = staff.user_status || '-';
         }
-        
+
         function confirmDeleteStudent(studentId) {
             Swal.fire({
                 icon: 'warning',
@@ -1352,7 +1569,7 @@ if (isset($_SESSION['message'])) {
         }
 
         function openEditRole(role) {
-            document.getElementById('edit_role_id').value   = role.role_id;
+            document.getElementById('edit_role_id').value = role.role_id;
             document.getElementById('edit_role_name').value = role.role_name;
             document.getElementById('edit_role_rank').value = role.role_rank;
         }
@@ -1392,7 +1609,7 @@ if (isset($_SESSION['message'])) {
         }
 
         function openAssignRole(userId, username, currentRoleId) {
-            document.getElementById('assign_staff_user_id').value   = userId;
+            document.getElementById('assign_staff_user_id').value = userId;
             document.getElementById('assign_staff_name').textContent = username;
             const select = document.getElementById('assign_role_id');
             select.value = currentRoleId || '';
