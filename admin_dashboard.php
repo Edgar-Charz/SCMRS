@@ -27,6 +27,7 @@ $total_inprogress = $admin->getTotalInprogress();
 $total_resolved = $admin->getTotalResolved();
 $total_rejected = $admin->getTotalRejected();
 $complaints = $admin->getComplaints();
+$roleCounts = $admin->getUserCountsByRole();
 
 if (isset($_SESSION['message'])) {
     $message = $_SESSION['message'];
@@ -177,8 +178,12 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                 <?php endif; ?>
 
                 <div class="row g-3 mb-4">
-                    <div class="col12 col-md-6 col-lg-3">
-                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm"
+                            style="cursor:pointer; position:relative;" data-bs-toggle="modal"
+                            data-bs-target="#userBreakdownModal">
+                            <i class="fas fa-info-circle"
+                                style="position:absolute; top:6px; right:8px; font-size:0.7rem; opacity:0.5;"></i>
                             <i class="fas fa-users fa-2x"></i>
                             <div class="text-end">
                                 <h2 class="mb-0"> <?= $total_users; ?> </h2>
@@ -378,6 +383,55 @@ $pendingStaffCount = $admin->getPendingStaffCount();
             }
         });
     </script>
+
+    <!-- User Role Breakdown Modal -->
+    <div class="modal fade" id="userBreakdownModal" tabindex="-1" aria-labelledby="userBreakdownModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold" id="userBreakdownModalLabel">
+                        <i class="fas fa-users me-2" style="color:var(--udsm-blue);"></i>User Breakdown
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body pt-3 pb-4">
+                    <div class="row g-3 text-center">
+                        <div class="col-4">
+                            <div class="rounded-3 p-3" style="background:#eef4ff;">
+                                <i class="fas fa-user-graduate fa-2x mb-2" style="color:#0062cc;"></i>
+                                <h3 class="fw-bold mb-0" style="color:#0062cc;"><?= $roleCounts['student'] ?></h3>
+                                <p class="small mb-0 text-muted fw-semibold">Students</p>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="rounded-3 p-3" style="background:#fff8e1;">
+                                <i class="fas fa-user-tie fa-2x mb-2" style="color:#f59e0b;"></i>
+                                <h3 class="fw-bold mb-0" style="color:#f59e0b;"><?= $roleCounts['staff'] ?></h3>
+                                <p class="small mb-0 text-muted fw-semibold">Staff</p>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="rounded-3 p-3" style="background:#f0fdf4;">
+                                <i class="fas fa-user-shield fa-2x mb-2" style="color:#16a34a;"></i>
+                                <h3 class="fw-bold mb-0" style="color:#16a34a;"><?= $roleCounts['admin'] ?></h3>
+                                <p class="small mb-0 text-muted fw-semibold">Admins</p>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-center text-muted small mt-3 mb-0">
+                        Total: <strong><?= $total_users ?></strong> registered users
+                    </p>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <a href="user_management.php" class="btn btn-sm btn-primary">
+                        <i class="fas fa-external-link-alt me-1"></i>Manage Users
+                    </a>
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <?php if (!empty($_SESSION['login_success'])):
         unset($_SESSION['login_success']); ?>
