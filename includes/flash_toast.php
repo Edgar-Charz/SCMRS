@@ -41,15 +41,16 @@ $_iconMap = [
 ];
 ?>
 <div class="position-fixed top-0 start-50 translate-middle-x p-3"
-    style="z-index:11000; min-width:400px; max-width:600px;" id="flashToastStack">
+    style="z-index:11000; width:min(680px, 92vw);" id="flashToastStack">
     <?php foreach ($_toasts as $_t):
         $bgType = explode(' ', $_t['type'])[0];
         $icon   = $_iconMap[$_t['type']] ?? 'fa-info-circle';
     ?>
-    <div class="toast show align-items-center text-white bg-<?= $_t['type'] ?> border-0 mb-2 shadow-sm"
-        role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="d-flex">
-            <div class="toast-body fw-semibold">
+    <div class="toast show align-items-center text-white bg-<?= $_t['type'] ?> border-0 mb-2 shadow"
+        role="alert" aria-live="assertive" aria-atomic="true"
+        style="font-size:1.05rem; width:100%; max-width:100%; border-radius:10px;">
+        <div class="d-flex align-items-center">
+            <div class="toast-body fw-semibold py-3 px-4 flex-grow-1">
                 <i class="fas <?= $icon ?> me-2"></i><?= htmlspecialchars($_t['text']) ?>
             </div>
             <button type="button" class="btn-close btn-close-white me-2 m-auto"

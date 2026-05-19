@@ -64,10 +64,10 @@ document.addEventListener("DOMContentLoaded", function () {
   }
   const overlay = document.querySelector(".overlay");
 
-  // Desktop persistence
+  // Desktop: open by default, collapsed only if user explicitly closed it
   if (
     window.innerWidth >= 768 &&
-    localStorage.getItem("sidebarStatus") === "permanent-expanded"
+    localStorage.getItem("sidebarStatus") !== "collapsed"
   ) {
     sidebar.classList.add("expanded");
   }
@@ -95,17 +95,23 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
-// Active menu highlighting with query params
+// Active menu highlighting
 const currentURL = window.location.pathname.split("/").pop();
-const links = document.querySelectorAll("#sidebar ul li a");
 
-links.forEach((link) => {
-  const linkURL = link.getAttribute("href");
+// Pages not in the sidebar — map them to their parent nav link
+const parentPageMap = {
+  "complaint_details.php":          "manage_complaints.php",
+  "respond_complaint.php":          "manage_complaints.php",
+  "assigned_complaint_details.php": "assigned_complaints.php",
+  "respond_assigned_complaint.php": "assigned_complaints.php",
+  "student_complaint_details.php":  "track_complaints.php",
+};
 
-  // Remove query params from link too
-  const cleanLinkURL = linkURL.split("?")[0];
+const activeURL = parentPageMap[currentURL] ?? currentURL;
 
-  if (currentURL === cleanLinkURL) {
+document.querySelectorAll("#sidebar ul li a").forEach((link) => {
+  const cleanLinkURL = link.getAttribute("href").split("?")[0];
+  if (activeURL && cleanLinkURL === activeURL) {
     link.parentElement.classList.add("active");
   } else {
     link.parentElement.classList.remove("active");

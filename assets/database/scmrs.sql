@@ -131,7 +131,8 @@ CREATE TABLE
       'in_progress',
       'rejected',
       'awaiting_student_response',
-      'resolved'
+      'resolved',
+      'reopened'
     ) DEFAULT 'pending',
     `is_anonymous` tinyint (1) DEFAULT 0,
     `complaint_response` text DEFAULT NULL,

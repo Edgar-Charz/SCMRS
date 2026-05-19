@@ -99,10 +99,11 @@ html {
 
 #sidebar ul li.active > a {
   color: #fff;
-  font-weight: bold;
-  background: rgba(255, 255, 255, 0.1);
-  border-left: 5px solid rgb(62, 16, 16);
-  border-radius: 8px;
+  font-weight: 600;
+  background: rgba(253, 216, 53, 0.12);
+  border-left: 3px solid var(--udsm-yellow);
+  padding-left: 17px;
+  border-radius: 0 6px 6px 0;
   margin: 2px;
 }
 
@@ -406,7 +407,7 @@ html {
   box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 }
 
-.container-card h4 {
+.container-card h4, h5, h6 {
   color: var(--udsm-blue);
 }
 
@@ -420,7 +421,7 @@ html {
   margin-top: 2rem;
   box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 }
-.form-card h4 {
+.form-card h4, .form-card h5, .form-card h6 {
   color: var(--udsm-blue);
 }
 .form-hint {
