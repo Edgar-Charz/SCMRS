@@ -383,6 +383,8 @@ class Admin extends User
         $stmt = $this->conn->prepare(
             "SELECT c.*, cc.category_name,
                     u.username AS student_name,
+                    u.user_email AS student_email,
+                    u.user_phone_number AS student_phone,
                     s.student_registration_number,
                     d.department_name,
                     su.username AS assigned_staff_name

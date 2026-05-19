@@ -139,6 +139,7 @@ class Notification
             'complaint_rejected' => 'fa-ban text-danger',
             'complaint_resolved' => 'fa-check-double text-success',
             'complaint_deleted'  => 'fa-trash text-danger',
+            'complaint_reopened' => 'fa-redo text-warning',
         ];
         return $map[$type] ?? 'fa-bell text-secondary';
     }

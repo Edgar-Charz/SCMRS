@@ -239,6 +239,61 @@ class Student extends User
         return $data;
     }
 
+    public function reopenComplaint($complaintId, $studentId, $userId)
+    {
+        // Verify ownership, status and 7-day window
+        $stmt = $this->conn->prepare(
+            "SELECT complaint_status, updated_at, assigned_staff_id
+             FROM complaints
+             WHERE complaint_id = ? AND student_id = ?"
+        );
+        $stmt->bind_param("ii", $complaintId, $studentId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if (!$row) throw new Exception("Complaint not found.");
+        if ($row['complaint_status'] !== 'resolved')
+            throw new Exception("Only resolved complaints can be reopened.");
+
+        $daysSince = (new DateTime())->diff(new DateTime($row['updated_at']))->days;
+        if ($daysSince > 7)
+            throw new Exception("Complaints can only be reopened within 7 days of resolution.");
+
+        // Update status
+        $stmt = $this->conn->prepare(
+            "UPDATE complaints SET complaint_status = 'reopened', updated_at = NOW() WHERE complaint_id = ?"
+        );
+        $stmt->bind_param("i", $complaintId);
+        $stmt->execute();
+        $stmt->close();
+
+        // Log the change
+        $old = 'resolved'; $new = 'reopened';
+        $remarks = 'Student requested reopening — resolution was unsatisfactory.';
+        $stmt = $this->conn->prepare(
+            "INSERT INTO complaint_status_logs (complaint_id, performed_by, action, old_status, new_status, remarks)
+             VALUES (?, ?, 'complaint_reopened', ?, ?, ?)"
+        );
+        $stmt->bind_param("iisss", $complaintId, $userId, $old, $new, $remarks);
+        $stmt->execute();
+        $stmt->close();
+
+        // Look up the active lead staff via complaint_assignments
+        $stmt = $this->conn->prepare(
+            "SELECT sf.staff_user_id
+             FROM complaint_assignments ca
+             JOIN staffs sf ON ca.staff_id = sf.staff_id
+             WHERE ca.complaint_id = ? AND ca.status = 'active' AND ca.is_lead = 1
+             LIMIT 1"
+        );
+        $stmt->bind_param("i", $complaintId);
+        $stmt->execute();
+        $staffRow = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return $staffRow['staff_user_id'] ?? null;
+    }
+
     // Get filtered complaints with status tabs support
     public function getFilteredComplaints($studentId, $filter = 'all')
     {

@@ -126,10 +126,12 @@ class Staff
     public function getAssignedComplaints($staffId)
     {
         $sql = "SELECT complaints.complaint_id, complaints.complaint_title, complaints.complaint_status, complaints.created_at,
-                       users.username AS student_name, complaint_categories.category_name
+                       complaints.is_anonymous, users.username AS student_name,
+                       students.student_registration_number, complaint_categories.category_name
                 FROM complaints
                 JOIN complaint_assignments ca ON complaints.complaint_id = ca.complaint_id AND ca.staff_id = ? AND ca.status = 'active'
-                LEFT JOIN users ON complaints.student_id = users.user_id
+                JOIN students ON complaints.student_id = students.student_id
+                JOIN users ON students.student_user_id = users.user_id
                 LEFT JOIN complaint_categories ON complaints.category_id = complaint_categories.category_id
                 ORDER BY complaints.created_at DESC";
 
@@ -304,13 +306,18 @@ class Staff
     public function getComplaintById($complaintId, $staffId)
     {
         $sql = "SELECT c.*,
+                       u.user_id AS student_user_id,
                        u.username AS student_name,
+                       u.user_email AS student_email,
+                       u.user_phone_number AS student_phone,
+                       s.student_registration_number,
                        cc.category_name,
                        d.department_name,
                        su.username AS assigned_staff_name,
                        sr.role_name AS staff_role_name
                 FROM complaints c
-                LEFT JOIN users u ON c.student_id = u.user_id
+                JOIN students s ON c.student_id = s.student_id
+                JOIN users u ON s.student_user_id = u.user_id
                 LEFT JOIN complaint_categories cc ON c.category_id = cc.category_id
                 LEFT JOIN departments d ON c.department_id = d.department_id
                 JOIN complaint_assignments ca ON c.complaint_id = ca.complaint_id AND ca.staff_id = ? AND ca.status = 'active'
