@@ -17,6 +17,7 @@ if ($complaintId <= 0) {
 require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/Student.php";
+require_once "classes/Notification.php";
 
 $db      = new Database();
 $conn    = $db->connect();
@@ -49,6 +50,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         } catch (Exception $e) {
             $error = $e->getMessage();
         }
+    }
+}
+
+// ── Handle: reopen complaint ─────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'reopen_complaint') {
+    try {
+        $notif      = new Notification($conn);
+        $staffUserId = $student->reopenComplaint($complaintId, $studentId, $userId);
+
+        $link = "assigned_complaint_details.php?id=$complaintId";
+        $msg  = "Complaint #$complaintId has been reopened by the student — please review.";
+
+        if ($staffUserId) {
+            $notif->create($staffUserId, $msg, 'complaint_reopened', $link, $complaintId);
+        }
+        $notif->notifyAllAdmins($msg, 'complaint_reopened', "complaint_details.php?id=$complaintId", $complaintId);
+
+        $_SESSION['message'] = "Your complaint has been reopened. The assigned staff has been notified.";
+        header("Location: student_complaint_details.php?id=$complaintId");
+        exit;
+    } catch (Exception $e) {
+        $error = $e->getMessage();
     }
 }
 
@@ -102,6 +125,7 @@ function statusBadge($status): string
         'awaiting_student_response' => ['bg-primary text-white','Awaiting Your Response'],
         'resolved'                  => ['bg-success text-white','Resolved'],
         'rejected'                  => ['bg-danger text-white', 'Rejected'],
+        'reopened'                  => ['bg-warning text-dark', 'Reopened'],
     ];
     [$cls, $label] = $map[$status] ?? ['bg-secondary text-white', ucfirst(str_replace('_', ' ', $status))];
     return "<span class=\"badge $cls\">$label</span>";
@@ -136,51 +160,7 @@ function statusBadge($status): string
     </div>
 
     <div class="d-flex">
-
-        <!-- Sidebar -->
-        <nav id="sidebar">
-            <div class="sidebar-header d-flex align-items-center">
-                <div class="logo-container me-2">
-                    <img src="assets/img/logo.png" alt="UDSM Logo" class="img-fluid rounded circle"
-                        style="width:45px;height:45px;object-fit:cover;border:2px solid var(--udsm-yellow);">
-                </div>
-                <div class="header-text">
-                    <h6 class="mb-0 text-white fw-bold">UDSM</h6>
-                    <small class="text-warning" style="font-size:.7rem;">Complaints System</small>
-                </div>
-            </div>
-
-            <div class="user-info d-flex align-items-center">
-                <div class="flex-shrink-0"><i class="fas fa-user me-2"></i></div>
-                <div class="flex-grow-1 ms-3">
-                    <p class="mb-0 small fw-bold"><?= strtoupper($_SESSION['user_role']) ?></p>
-                </div>
-            </div>
-
-            <ul class="list-unstyled components">
-                <li>
-                    <a href="student_dashboard.php" title="Dashboard">
-                        <i class="fas fa-chart-pie me-2"></i><span class="link-text">Dashboard</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="create_complaint.php" title="Submit Complaint">
-                        <i class="fas fa-paper-plane me-2"></i><span class="link-text">Submit Complaint</span>
-                    </a>
-                </li>
-                <li class="active">
-                    <a href="track_complaints.php" title="Track Complaints">
-                        <i class="fas fa-search-location me-2"></i><span class="link-text">Track Complaints</span>
-                    </a>
-                </li>
-            </ul>
-            <div class="sidebar-footer">
-                <a href="logout.php" title="Sign Out">
-                    <i class="fas fa-sign-out-alt me-2"></i>
-                    <span class="link-text">Sign Out</span>
-                </a>
-            </div>
-        </nav>
+        <?php require_once 'includes/sidebar.php'; ?>
 
         <div id="content" class="w-100">
 
@@ -447,6 +427,33 @@ function statusBadge($status): string
                     </div>
                 <?php endif; ?>
 
+                <!-- ── Reopen Complaint ─────────────────────────── -->
+                <?php
+                $canReopen = $complaint_details['complaint_status'] === 'resolved'
+                    && (new DateTime())->diff(new DateTime($complaint_details['updated_at']))->days <= 7;
+                ?>
+                <?php if ($canReopen): ?>
+                <div class="container-card shadow-sm mb-4" style="border-left:4px solid #f59e0b;">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                        <div>
+                            <h6 class="fw-bold mb-1"><i class="fas fa-redo me-2 text-warning"></i>Not satisfied with the resolution?</h6>
+                            <p class="text-muted small mb-0">
+                                You can reopen this complaint within 7 days of it being resolved.
+                                The assigned staff will be notified immediately.
+                            </p>
+                        </div>
+                        <button type="button" class="btn btn-warning fw-bold"
+                            onclick="confirmReopen(<?= $complaintId ?>)">
+                            <i class="fas fa-redo me-1"></i> Reopen Complaint
+                        </button>
+                    </div>
+                    <form id="reopenForm" method="POST"
+                        action="student_complaint_details.php?id=<?= $complaintId ?>">
+                        <input type="hidden" name="action" value="reopen_complaint">
+                    </form>
+                </div>
+                <?php endif; ?>
+
                 <!-- ── Complaint Timeline ────────────────────────── -->
                 <?php if (!empty($complaint_history)): ?>
                     <div class="container-card shadow-sm mb-4">
@@ -489,6 +496,25 @@ function statusBadge($status): string
     <script src="assets/js/bootstrap.bundle.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
     <script src="assets/js/script.js"></script>
+
+    <script>
+        function confirmReopen(id) {
+            Swal.fire({
+                title: 'Reopen this complaint?',
+                html: 'This will notify the assigned staff to revisit your complaint.<br><small class="text-muted">You can only reopen once within 7 days of resolution.</small>',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#f59e0b',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: '<i class="fas fa-redo me-1"></i> Yes, Reopen',
+                cancelButtonText: 'Cancel',
+            }).then(function (result) {
+                if (result.isConfirmed) {
+                    document.getElementById('reopenForm').submit();
+                }
+            });
+        }
+    </script>
 
     <script>
         // Star rating highlight

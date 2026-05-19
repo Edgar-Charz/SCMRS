@@ -95,58 +95,7 @@ if (isset($_SESSION['message'])) {
     </div>
 
     <div class="d-flex">
-
-        <!-- Sidebar -->
-        <nav id="sidebar">
-            <div class="sidebar-header d-flex align-items-center">
-                <div class="logo-container me-2">
-                    <img src="assets/img/logo.png" alt="UDSM Logo" class="img-fluid rounded circle"
-                        Style="width: 45px; height: 45px; object-fit: cover; border: 2px solid var(--udsm-yellow);">
-                </div>
-                <div class="header-text">
-                    <h6 class="mb-0 text-white fw-bold"> UDSM</h6>
-                    <small class="text-warning" style="font-size: 0.7rem;">Complaints System</small>
-                </div>
-            </div>
-
-            <div class="user-info d-flex align-items-center">
-                <div class="flex-shrink-0">
-                    <i class="fas fa-user me-2"></i>
-                </div>
-                <div class="flex-grow-1 ms-3">
-                    <p class="mb-0 small fw-bold">
-                        <?= strtoupper($_SESSION['user_role']); ?>
-                    </p>
-                </div>
-            </div>
-
-            <ul class="list-unstyled components">
-                <li>
-                    <a href="student_dashboard.php" title="Dashboard">
-                        <i class="fas fa-chart-pie me-2"></i>
-                        <span class="link-text">Dashboard</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="create_complaint.php" title="Submit Complaint">
-                        <i class="fas fa-paper-plane me-2"></i>
-                        <span class="link-text">Submit Complaint</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="track_complaints.php" title="Track Complaints">
-                        <i class="fas fa-search-location me-2"></i>
-                        <span class="link-text">Track Complaints</span>
-                    </a>
-                </li>
-            </ul>
-            <div class="sidebar-footer">
-                <a href="logout.php" title="Sign Out">
-                    <i class="fas fa-sign-out-alt me-2"></i>
-                    <span class="link-text">Sign Out</span>
-                </a>
-            </div>
-        </nav>
+        <?php require_once 'includes/sidebar.php'; ?>
 
         <div id="content" class="w-100">
 

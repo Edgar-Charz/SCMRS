@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
@@ -66,80 +66,7 @@ $pendingStaffCount = $admin->getPendingStaffCount();
     </div>
 
     <div class="d-flex">
-
-        <!-- Sidebar -->
-        <nav id="sidebar">
-            <div class="sidebar-header d-flex align-items-center">
-                <div class="logo-container me-2">
-                    <img src="assets/img/logo.png" alt="UDSM Logo" class="img-fluid rounded circle"
-                        Style="width: 45px; height: 45px; object-fit: cover; border: 2px solid var(--udsm-yellow);">
-                </div>
-                <div class="header-text">
-                    <h6 class="mb-0 text-white fw-bold"> UDSM</h6>
-                    <small class="text-warning" style="font-size: 0.7rem;">Complaints System</small>
-                </div>
-            </div>
-
-            <div class="user-info d-flex align-items-center">
-                <div class="flex-shrink-0">
-                    <i class="fas fa-user me-2"></i>
-                </div>
-                <div class="flex-grow-1 ms-3">
-                    <p class="mb-0 small fw-bold">ADMIN</p>
-                </div>
-            </div>
-
-            <ul class="list-unstyled components">
-                <li>
-                    <a href="admin_dashboard.php" title="Dashboard">
-                        <i class="fas fa-chart-pie me-2"></i>
-                        <span class="link-text">Overview</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="manage_complaints.php" title="Manage Complaints">
-                        <i class="fas fa-file-invoice me-2"></i>
-                        <span class="link-text">Student Complaints</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="user_management.php">
-                        <i class="fas fa-user-shield me-2"></i>
-                        <span class="link-text">User Management</span>
-                    </a>
-                </li>
-                <!-- <li>
-                    <a href="staff_approval.php">
-                        <i class="fas fa-check-circle me-2"></i>
-                        <span class="link-text">Staff Approval</span>
-                    </a>
-                </li> -->
-                <li>
-                    <a href="manage_departments.php" title="Departments">
-                        <i class="fas fa-sitemap me-2"></i>
-                        <span class="link-text">Departments</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="manage_categories.php" title="Categories">
-                        <i class="fas fa-tags me-2"></i>
-                        <span class="link-text">Categories</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="reports.php" title="Reports">
-                        <i class="fas fa-file-contract me-2"></i>
-                        <span class="link-text">Reports</span>
-                    </a>
-                </li>
-            </ul>
-            <div class="sidebar-footer">
-                <a href="logout.php" title="Sign Out">
-                    <i class="fas fa-sign-out-alt me-2"></i>
-                    <span class="link-text">Sign Out</span>
-                </a>
-            </div>
-        </nav>
+        <?php require_once 'includes/sidebar.php'; ?>
 
         <div id="content" class="w-100">
 
@@ -182,86 +109,108 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                         <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm"
                             style="cursor:pointer; position:relative;" data-bs-toggle="modal"
                             data-bs-target="#userBreakdownModal">
-                            <i class="fas fa-info-circle"
+                            <i class="fas fa-circle-info"
                                 style="position:absolute; top:6px; right:8px; font-size:0.7rem; opacity:0.5;"></i>
-                            <i class="fas fa-users fa-2x"></i>
+                            <div
+                                style="width:48px;height:48px;border-radius:12px;background:rgba(0,98,204,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <i class="fas fa-users fa-lg" style="color:#0062cc;"></i>
+                            </div>
                             <div class="text-end">
-                                <h2 class="mb-0"> <?= $total_users; ?> </h2>
-                                <p class="mb-0 fw-bold">Total Users</p>
+                                <h2 class="mb-0 fw-bold" style="color:#0062cc;"> <?= $total_users; ?> </h2>
+                                <p class="mb-0 fw-bold small">Total Users</p>
                             </div>
                         </div>
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
                         <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
-                            <i class="fas fa-sitemap fa-2x" style="color: black;"></i>
+                            <div
+                                style="width:48px;height:48px;border-radius:12px;background:rgba(124,58,237,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <i class="fas fa-sitemap fa-lg" style="color:#7c3aed;"></i>
+                            </div>
                             <div class="text-end">
-                                <h2 class="mb-0"> <?= $total_departments; ?> </h2>
-                                <p class="mb-0 fw-bold">Departments</p>
+                                <h2 class="mb-0 fw-bold" style="color:#7c3aed;"> <?= $total_departments; ?> </h2>
+                                <p class="mb-0 fw-bold small">Departments</p>
                             </div>
                         </div>
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
                         <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
-                            <i class="fas fa-tags fa-2x"></i>
+                            <div
+                                style="width:48px;height:48px;border-radius:12px;background:rgba(8,145,178,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <i class="fas fa-tags fa-lg" style="color:#0891b2;"></i>
+                            </div>
                             <div class="text-end">
-                                <h2 class="mb-0"> <?= $total_categories; ?> </h2>
-                                <p class="mb-0 fw-bold">Categories</p>
+                                <h2 class="mb-0 fw-bold" style="color:#0891b2;"> <?= $total_categories; ?> </h2>
+                                <p class="mb-0 fw-bold small">Categories</p>
                             </div>
                         </div>
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
                         <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
-                            <i class="fas fa-folder-open fa-2x"></i>
+                            <div
+                                style="width:48px;height:48px;border-radius:12px;background:rgba(79,70,229,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <i class="fas fa-folder-open fa-lg" style="color:#4f46e5;"></i>
+                            </div>
                             <div class="text-end">
-                                <h2 class="mb-0"> <?= $total_complaints; ?> </h2>
+                                <h2 class="mb-0 fw-bold" style="color:#4f46e5;"> <?= $total_complaints; ?> </h2>
                                 <p class="mb-0 fw-bold small">Total Complaints</p>
                             </div>
                         </div>
                     </div>
-
                 </div>
 
                 <div class="row g-3 mb-4">
-
                     <div class="col-12 col-md-6 col-lg-3">
                         <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
-                            <i class="fas fa-clock fa-2x"></i>
+                            <div
+                                style="width:48px;height:48px;border-radius:12px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <i class="fas fa-clock fa-lg" style="color:#f59e0b;"></i>
+                            </div>
                             <div class="text-end">
-                                <h2 class="mb-0"> <?= $total_pending; ?> </h2>
-                                <p class="mb-0 fw-bold">Pending</p>
+                                <h2 class="mb-0 fw-bold" style="color:#f59e0b;"> <?= $total_pending; ?> </h2>
+                                <p class="mb-0 fw-bold small">Pending</p>
                             </div>
                         </div>
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
                         <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
-                            <i class="fas fa-spinner fa-spin fa-2x" style="color: black;"></i>
+                            <div
+                                style="width:48px;height:48px;border-radius:12px;background:rgba(2,132,199,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <i class="fas fa-spinner fa-spin fa-lg" style="color:#0284c7;"></i>
+                            </div>
                             <div class="text-end">
-                                <h2 class="mb-0"> <?= $total_inprogress; ?> </h2>
-                                <p class="mb-0 fw-bold">In Progress</p>
+                                <h2 class="mb-0 fw-bold" style="color:#0284c7;"> <?= $total_inprogress; ?> </h2>
+                                <p class="mb-0 fw-bold small">In Progress</p>
                             </div>
                         </div>
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
                         <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
-                            <i class="fas fa-check-circle fa-2x"></i>
+                            <div
+                                style="width:48px;height:48px;border-radius:12px;background:rgba(22,163,74,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <i class="fas fa-check-circle fa-lg" style="color:#16a34a;"></i>
+                            </div>
                             <div class="text-end">
-                                <h2 class="mb-0"> <?= $total_resolved; ?> </h2>
-                                <p class="mb-0 fw-bold">Resolved</p>
+                                <h2 class="mb-0 fw-bold" style="color:#16a34a;"> <?= $total_resolved; ?> </h2>
+                                <p class="mb-0 fw-bold small">Resolved</p>
                             </div>
                         </div>
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
                         <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
-                            <i class="fas fa-times-circle fa-2x"></i>
+                            <div
+                                style="width:48px;height:48px;border-radius:12px;background:rgba(220,38,38,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <i class="fas fa-times-circle fa-lg" style="color:#dc2626;"></i>
+                            </div>
                             <div class="text-end">
-                                <h2 class="mb-0"> <?= $total_rejected; ?> </h2>
-                                <p class="mb-0 fw-bold">Rejected</p>
+                                <h2 class="mb-0 fw-bold" style="color:#dc2626;"> <?= $total_rejected; ?> </h2>
+                                <p class="mb-0 fw-bold small">Rejected</p>
                             </div>
                         </div>
                     </div>

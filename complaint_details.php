@@ -73,9 +73,10 @@ $infoRequests = $admin->getInformationRequests($complaintId);
 $statusLogs   = $admin->getComplaintStatusLogs($complaintId);
 $feedback     = $admin->getComplaintFeedback($complaintId);
 
-$studentName = $complaint['is_anonymous']
-    ? 'Anonymous Student'
-    : htmlspecialchars($complaint['student_name']);
+$studentName = htmlspecialchars($complaint['student_name']);
+$anonymousBadge = $complaint['is_anonymous']
+    ? ' <span class="badge ms-1" style="background:#111;color:#fff;font-size:.7rem;vertical-align:middle;">Anonymous</span>'
+    : '';
 
 function statusBadge($status)
 {
@@ -132,66 +133,7 @@ $irStatusMap = [
     </div>
 
     <div class="d-flex">
-
-        <!-- Sidebar -->
-        <nav id="sidebar">
-            <div class="sidebar-header d-flex align-items-center">
-                <div class="logo-container me-2">
-                    <img src="assets/img/logo.png" alt="UDSM Logo" class="img-fluid rounded circle"
-                        style="width: 45px; height: 45px; object-fit: cover; border: 2px solid var(--udsm-yellow);">
-                </div>
-                <div class="header-text">
-                    <h6 class="mb-0 text-white fw-bold">UDSM</h6>
-                    <small class="text-warning" style="font-size: 0.7rem;">Complaints System</small>
-                </div>
-            </div>
-
-            <div class="user-info d-flex align-items-center">
-                <div class="flex-shrink-0"><i class="fas fa-user me-2"></i></div>
-                <div class="flex-grow-1 ms-3">
-                    <p class="mb-0 small fw-bold">ADMIN</p>
-                </div>
-            </div>
-
-            <ul class="list-unstyled components">
-                <li>
-                    <a href="admin_dashboard.php" title="Dashboard">
-                        <i class="fas fa-chart-pie me-2"></i><span class="link-text">Overview</span>
-                    </a>
-                </li>
-                <li class="active">
-                    <a href="manage_complaints.php" title="Manage Complaints">
-                        <i class="fas fa-file-invoice me-2"></i><span class="link-text">Student Complaints</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="user_management.php">
-                        <i class="fas fa-user-shield me-2"></i><span class="link-text">User Management</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="manage_departments.php" title="Departments">
-                        <i class="fas fa-sitemap me-2"></i><span class="link-text">Departments</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="manage_categories.php" title="Categories">
-                        <i class="fas fa-tags me-2"></i><span class="link-text">Categories</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="reports.php" title="Reports">
-                        <i class="fas fa-file-contract me-2"></i><span class="link-text">Reports</span>
-                    </a>
-                </li>
-            </ul>
-            <div class="sidebar-footer">
-                <a href="logout.php" title="Sign Out">
-                    <i class="fas fa-sign-out-alt me-2"></i>
-                    <span class="link-text">Sign Out</span>
-                </a>
-            </div>
-        </nav>
+        <?php require_once 'includes/sidebar.php'; ?>
 
         <div id="content" class="w-100">
 
@@ -252,14 +194,32 @@ $irStatusMap = [
 
                     <div class="detail-row">
                         <div class="detail-label fw-bold">Student:</div>
-                        <div class="detail-value"><?= $studentName ?></div>
+                        <div class="detail-value"><?= $studentName . $anonymousBadge ?></div>
                     </div>
 
-                    <?php if (!$complaint['is_anonymous']): ?>
+                    <div class="detail-row">
+                        <div class="detail-label fw-bold">Reg. Number:</div>
+                        <div class="detail-value">
+                            <?= htmlspecialchars($complaint['student_registration_number']) ?>
+                        </div>
+                    </div>
+
+                    <?php if (!empty($complaint['student_email'])): ?>
                         <div class="detail-row">
-                            <div class="detail-label fw-bold">Reg. Number:</div>
+                            <div class="detail-label fw-bold">Email:</div>
                             <div class="detail-value">
-                                <?= htmlspecialchars($complaint['student_registration_number']) ?>
+                                <a href="mailto:<?= htmlspecialchars($complaint['student_email']) ?>">
+                                    <?= htmlspecialchars($complaint['student_email']) ?>
+                                </a>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($complaint['student_phone'])): ?>
+                        <div class="detail-row">
+                            <div class="detail-label fw-bold">Phone:</div>
+                            <div class="detail-value">
+                                <?= htmlspecialchars($complaint['student_phone']) ?>
                             </div>
                         </div>
                     <?php endif; ?>
