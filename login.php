@@ -20,8 +20,8 @@ if (isset($_SESSION['message'])) {
 if (isset($_POST["loginBTN"])) {
 
     // User credentials
-    $email      = isset($_POST['email']) ? trim($_POST['email']) : '';
-    $password   = $_POST['password'] ?? '';
+    $email = isset($_POST['email']) ? trim($_POST['email']) : '';
+    $password = $_POST['password'] ?? '';
 
     // Validate user credentials
     if (empty($email) || empty($password)) {
@@ -46,7 +46,7 @@ if (isset($_POST["loginBTN"])) {
             switch ($role) {
                 case 'student':
                     header("Location: student_dashboard.php");
-                    break; 
+                    break;
                 case 'staff':
                     header("Location: staff_dashboard.php");
                     break;
@@ -79,58 +79,192 @@ if (isset($_POST["loginBTN"])) {
     <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
     <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="assets/css/auth-style.css">
+    <style>
+        body {
+            background-color: #001a52;
+            position: relative;
+        }
+
+        /* ── Slideshow backgrounds (same photos as register page) ── */
+        .slide-bg {
+            position: fixed;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+            z-index: 0;
+            animation: campusSlide 25s infinite;
+        }
+
+        .slide-bg:nth-child(1) {
+            background-image: url('assets/img/campus1.jpg');
+            animation-delay: 0s;
+        }
+
+        .slide-bg:nth-child(2) {
+            background-image: url('assets/img/campus2.jpg');
+            animation-delay: 5s;
+        }
+
+        .slide-bg:nth-child(3) {
+            background-image: url('assets/img/campus3.jpg');
+            animation-delay: 10s;
+        }
+
+        .slide-bg:nth-child(4) {
+            background-image: url('assets/img/campus4.jpg');
+            animation-delay: 15s;
+        }
+
+        .slide-bg:nth-child(5) {
+            background-image: url('assets/img/campus5.jpg');
+            animation-delay: 20s;
+        }
+
+        @keyframes campusSlide {
+            0% {
+                opacity: 0;
+            }
+
+            7% {
+                opacity: 1;
+            }
+
+            27% {
+                opacity: 1;
+            }
+
+            33% {
+                opacity: 0;
+            }
+
+            100% {
+                opacity: 0;
+            }
+        }
+
+        /* Dark overlay above photos */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            background: linear-gradient(160deg,
+                    rgba(0, 10, 40, 0.82) 0%,
+                    rgba(0, 35, 100, 0.72) 50%,
+                    rgba(0, 60, 100, 0.68) 100%);
+            pointer-events: none;
+        }
+
+        body::after {
+            content: none;
+        }
+
+        .auth-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 375px;
+        }
+
+        .brand-logo {
+            width: 86px;
+            height: 86px;
+            border: 3px solid rgba(253, 216, 53, 0.9);
+            box-shadow: 0 0 0 5px rgba(253, 216, 53, 0.12), 0 8px 28px rgba(0, 0, 0, 0.5);
+            margin-bottom: -30px;
+            position: relative;
+            z-index: 3;
+            background: #fff;
+        }
+
+        .auth-card {
+            position: relative;
+            z-index: 2;
+            background: #fff;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35), 0 4px 16px rgba(0, 0, 0, 0.2);
+            padding-top: 48px;
+        }
+    </style>
 </head>
 
 <body>
 
     <div id="loader">
-        <div class="spinner"></div>
+        <div class="loader-content">
+            <img src="assets/img/logo.png" alt="UDSM" class="loader-logo">
+            <div class="spinner"></div>
+            <p class="loader-text">Please wait...</p>
+        </div>
     </div>
 
-    <div class="auth-card text-center">
+    <!-- Campus slideshow backgrounds -->
+    <div class="slide-bg"></div>
+    <div class="slide-bg"></div>
+    <div class="slide-bg"></div>
+    <div class="slide-bg"></div>
+    <div class="slide-bg"></div>
+
+    <div class="auth-wrap">
         <img src="assets/img/logo.png" alt="UDSM Logo" class="rounded-circle brand-logo">
-        <h4 class="fw-bold mb-1">Welcome Back</h4>
-        <p class="text-muted small mb-4">Login to manage your complaints</p>
+        <div class="auth-card text-center">
+            <h4 class="fw-bold mb-1">Welcome Back</h4>
+            <p class="text-muted small mb-2">Login to manage your complaints</p>
 
-        <!-- Alert -->
-        <?php if (!empty($message) || !empty($error)):
-            $type = !empty($message) ? 'success' : 'danger';
-            $text = !empty($message) ? $message : $error;
-            ?>
-            <div class="alert alert-<?php echo $type; ?> text-start mb-3" id="loginAlert">
-                <span style="display: flex; align-items: center; gap: 0.5rem; font-size: 15px;">
-                    <i class="fas <?php echo $type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'; ?>"></i>
-                    <?php echo htmlspecialchars($text); ?>
-                    <button onclick="document.getElementById('loginAlert').style.display='none'"
-                        style="background: none; border: none; color: inherit; cursor: pointer; opacity: 0.7; transition: opacity 0.2s; margin-left: auto;"
-                        onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </span>
-            </div>
-        <?php endif; ?>
-        <!-- / Alert -->
-
-        <form action="" method="POST" onsubmit="showLoader()">
-            <div class="mb-3 text-start">
-                <label for="" class="form-label small fw-bold">Email Address</label>
-                <input type="email" name="email" class="form-control" placeholder="name@example.com" autocomplete required>
-            </div>
-            <div class="mb-3 text-start">
-                <label for="" class="form-label small fw-bold">Password</label>
-                <input type="password" name="password" class="form-control" placeholder="........" autocomplete required>
-            </div>
-            <div class="d-flex justify-content-between mb-4">
-                <div class="form-check small">
-                    <input type="checkbox" class="form-check-input" id="remember">
-                    <label for="remember" class="form-check-label">Remember me</label>
+            <!-- Alert -->
+            <?php if (!empty($message) || !empty($error)):
+                $type = !empty($message) ? 'success' : 'danger';
+                $text = !empty($message) ? $message : $error;
+                ?>
+                <div class="alert alert-<?php echo $type; ?> text-start mb-2" id="loginAlert">
+                    <span style="display: flex; align-items: center; gap: 0.5rem; font-size: 15px;">
+                        <i class="fas <?php echo $type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'; ?>"></i>
+                        <?php echo htmlspecialchars($text); ?>
+                        <button onclick="document.getElementById('loginAlert').style.display='none'"
+                            style="background: none; border: none; color: inherit; cursor: pointer; opacity: 0.7; transition: opacity 0.2s; margin-left: auto;"
+                            onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </span>
                 </div>
-                <a href="forgot_password.php" class="small text-decoration-none" style="color: var(--udsm-blue);">Forgot password?</a>
-            </div>
-            <button type="submit" name="loginBTN" class="btn btn-primary w-100 mb-3">Sign In <i class="fas fa-arrow-right"></i></button>
-            <p class="small mb-0">Don't have an account? <a href="register.php" class="fw-bold text-decoration-none" style="color: var(--udsm-blue);">Register</a></p>
-        </form>
-    </div>
+            <?php endif; ?>
+            <!-- / Alert -->
+
+            <form action="" method="POST" onsubmit="showLoader()">
+                <div class="mb-2 text-start">
+                    <label for="" class="form-label small fw-bold">Email Address</label>
+                    <input type="email" name="email" class="form-control" placeholder="name@example.com" autocomplete
+                        required>
+                </div>
+                <div class="mb-2 text-start">
+                    <label class="form-label small fw-bold">Password</label>
+                    <div class="pwd-wrap">
+                        <input type="password" id="loginPwd" name="password" class="form-control" placeholder="........"
+                            autocomplete required>
+                        <button type="button" class="pwd-eye" onclick="togglePwd('loginPwd',this)" tabindex="-1">
+                            <i class="fas fa-eye-slash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <div class="form-check small">
+                        <input type="checkbox" class="form-check-input" id="remember">
+                        <label for="remember" class="form-check-label">Remember me</label>
+                    </div>
+                    <a href="forgot_password.php" class="small text-decoration-none"
+                        style="color: var(--udsm-blue);">Forgot
+                        password?</a>
+                </div>
+                <button type="submit" name="loginBTN" class="btn btn-primary w-100 mb-2">Sign In <i
+                        class="fas fa-arrow-right"></i></button>
+                <p class="small mb-0">Don't have an account? <a href="register.php" class="fw-bold text-decoration-none"
+                        style="color: var(--udsm-blue);">Register</a></p>
+            </form>
+        </div><!-- /.auth-card -->
+    </div><!-- /.auth-wrap -->
 
     <script src="assets/js/auth-script.js"></script>
     <script src="assets/js/bootstrap.bundle.min.js"></script>
