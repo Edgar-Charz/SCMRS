@@ -13,7 +13,7 @@ body {
 
 .auth-card {
   width: 100%;
-  max-width: 400px;
+  max-width: 375px;
   padding: 40px;
   border: none;
   border-radius: 15px;
@@ -234,3 +234,9 @@ body {
   gap: 10px;
   border-left: 4px solid #0c934b;
 }
+
+
+.pwd-wrap { position: relative; }
+.pwd-wrap .form-control { padding-right: 2.5rem; }
+.pwd-eye { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); background: none; border: none; padding: 0; color: #adb5bd; cursor: pointer; line-height: 1; }
+.pwd-eye:hover { color: #6c757d; }

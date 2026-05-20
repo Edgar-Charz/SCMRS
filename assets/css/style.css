@@ -359,42 +359,46 @@ html {
 
 /* Action Cards */
 .action-card {
-  border: 1px solid #dee2e6;
-  border-radius: 10px;
-  padding: 25px;
-  background-color: #fff;
-  box-shadow: 2px 2px 2px 2px var(--udsm-yellow) !important;
-  transition: box-shadow 0.3s ease, transform 0.3s ease;
-  cursor: pointer;
-  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-radius: 14px;
+  padding: 28px 20px;
+  color: #fff;
+  text-decoration: none;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  min-height: 155px;
 }
 
 .action-card:hover {
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-  transform: translateX(-5px);
+  transform: translateY(-6px);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18);
+  color: #fff;
 }
 
-.action-card a {
-  display: block;
-  color: var(--text-muted);
-  text-decoration: none;
-}
-
-.action-card a:hover {
-  /* color: #fff; */
-  background: rgba(255, 255, 255, 0.1);
-}
+.action-card--blue   { background: linear-gradient(135deg, #0062cc, #4da3ff); }
+.action-card--teal   { background: linear-gradient(135deg, #0a8f7c, #2dd4bf); }
+.action-card--amber  { background: linear-gradient(135deg, #d97706, #fbbf24); }
+.action-card--purple { background: linear-gradient(135deg, #7c3aed, #c084fc); }
 
 .action-icon {
-  /* color: var(--udsm-yellow); */
-  font-size: 2.5rem;
-  margin-bottom: 15px;
+  font-size: 2rem;
+  margin-bottom: 12px;
   display: block;
+  opacity: 0.92;
 }
 
 .action-card h5 {
-  color: var(--udsm-blue);
+  color: #fff;
   font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.action-card small {
+  opacity: 0.82;
+  font-size: 0.78rem;
 }
 
 /* Container Cards */
@@ -617,6 +621,10 @@ table.dataTable > thead .sorting_desc_disabled:before {
   min-width: 60px;
   /* background: url(../img/icons/dropdown.svg) no-repeat 95% 50%; */
 }
+.bg-orange {
+  background-color: #f97316 !important;
+}
+
 .pagination li {
   margin: 0 5px;
 }
@@ -697,6 +705,11 @@ div.dataTables_wrapper div.dataTables_info {
   color: rgba(255, 255, 255, 0.9);
   margin: 0;
 }
+
+.pwd-wrap { position: relative; }
+.pwd-wrap .form-control { padding-right: 2.5rem; }
+.pwd-eye { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); background: none; border: none; padding: 0; color: #adb5bd; cursor: pointer; line-height: 1; }
+.pwd-eye:hover { color: #6c757d; }
 
 .info-grid {
   display: grid;
