@@ -62,7 +62,11 @@ $pendingStaffCount = $admin->getPendingStaffCount();
     <?php require_once 'includes/flash_toast.php'; ?>
 
     <div id="loader">
-        <div class="spinner"></div>
+        <div class="loader-content">
+            <img src="assets/img/logo.png" alt="UDSM" class="loader-logo">
+            <div class="spinner"></div>
+            <p class="loader-text">Please wait...</p>
+        </div>
     </div>
 
     <div class="d-flex">
@@ -220,41 +224,32 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                     <h4 class="mb-4 fw-bold"><i class="fas fa-chart-line me-2"></i>Quick Actions</h4>
                     <div class="row g-3">
                         <div class="col-12 col-md-6 col-lg-3">
-
-                            <div class="action-card text-center shadow-sm">
-                                <a href="manage_complaints.php">
-                                    <i class="fas fa-envelope-open action-icon"></i>
-                                    <h5>Review Complaints</h5>
-                                </a>
-                            </div>
-
+                            <a href="manage_complaints.php" class="action-card action-card--blue">
+                                <i class="fas fa-envelope-open action-icon"></i>
+                                <h5>Review Complaints</h5>
+                                <small>View &amp; manage student complaints</small>
+                            </a>
                         </div>
-
                         <div class="col-12 col-md-6 col-lg-3">
-                            <div class="action-card text-center shadow-sm">
-                                <a href="manage_departments.php">
-                                    <i class="fas fa-sitemap action-icon"></i>
-                                    <h5>Manage Departments</h5>
-                                </a>
-                            </div>
+                            <a href="manage_departments.php" class="action-card action-card--teal">
+                                <i class="fas fa-sitemap action-icon"></i>
+                                <h5>Manage Departments</h5>
+                                <small>Add or update departments</small>
+                            </a>
                         </div>
-
                         <div class="col-12 col-md-6 col-lg-3">
-                            <div class="action-card text-center shadow-sm">
-                                <a href="manage_categories.php">
-                                    <i class="fas fa-tags action-icon"></i>
-                                    <h5>Manage Categories</h5>
-                                </a>
-                            </div>
+                            <a href="manage_categories.php" class="action-card action-card--amber">
+                                <i class="fas fa-tags action-icon"></i>
+                                <h5>Manage Categories</h5>
+                                <small>Organise complaint categories</small>
+                            </a>
                         </div>
-
                         <div class="col-12 col-md-6 col-lg-3">
-                            <div class="action-card text-center shadow-sm">
-                                <a href="reports.php">
-                                    <i class="fas fa-chart-bar action-icon"></i>
-                                    <h5>Reports</h5>
-                                </a>
-                            </div>
+                            <a href="reports.php" class="action-card action-card--purple">
+                                <i class="fas fa-chart-bar action-icon"></i>
+                                <h5>Reports &amp; Analytics</h5>
+                                <small>View statistics &amp; reports</small>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -284,8 +279,18 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                                             <td><?= $complaint_row['category_name']; ?></td>
                                             <td><?= date('M d, Y', strtotime($complaint_row['created_at'])); ?></td>
                                             <td>
-                                                <span
-                                                    class="badge bg-<?= $complaint_row['complaint_status']; ?>"><?= ucfirst($complaint_row['complaint_status']); ?></span>
+                                                <?php
+                                                $statusMap = [
+                                                    'pending'                   => ['bg-warning text-dark', 'Pending'],
+                                                    'in_progress'               => ['bg-info text-white',    'In Progress'],
+                                                    'awaiting_student_response' => ['bg-primary text-white', 'Awaiting Response'],
+                                                    'resolved'                  => ['bg-success text-white', 'Resolved'],
+                                                    'rejected'                  => ['bg-danger text-white',  'Rejected'],
+                                                    'reopened'                  => ['bg-orange text-white',  'Reopened'],
+                                                ];
+                                                [$sCls, $sLabel] = $statusMap[$complaint_row['complaint_status']] ?? ['bg-secondary text-white', ucfirst(str_replace('_', ' ', $complaint_row['complaint_status']))];
+                                                ?>
+                                                <span class="badge <?= $sCls ?>"><?= $sLabel ?></span>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -392,7 +397,7 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                     icon: 'success',
                     title: 'Welcome back, <?= htmlspecialchars($_SESSION['username']) ?>!',
                     showConfirmButton: false,
-                    timer: 4000,
+                    timer: 3000,
                     timerProgressBar: true,
                 });
             });

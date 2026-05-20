@@ -63,11 +63,12 @@ $staffList = $admin->getApprovedStaff();
 function statusBadge($status)
 {
     $map = [
-        'pending' => ['bg-warning text-dark', 'Pending'],
-        'in_progress' => ['bg-info text-white', 'In Progress'],
+        'pending'                   => ['bg-warning text-dark',  'Pending'],
+        'in_progress'               => ['bg-info text-white',    'In Progress'],
         'awaiting_student_response' => ['bg-primary text-white', 'Awaiting Response'],
-        'resolved' => ['bg-success text-white', 'Resolved'],
-        'rejected' => ['bg-danger text-white', 'Rejected'],
+        'resolved'                  => ['bg-success text-white', 'Resolved'],
+        'rejected'                  => ['bg-danger text-white',  'Rejected'],
+        'reopened'                  => ['bg-orange text-white',  'Reopened'],
     ];
     [$class, $label] = $map[$status] ?? ['bg-secondary text-white', ucfirst(str_replace('_', ' ', $status))];
     return "<span class=\"badge $class\">$label</span>";
@@ -233,7 +234,7 @@ function statusBadge($status)
         <div class="modal-dialog">
             <div class="modal-content shadow-lg rounded-3">
                 <div class="modal-header text-white" style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                    <h5 class="modal-title fw-bold" id="assignModalLabel">
+                    <h5 class="modal-title fw-bold text-white" id="assignModalLabel">
                         <i class="fas fa-user-tag me-2"></i>
                         Assign Complaint to Staff
                     </h5>
@@ -297,7 +298,7 @@ function statusBadge($status)
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg rounded-3">
                 <div class="modal-header text-white" style="background: linear-gradient(135deg, #dc3545, #c82333);">
-                    <h5 class="modal-title fw-bold" id="deleteReasonModalLabel">
+                    <h5 class="modal-title fw-bold text-white" id="deleteReasonModalLabel">
                         <i class="fas fa-trash me-2"></i>Delete Complaint
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"

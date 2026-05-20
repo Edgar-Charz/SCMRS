@@ -49,7 +49,11 @@ $dashboardLink = match ($role) {
     <?php require_once 'includes/flash_toast.php'; ?>
 
     <div id="loader">
-        <div class="spinner"></div>
+        <div class="loader-content">
+            <img src="assets/img/logo.png" alt="UDSM" class="loader-logo">
+            <div class="spinner"></div>
+            <p class="loader-text">Please wait...</p>
+        </div>
     </div>
 
     <div class="d-flex">

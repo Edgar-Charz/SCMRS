@@ -384,7 +384,7 @@ if (isset($_SESSION['message'])) {
                                             <div class="modal-content shadow-lg rounded-3">
                                                 <div class="modal-header text-white"
                                                     style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                                                    <h5 class="modal-title fw-bold" id="viewStudentModalLabel">
+                                                    <h5 class="modal-title fw-bold text-white" id="viewStudentModalLabel">
                                                         <i class="fas fa-user-graduate me-2"></i>
                                                         STUDENT INFORMATION
                                                     </h5>
@@ -437,7 +437,7 @@ if (isset($_SESSION['message'])) {
                                             <div class="modal-content shadow-lg rounded-3">
                                                 <div class="modal-header text-white"
                                                     style="background: linear-gradient(135deg, #007bff, #0056b3);">
-                                                    <h5 class="modal-title fw-bold" id="editStudentModalLabel">
+                                                    <h5 class="modal-title fw-bold text-white" id="editStudentModalLabel">
                                                         <i class="fas fa-user-edit me-2"></i>
                                                         EDIT STUDENT INFORMATION
                                                     </h5>
@@ -508,7 +508,7 @@ if (isset($_SESSION['message'])) {
                             <div class="modal-content border-0 shadow-lg" style="border-radius:12px; overflow:hidden;">
                                 <div class="modal-header text-white"
                                     style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                                    <h5 class="modal-title fw-bold" id="addStudentModalLabel">
+                                    <h5 class="modal-title fw-bold text-white" id="addStudentModalLabel">
                                         <i class="fas fa-user-graduate me-2"></i>
                                         Add New Student
                                     </h5>
@@ -565,15 +565,25 @@ if (isset($_SESSION['message'])) {
                                             <div class="col-12 col-md-6">
                                                 <label class="form-label fw-bold small">Password <span
                                                         class="text-danger">*</span></label>
-                                                <input type="password" name="student_password" id="addStudentPwd"
-                                                    class="form-control" placeholder="Min 8 characters" required>
+                                                <div class="pwd-wrap">
+                                                    <input type="password" name="student_password" id="addStudentPwd"
+                                                        class="form-control" placeholder="Min 8 characters" required>
+                                                    <button type="button" class="pwd-eye" onclick="togglePwd('addStudentPwd',this)" tabindex="-1">
+                                                        <i class="fas fa-eye-slash"></i>
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div class="col-12 col-md-6">
                                                 <label class="form-label fw-bold small">Confirm Password <span
                                                         class="text-danger">*</span></label>
-                                                <input type="password" name="student_confirm_password"
-                                                    id="addStudentPwdConfirm" class="form-control"
-                                                    placeholder="Re-enter password" required>
+                                                <div class="pwd-wrap">
+                                                    <input type="password" name="student_confirm_password"
+                                                        id="addStudentPwdConfirm" class="form-control"
+                                                        placeholder="Re-enter password" required>
+                                                    <button type="button" class="pwd-eye" onclick="togglePwd('addStudentPwdConfirm',this)" tabindex="-1">
+                                                        <i class="fas fa-eye-slash"></i>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -679,7 +689,7 @@ if (isset($_SESSION['message'])) {
                                             <div class="modal-content shadow-lg rounded-3">
                                                 <div class="modal-header text-white"
                                                     style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                                                    <h5 class="modal-title fw-bold" id="viewStaffModalLabel">
+                                                    <h5 class="modal-title fw-bold text-white" id="viewStaffModalLabel">
                                                         <i class="fas fa-user-tie me-2"></i>
                                                         STAFF INFORMATION
                                                     </h5>
@@ -731,7 +741,7 @@ if (isset($_SESSION['message'])) {
                                         <div class="modal-dialog">
                                             <div class="modal-content shadow-lg rounded-3">
                                                 <div class="modal-header bg-secondary text-white">
-                                                    <h5 class="modal-title fw-bold" id="editStaffModalLabel">
+                                                    <h5 class="modal-title fw-bold text-white" id="editStaffModalLabel">
                                                         EDIT STAFF INFORMATION
                                                     </h5>
                                                     <button type="button" class="btn-close btn-close-white"
@@ -794,7 +804,7 @@ if (isset($_SESSION['message'])) {
                             <div class="modal-content border-0 shadow-lg" style="border-radius:12px; overflow:hidden;">
                                 <div class="modal-header text-white"
                                     style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                                    <h5 class="modal-title fw-bold" id="addStaffModalLabel">
+                                    <h5 class="modal-title fw-bold text-white" id="addStaffModalLabel">
                                         <i class="fas fa-user-tie me-2"></i>
                                         Add New Staff
                                     </h5>
@@ -859,15 +869,25 @@ if (isset($_SESSION['message'])) {
                                             <div class="col-12 col-md-6">
                                                 <label class="form-label fw-bold small">Password <span
                                                         class="text-danger">*</span></label>
-                                                <input type="password" name="staff_password" id="addStaffPwd"
-                                                    class="form-control" placeholder="Min 8 characters" required>
+                                                <div class="pwd-wrap">
+                                                    <input type="password" name="staff_password" id="addStaffPwd"
+                                                        class="form-control" placeholder="Min 8 characters" required>
+                                                    <button type="button" class="pwd-eye" onclick="togglePwd('addStaffPwd',this)" tabindex="-1">
+                                                        <i class="fas fa-eye-slash"></i>
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div class="col-12 col-md-6">
                                                 <label class="form-label fw-bold small">Confirm Password <span
                                                         class="text-danger">*</span></label>
-                                                <input type="password" name="staff_confirm_password"
-                                                    id="addStaffPwdConfirm" class="form-control"
-                                                    placeholder="Re-enter password" required>
+                                                <div class="pwd-wrap">
+                                                    <input type="password" name="staff_confirm_password"
+                                                        id="addStaffPwdConfirm" class="form-control"
+                                                        placeholder="Re-enter password" required>
+                                                    <button type="button" class="pwd-eye" onclick="togglePwd('addStaffPwdConfirm',this)" tabindex="-1">
+                                                        <i class="fas fa-eye-slash"></i>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                         <p class="text-muted small mt-3 mb-0">
@@ -1096,7 +1116,7 @@ if (isset($_SESSION['message'])) {
                                             <div class="modal-content shadow-lg rounded-3">
                                                 <div class="modal-header text-white"
                                                     style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                                                    <h5 class="modal-title fw-bold" id="viewApprovedStaffModalLabel">
+                                                    <h5 class="modal-title fw-bold text-white" id="viewApprovedStaffModalLabel">
                                                         <i class="fas fa-user-tie me-2"></i>
                                                         STAFF INFORMATION
                                                     </h5>
@@ -1156,7 +1176,7 @@ if (isset($_SESSION['message'])) {
                                             <div class="modal-content shadow-lg rounded-3">
                                                 <div class="modal-header text-white"
                                                     style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                                                    <h5 class="modal-title fw-bold" id="editStaffModalLabel">
+                                                    <h5 class="modal-title fw-bold text-white" id="editStaffModalLabel">
                                                         <i class="fas fa-user-edit me-2"></i>
                                                         Edit Staff Information
                                                     </h5>
@@ -1269,7 +1289,7 @@ if (isset($_SESSION['message'])) {
                             <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
                                 <div class="modal-header text-white"
                                     style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                                    <h5 class="modal-title fw-bold">
+                                    <h5 class="modal-title fw-bold text-white">
                                         <i class="fas fa-id-badge me-2"></i>
                                         ADD STAFF ROLE
                                     </h5>
@@ -1311,7 +1331,7 @@ if (isset($_SESSION['message'])) {
                             <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
                                 <div class="modal-header text-white"
                                     style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                                    <h5 class="modal-title fw-bold">
+                                    <h5 class="modal-title fw-bold text-white">
                                         <i class="fas fa-user-edit me-2"></i>
                                         EDIT STAFF ROLE
                                     </h5>
@@ -1357,7 +1377,7 @@ if (isset($_SESSION['message'])) {
                         <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
                             <div class="modal-header text-white"
                                 style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                                <h5 class="modal-title fw-bold">
+                                <h5 class="modal-title fw-bold text-white">
                                     <i class="fas fa-user-plus me-2"></i>
                                     ASSIGN ROLE
                                 </h5>

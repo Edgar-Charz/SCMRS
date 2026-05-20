@@ -39,21 +39,15 @@ $studentRespondedCount  = $isApproved ? $staff->getStudentRespondedCount($staffD
 
 function formatStatusBadgeClass($status)
 {
-    switch (strtolower($status)) {
-        case 'pending':
-            return 'bg-danger';
-        case 'in_progress':
-        case 'in progress':
-            return 'bg-warning';
-        case 'resolved':
-            return 'bg-success';
-        case 'rejected':
-            return 'bg-secondary';
-        case 'awaiting_student_response':
-            return 'bg-info';
-        default:
-            return 'bg-secondary';
-    }
+    return match (strtolower($status)) {
+        'pending'                   => 'bg-danger',
+        'in_progress', 'in progress' => 'bg-warning',
+        'resolved'                  => 'bg-success',
+        'rejected'                  => 'bg-secondary',
+        'awaiting_student_response' => 'bg-info',
+        'reopened'                  => 'bg-orange',
+        default                     => 'bg-secondary',
+    };
 }
 
 function formatStatusLabel($status)
@@ -82,7 +76,11 @@ function formatStatusLabel($status)
     <?php require_once 'includes/flash_toast.php'; ?>
 
     <div id="loader">
-        <div class="spinner"></div>
+        <div class="loader-content">
+            <img src="assets/img/logo.png" alt="UDSM" class="loader-logo">
+            <div class="spinner"></div>
+            <p class="loader-text">Please wait...</p>
+        </div>
     </div>
 
     <div class="d-flex">
@@ -197,13 +195,11 @@ function formatStatusLabel($status)
 
                     <div class="row g-3 mb-4">
                         <div class="col-12 col-md-12 col-lg-12">
-                            <div class="action-card text-center shadow-sm">
-                                <a href="assigned_complaints.php">
-                                    <i class="fas fa-folder-open action-icon text-center"></i>
-                                    <h5>View Assigned Complaint</h5>
-                                    <p class="text-muted small mb-0">View all complaints assigned to you</p>
-                                </a>
-                            </div>
+                            <a href="assigned_complaints.php" class="action-card action-card--blue">
+                                <i class="fas fa-folder-open action-icon"></i>
+                                <h5>View Assigned Complaints</h5>
+                                <small>View all complaints assigned to you</small>
+                            </a>
                         </div>
                     </div>
 
@@ -297,7 +293,7 @@ function formatStatusLabel($status)
                     icon: 'success',
                     title: 'Welcome back, <?= htmlspecialchars($_SESSION['username']) ?>!',
                     showConfirmButton: false,
-                    timer: 4000,
+                    timer: 3000,
                     timerProgressBar: true,
                 });
             });

@@ -240,7 +240,7 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
                     <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
                         <div class="modal-header text-white"
                             style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                            <h5 class="modal-title fw-bold">
+                            <h5 class="modal-title fw-bold text-white">
                                 <i class="fas fa-plus me-2"></i>
                                 ADD CATEGORY
                             </h5>
@@ -278,7 +278,7 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
                     <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
                         <div class="modal-header text-white"
                             style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                            <h5 class="modal-title fw-bold">
+                            <h5 class="modal-title fw-bold text-white">
                                 <i class="fas fa-edit me-2"></i>
                                 EDIT CATEGORY
                             </h5>
@@ -323,7 +323,7 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
                     <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
                         <div class="modal-header text-white"
                             style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                            <h5 class="modal-title fw-bold" id="sub_modal_title">
+                            <h5 class="modal-title fw-bold text-white" id="sub_modal_title">
                                 <i class="fas fa-list me-2"></i>
                                 SUBCATEGORIES
                             </h5>
@@ -399,7 +399,7 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
                     <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
                         <div class="modal-header text-white"
                             style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                            <h5 class="modal-title fw-bold">
+                            <h5 class="modal-title fw-bold text-white">
                                 <i class="fas fa-edit me-2"></i>
                                 EDIT SUBCATEGORY
                             </h5>

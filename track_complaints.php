@@ -311,7 +311,7 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg rounded-3">
                 <div class="modal-header text-white" style="background: linear-gradient(135deg, #dc3545, #c82333);">
-                    <h5 class="modal-title fw-bold" id="deleteReasonModalLabel">
+                    <h5 class="modal-title fw-bold text-white" id="deleteReasonModalLabel">
                         <i class="fas fa-trash me-2"></i>
                         Delete Complaint
                     </h5>

@@ -165,7 +165,7 @@ $departments = $admin->getAllDepartmentsWithStats();
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
                         <div class="modal-header text-white" style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                            <h5 class="modal-title fw-bold">ADD DEPARTMENT</h5>
+                            <h5 class="modal-title fw-bold text-white">ADD DEPARTMENT</h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <form action="manage_departments.php" method="POST">
@@ -193,7 +193,7 @@ $departments = $admin->getAllDepartmentsWithStats();
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
                         <div class="modal-header text-white" style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                            <h5 class="modal-title fw-bold">EDIT DEPARTMENT</h5>
+                            <h5 class="modal-title fw-bold text-white">EDIT DEPARTMENT</h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <form action="manage_departments.php" method="POST">

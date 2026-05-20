@@ -30,6 +30,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['updateUsernameBTN']))
     exit;
 }
 
+// Handle Update Contact Info
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['updateContactBTN'])) {
+    $newEmail = trim($_POST['new_email'] ?? '');
+    $newPhone = trim($_POST['new_phone'] ?? '');
+    try {
+        $user->updateContact($userId, $newEmail, $newPhone);
+        $_SESSION['message'] = "Contact information updated successfully.";
+    } catch (Exception $e) {
+        $_SESSION['message_error'] = $e->getMessage();
+    }
+    header("Location: profile.php");
+    exit;
+}
+
 // Handle Update Password
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['updatePasswordBTN'])) {
     $currentPwd = $_POST['current_password'] ?? '';
@@ -134,6 +148,10 @@ $homeLink = match($role) {
                         <div class="value"><?= htmlspecialchars($profile['user_email'] ?? '-') ?></div>
                     </div>
                     <div class="info-item">
+                        <label><i class="fas fa-phone me-2"></i>Phone</label>
+                        <div class="value"><?= htmlspecialchars($profile['user_phone_number'] ?? '-') ?></div>
+                    </div>
+                    <div class="info-item">
                         <label><i class="fas fa-user-tag me-2"></i>Role</label>
                         <div class="value"><?= ucfirst($role) ?></div>
                     </div>
@@ -172,6 +190,63 @@ $homeLink = match($role) {
                     <?php endif; ?>
                 </div>
 
+                <!-- Contact Information -->
+                <div class="container-card shadow-sm mb-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div style="width:40px;height:40px;border-radius:10px;background:rgba(16,185,129,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <i class="fas fa-address-card" style="color:#10b981;"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h4 class="mb-0 fw-bold">Contact Information</h4>
+                            <small class="text-muted">Update your email address and phone number</small>
+                        </div>
+                    </div>
+
+                    <form action="profile.php" method="POST" id="contactForm" novalidate>
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold small">Current Email</label>
+                                <input type="email" class="form-control p-3 shadow-sm"
+                                    style="border-radius: 10px; border: 1px solid #e0e6ed; background:#f8f9fa;"
+                                    value="<?= htmlspecialchars($profile['user_email'] ?? '') ?>" readonly>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold small">
+                                    New Email Address <span class="text-danger">*</span>
+                                </label>
+                                <input type="email" name="new_email" id="newEmail" class="form-control p-3 shadow-sm"
+                                    style="border-radius: 10px; border: 1px solid #e0e6ed;"
+                                    placeholder="Enter new email address"
+                                    value="<?= htmlspecialchars($profile['user_email'] ?? '') ?>"
+                                    required>
+                                <div class="invalid-feedback" id="emailFeedback"></div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold small">Current Phone</label>
+                                <input type="text" class="form-control p-3 shadow-sm"
+                                    style="border-radius: 10px; border: 1px solid #e0e6ed; background:#f8f9fa;"
+                                    value="<?= htmlspecialchars($profile['user_phone_number'] ?? '') ?>" readonly>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold small">New Phone Number</label>
+                                <input type="text" name="new_phone" id="newPhone" class="form-control p-3 shadow-sm"
+                                    style="border-radius: 10px; border: 1px solid #e0e6ed;"
+                                    placeholder="e.g. 0712345678"
+                                    value="<?= htmlspecialchars($profile['user_phone_number'] ?? '') ?>"
+                                    maxlength="10">
+                                <div class="invalid-feedback" id="phoneFeedback"></div>
+                                <small class="text-muted">10 digits starting with 0. Leave unchanged to keep current.</small>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <button type="submit" name="updateContactBTN" class="btn btn-success p-3 fw-bold"
+                                style="border-radius: 10px; min-width: 200px;">
+                                <i class="fas fa-save me-2"></i>Save Contact Info
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
                 <!-- Change Username -->
                 <div class="container-card shadow-sm mb-4">
                     <h4 class="mb-3 fw-bold"><i class="fas fa-user-edit me-2"></i>Change Username</h4>
@@ -208,14 +283,12 @@ $homeLink = match($role) {
                                 <label class="form-label fw-bold small">
                                     Current Password <span class="text-danger">*</span>
                                 </label>
-                                <div class="input-group">
+                                <div class="pwd-wrap">
                                     <input type="password" name="current_password" id="currentPwd"
                                         class="form-control p-3 shadow-sm"
-                                        style="border-radius: 10px 0 0 10px; border: 1px solid #e0e6ed;" required>
-                                    <button class="btn btn-outline-secondary" type="button"
-                                        onclick="togglePwd('currentPwd', this)"
-                                        style="border-radius: 0 10px 10px 0;">
-                                        <i class="fas fa-eye"></i>
+                                        style="border-radius: 10px; border: 1px solid #e0e6ed;" required>
+                                    <button type="button" class="pwd-eye" onclick="togglePwd('currentPwd',this)" tabindex="-1">
+                                        <i class="fas fa-eye-slash"></i>
                                     </button>
                                 </div>
                             </div>
@@ -223,31 +296,27 @@ $homeLink = match($role) {
                                 <label class="form-label fw-bold small">
                                     New Password <span class="text-danger">*</span>
                                 </label>
-                                <div class="input-group">
+                                <div class="pwd-wrap">
                                     <input type="password" name="new_password" id="newPwd"
                                         class="form-control p-3 shadow-sm"
-                                        style="border-radius: 10px 0 0 10px; border: 1px solid #e0e6ed;"
+                                        style="border-radius: 10px; border: 1px solid #e0e6ed;"
                                         minlength="8" required>
-                                    <button class="btn btn-outline-secondary" type="button"
-                                        onclick="togglePwd('newPwd', this)"
-                                        style="border-radius: 0 10px 10px 0;">
-                                        <i class="fas fa-eye"></i>
+                                    <button type="button" class="pwd-eye" onclick="togglePwd('newPwd',this)" tabindex="-1">
+                                        <i class="fas fa-eye-slash"></i>
                                     </button>
                                 </div>
-                                <small class="text-muted">Minimum 8 characters.</small>
+                                <small class="text-muted">Minimum 8 characters, uppercase, lowercase, number, symbol.</small>
                             </div>
                             <div class="col-12 col-md-6 mb-3">
                                 <label class="form-label fw-bold small">
                                     Confirm New Password <span class="text-danger">*</span>
                                 </label>
-                                <div class="input-group">
+                                <div class="pwd-wrap">
                                     <input type="password" name="confirm_password" id="confirmPwd"
                                         class="form-control p-3 shadow-sm"
-                                        style="border-radius: 10px 0 0 10px; border: 1px solid #e0e6ed;" required>
-                                    <button class="btn btn-outline-secondary" type="button"
-                                        onclick="togglePwd('confirmPwd', this)"
-                                        style="border-radius: 0 10px 10px 0;">
-                                        <i class="fas fa-eye"></i>
+                                        style="border-radius: 10px; border: 1px solid #e0e6ed;" required>
+                                    <button type="button" class="pwd-eye" onclick="togglePwd('confirmPwd',this)" tabindex="-1">
+                                        <i class="fas fa-eye-slash"></i>
                                     </button>
                                 </div>
                             </div>
@@ -269,17 +338,56 @@ $homeLink = match($role) {
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
-        function togglePwd(inputId, btn) {
-            const input = document.getElementById(inputId);
-            const icon  = btn.querySelector('i');
-            if (input.type === 'password') {
-                input.type = 'text';
-                icon.classList.replace('fa-eye', 'fa-eye-slash');
-            } else {
-                input.type = 'password';
-                icon.classList.replace('fa-eye-slash', 'fa-eye');
+        (function () {
+            const form     = document.getElementById('contactForm');
+            const emailEl  = document.getElementById('newEmail');
+            const phoneEl  = document.getElementById('newPhone');
+            const emailFb  = document.getElementById('emailFeedback');
+            const phoneFb  = document.getElementById('phoneFeedback');
+
+            function validateEmail(val) {
+                if (!val) return 'Email is required.';
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) return 'Enter a valid email address.';
+                return '';
             }
-        }
+
+            function validatePhone(val) {
+                if (!val) return '';
+                if (!/^0\d{9}$/.test(val)) return 'Must be 10 digits starting with 0 (e.g. 0712345678).';
+                return '';
+            }
+
+            function setValidity(el, fb, msg) {
+                if (msg) {
+                    el.classList.add('is-invalid');
+                    el.classList.remove('is-valid');
+                    fb.textContent = msg;
+                } else {
+                    el.classList.remove('is-invalid');
+                    el.classList.add('is-valid');
+                    fb.textContent = '';
+                }
+            }
+
+            emailEl.addEventListener('input', function () {
+                setValidity(emailEl, emailFb, validateEmail(this.value.trim()));
+            });
+
+            phoneEl.addEventListener('input', function () {
+                setValidity(phoneEl, phoneFb, validatePhone(this.value.trim()));
+            });
+
+            form.addEventListener('submit', function (e) {
+                const eMsg = validateEmail(emailEl.value.trim());
+                const pMsg = validatePhone(phoneEl.value.trim());
+                setValidity(emailEl, emailFb, eMsg);
+                setValidity(phoneEl, phoneFb, pMsg);
+                if (eMsg || pMsg) {
+                    e.preventDefault();
+                }
+            });
+        })();
+
     </script>
 </body>
 </html>

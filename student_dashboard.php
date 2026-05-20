@@ -54,7 +54,11 @@ if (isset($_SESSION['message'])) {
     <?php require_once 'includes/flash_toast.php'; ?>
 
     <div id="loader">
-        <div class="spinner"></div>
+        <div class="loader-content">
+            <img src="assets/img/logo.png" alt="UDSM" class="loader-logo">
+            <div class="spinner"></div>
+            <p class="loader-text">Please wait...</p>
+        </div>
     </div>
 
     <div class="d-flex">
@@ -167,32 +171,25 @@ if (isset($_SESSION['message'])) {
 
                 <div class="row g-3 mb-4">
                     <div class="col-12 col-md-4">
-                        <div class="action-card text-center shadow-sm">
-                            <a href="create_complaint.php">
-                                <i class="fas fa-file-signature action-icon"></i>
-                                <h5>Submit New Complaint</h5>
-                                <p class="text-muted small mb-0">File new complaint with the system</p>
-                            </a>
-                        </div>
-                    </div>
-
-                    <div class="col-12 col-md-4">
-                        <div class="action-card text-center shadow-sm">
-                            <a href="track_complaints.php">
-                                <i class="fas fa-search-location action-icon"></i>
-                                <h5>Track Complaints</h5>
-                                <p class="text-muted small mb-0">Monitor status of your submission</p>
-                            </a>
-                        </div>
+                        <a href="create_complaint.php" class="action-card action-card--blue">
+                            <i class="fas fa-file-signature action-icon"></i>
+                            <h5>Submit New Complaint</h5>
+                            <small>File a new complaint with the system</small>
+                        </a>
                     </div>
                     <div class="col-12 col-md-4">
-                        <div class="action-card text-center shadow-sm">
-                            <a href="track_complaints.php?filter=pending">
-                                <i class="fas fa-history action-icon"></i>
-                                <h5>View Pending Issues</h5>
-                                <p class="text-muted small mb-0">Complaints awaiting review</p>
-                            </a>
-                        </div>
+                        <a href="track_complaints.php" class="action-card action-card--teal">
+                            <i class="fas fa-search-location action-icon"></i>
+                            <h5>Track Complaints</h5>
+                            <small>Monitor the status of your submissions</small>
+                        </a>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <a href="track_complaints.php?filter=pending" class="action-card action-card--amber">
+                            <i class="fas fa-history action-icon"></i>
+                            <h5>View Pending Issues</h5>
+                            <small>Complaints awaiting review</small>
+                        </a>
                     </div>
                 </div>
 
@@ -222,8 +219,18 @@ if (isset($_SESSION['message'])) {
                                             <td><?= $complaint_row['category_name']; ?></td>
                                             <td><?= date('M d, Y', strtotime($complaint_row['created_at'])); ?></td>
                                             <td>
-                                                <span
-                                                    class="badge bg-<?= $complaint_row['complaint_status']; ?>"><?= ucfirst($complaint_row['complaint_status']); ?></span>
+                                                <?php
+                                                $statusMap = [
+                                                    'pending'                   => ['bg-warning text-dark', 'Pending'],
+                                                    'in_progress'               => ['bg-info text-white',    'In Progress'],
+                                                    'awaiting_student_response' => ['bg-primary text-white', 'Awaiting Response'],
+                                                    'resolved'                  => ['bg-success text-white', 'Resolved'],
+                                                    'rejected'                  => ['bg-danger text-white',  'Rejected'],
+                                                    'reopened'                  => ['bg-orange text-white',  'Reopened'],
+                                                ];
+                                                [$sCls, $sLabel] = $statusMap[$complaint_row['complaint_status']] ?? ['bg-secondary text-white', ucfirst(str_replace('_', ' ', $complaint_row['complaint_status']))];
+                                                ?>
+                                                <span class="badge <?= $sCls ?>"><?= $sLabel ?></span>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -237,13 +244,11 @@ if (isset($_SESSION['message'])) {
                     <!-- Submit first complaint -->
                     <div class="row g-3 mb-4">
                         <div class="col-12 col-md-12 col-lg-12">
-                            <div class="action-card text-center shadow-sm">
-                                <a href="create_complaint.php">
-                                    <i class="fas fa-plus-circle action-icon"></i>
-                                    <h5>Submit Your First Complaint</h5>
-                                    <p class="text-muted small mb-0">File your first complaint with the system</p>
-                                </a>
-                            </div>
+                            <a href="create_complaint.php" class="action-card action-card--blue">
+                                <i class="fas fa-plus-circle action-icon"></i>
+                                <h5>Submit Your First Complaint</h5>
+                                <small>File your first complaint with the system</small>
+                            </a>
                         </div>
                     </div>
                     <!-- / Submit first complaint -->
@@ -297,7 +302,7 @@ if (isset($_SESSION['message'])) {
                     icon: 'success',
                     title: 'Welcome back, <?= htmlspecialchars($_SESSION['username']) ?>!',
                     showConfirmButton: false,
-                    timer: 6000,
+                    timer: 3000,
                     timerProgressBar: true,
                 });
             });

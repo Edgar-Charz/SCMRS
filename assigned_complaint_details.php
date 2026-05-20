@@ -139,11 +139,12 @@ $studentUserId  = (int) ($complaint['student_user_id'] ?? 0);
 function statusBadge($status)
 {
     $map = [
-        'pending'                   => ['bg-warning text-dark', 'Pending'],
-        'in_progress'               => ['bg-info text-white',   'In Progress'],
+        'pending'                   => ['bg-warning text-dark',  'Pending'],
+        'in_progress'               => ['bg-info text-white',    'In Progress'],
         'awaiting_student_response' => ['bg-primary text-white', 'Awaiting Response'],
         'resolved'                  => ['bg-success text-white', 'Resolved'],
         'rejected'                  => ['bg-danger text-white',  'Rejected'],
+        'reopened'                  => ['bg-orange text-white',  'Reopened'],
     ];
     [$class, $label] = $map[$status] ?? ['bg-secondary text-white', ucwords(str_replace('_', ' ', $status))];
     return "<span class=\"badge $class\">$label</span>";

@@ -127,7 +127,7 @@
                                     <div class="modal-dialog modal-xl">
                                         <div class="modal-content shadow-lg rounded-3">
                                             <div class="modal-header bg-secondary text-white">
-                                                <h5 class="modal-title fw-bold" id="viewStaffModalLabel">
+                                                <h5 class="modal-title fw-bold text-white" id="viewStaffModalLabel">
 
                                                 </h5>
                                                 <button type="button" class="btn-close btn-close-white"
@@ -179,7 +179,7 @@
                                     <div class="modal-dialog modal-xl">
                                         <div class="modal-content shadow-lg rounded-3">
                                             <div class="modal-header bg-secondary text-white">
-                                                <h5 class="modal-title fw-bold" id="editStaffModalLabel">
+                                                <h5 class="modal-title fw-bold text-white" id="editStaffModalLabel">
                                                 </h5>
                                                 <button type="button" class="btn-close btn-close-white"
                                                     data-bs-dismiss="modal" aria-label="Close">x</button>
