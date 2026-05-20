@@ -349,7 +349,7 @@ class User
     public function getFullProfile($userId, $role)
     {
         if ($role === 'student') {
-            $sql = "SELECT u.user_id, u.username, u.user_email, u.user_role, u.user_status, u.created_at,
+            $sql = "SELECT u.user_id, u.username, u.user_email, u.user_phone_number, u.user_role, u.user_status, u.created_at,
                            s.student_registration_number, s.student_program,
                            c.college_name
                     FROM users u
@@ -357,7 +357,7 @@ class User
                     LEFT JOIN colleges c ON s.student_college_id = c.college_id
                     WHERE u.user_id = ?";
         } elseif ($role === 'staff') {
-            $sql = "SELECT u.user_id, u.username, u.user_email, u.user_role, u.user_status, u.created_at,
+            $sql = "SELECT u.user_id, u.username, u.user_email, u.user_phone_number, u.user_role, u.user_status, u.created_at,
                            d.department_name, sr.role_name
                     FROM users u
                     JOIN staffs st ON u.user_id = st.staff_user_id
@@ -365,7 +365,7 @@ class User
                     LEFT JOIN staff_roles sr ON st.staff_role_id = sr.role_id
                     WHERE u.user_id = ?";
         } else {
-            $sql = "SELECT user_id, username, user_email, user_role, user_status, created_at
+            $sql = "SELECT user_id, username, user_email, user_phone_number, user_role, user_status, created_at
                     FROM users WHERE user_id = ?";
         }
         $stmt = $this->conn->prepare($sql);
@@ -374,6 +374,40 @@ class User
         $data = $stmt->get_result()->fetch_assoc();
         $stmt->close();
         return $data;
+    }
+
+    // Update contact info (email + phone)
+    public function updateContact($userId, $newEmail, $newPhone)
+    {
+        $newEmail = trim($newEmail);
+        $newPhone = trim($newPhone);
+
+        if (empty($newEmail)) {
+            throw new Exception("Email address is required.");
+        }
+        if (!filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
+            throw new Exception("Invalid email format.");
+        }
+
+        $chk = $this->conn->prepare("SELECT user_id FROM users WHERE user_email = ? AND user_id != ?");
+        $chk->bind_param("si", $newEmail, $userId);
+        $chk->execute();
+        if ($chk->get_result()->num_rows > 0) {
+            $chk->close();
+            throw new Exception("Email address is already in use by another account.");
+        }
+        $chk->close();
+
+        if (!empty($newPhone) && !preg_match('/^0\d{9}$/', $newPhone)) {
+            throw new Exception("Invalid phone number format. Must be 10 digits starting with 0 (e.g. 0712345678).");
+        }
+
+        $phoneVal = !empty($newPhone) ? $newPhone : null;
+        $stmt = $this->conn->prepare("UPDATE users SET user_email = ?, user_phone_number = ? WHERE user_id = ?");
+        $stmt->bind_param("ssi", $newEmail, $phoneVal, $userId);
+        $ok = $stmt->execute();
+        $stmt->close();
+        return $ok;
     }
 
     // Update username
