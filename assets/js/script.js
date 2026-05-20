@@ -185,6 +185,21 @@ function capitalizeWords(input) {
   });
 }
 
+// Password visibility toggle
+function togglePwd(inputId, btn) {
+  var input = document.getElementById(inputId);
+  var icon  = btn.querySelector("i");
+  if (input.type === "password") {
+    input.type = "text";
+    icon.classList.remove("fa-eye-slash");
+    icon.classList.add("fa-eye");
+  } else {
+    input.type = "password";
+    icon.classList.remove("fa-eye");
+    icon.classList.add("fa-eye-slash");
+  }
+}
+
 // Toast alert
 document.addEventListener("DOMContentLoaded", function () {
   var toastElList = [].slice.call(document.querySelectorAll(".toast"));
