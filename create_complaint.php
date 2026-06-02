@@ -14,6 +14,7 @@ require_once "classes/Student.php";
 require_once "classes/Category.php";
 require_once "classes/Complaint.php";
 require_once "classes/Notification.php";
+require_once "includes/csrf.php";
 
 $db = new Database();
 $conn = $db->connect();
@@ -29,6 +30,7 @@ $message = $error = "";
 
 // Handle complaint submission
 if (isset($_POST["submitComplaintBTN"])) {
+    csrf_verify();
     try {
 
         $title          = trim($_POST['title'] ?? '');
@@ -135,6 +137,7 @@ if (isset($_SESSION['message'])) {
                 <!-- / Alert -->
 
                 <form action="" method="POST" enctype="multipart/form-data">
+                    <?= csrf_field() ?>
                     <div class="form-card shadow-sm mb-4" style="align-items: center;">
                         <h4 class="mb-3 fw-bold"><i class="fas fa-info-circle me-2"></i>Basic Information</h4>
 

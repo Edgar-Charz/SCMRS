@@ -259,6 +259,12 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                                     class="btn btn-primary">
                                     <i class="fas fa-eye"></i> View
                                 </a>
+                                <?php if ($complaint_row['complaint_status'] === 'pending'): ?>
+                                    <a href="edit_student_complaint.php?id=<?php echo $complaint_row['complaint_id']; ?>"
+                                        class="btn btn-warning text-dark fw-bold">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </a>
+                                <?php endif; ?>
                                 <?php if ($complaint_row['complaint_status'] === 'pending' && empty($complaint_row['pending_requests'])): ?>
                                     <button type="button" class="btn btn-danger"
                                         onclick="confirmDelete(<?php echo $complaint_row['complaint_id']; ?>)">

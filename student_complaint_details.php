@@ -17,11 +17,13 @@ if ($complaintId <= 0) {
 require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/Student.php";
+require_once "classes/Category.php";
 require_once "classes/Notification.php";
 
-$db      = new Database();
-$conn    = $db->connect();
-$student = new Student($conn);
+$db       = new Database();
+$conn     = $db->connect();
+$student  = new Student($conn);
+$category = new Category($conn);
 
 $studentId = $student->getStudentId($userId);
 
@@ -33,6 +35,27 @@ if (!$complaint_details || (int)$complaint_details['student_id'] !== (int)$stude
 }
 
 $message = $error = "";
+
+// ── Handle: edit complaint ───────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit_complaint') {
+    $editTitle    = trim($_POST['edit_title'] ?? '');
+    $editDesc     = trim($_POST['edit_description'] ?? '');
+    $editCatId    = (int)($_POST['edit_category_id'] ?? 0);
+    $editSubcatId = (int)($_POST['edit_subcategory_id'] ?? 0) ?: null;
+
+    if (empty($editTitle) || empty($editDesc) || $editCatId <= 0) {
+        $error = "Title, category, and description are required.";
+    } else {
+        try {
+            $student->updateComplaint($complaintId, $studentId, $editTitle, $editDesc, $editCatId, $editSubcatId);
+            $_SESSION['message'] = "Complaint updated successfully.";
+            header("Location: student_complaint_details.php?id=$complaintId");
+            exit;
+        } catch (Exception $e) {
+            $error = $e->getMessage();
+        }
+    }
+}
 
 // ── Handle: respond to an information request ────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'respond_info_request') {
@@ -108,6 +131,7 @@ $complaint_history    = $student->readStudentComplaintHistory($complaintId);
 $complaint_attachment = $student->readStudentComplaintAttachments($complaintId);
 $complaint_info_req   = $student->readStudentComplaintInfoRequests($complaintId);
 $existing_feedback    = $student->getComplaintFeedback($complaintId, $studentId);
+$all_categories       = $category->getCategories();
 
 $has_pending_request = false;
 foreach ($complaint_info_req as $req) {
@@ -325,6 +349,27 @@ function statusBadge($status): string
                     <?php endif; ?>
                 </div>
 
+                <!-- ── Edit Complaint (pending only) ────────────── -->
+                <?php if ($complaint_details['complaint_status'] === 'pending'): ?>
+                <div class="container-card shadow-sm mb-4" style="border-left:4px solid #4f46e5;">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                        <div>
+                            <h6 class="fw-bold mb-1">
+                                <i class="fas fa-edit me-2" style="color:#4f46e5;"></i>Want to make changes?
+                            </h6>
+                            <p class="text-muted small mb-0">
+                                You can edit the title, description, category, and attachments while your complaint is still pending.
+                            </p>
+                        </div>
+                        <a href="edit_student_complaint.php?id=<?= $complaintId ?>"
+                            class="btn btn-primary fw-bold"
+                            style="border-radius:10px;background-color:#4f46e5;border-color:#4f46e5;">
+                            <i class="fas fa-edit me-1"></i> Edit Complaint
+                        </a>
+                    </div>
+                </div>
+                <?php endif; ?>
+
                 <!-- ── Information Requests ──────────────────────── -->
                 <?php if (!empty($complaint_info_req)): ?>
                     <div class="container-card shadow-sm mb-4" id="info-requests">
@@ -496,6 +541,51 @@ function statusBadge($status): string
     <script src="assets/js/bootstrap.bundle.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
     <script src="assets/js/script.js"></script>
+
+    <script>
+        (function () {
+            var currentSubcatId = <?= (int)($complaint_details['subcategory_id'] ?? 0) ?>;
+            var $cat    = $('#editCategoryId');
+            var $subcat = $('#editSubcategoryId');
+
+            if (!$cat.length) return;
+
+            function loadSubcategories(categoryId, preselectId) {
+                $subcat.prop('disabled', true).html('<option value="">Loading...</option>');
+                $.getJSON('ajax/get_subcategories.php', { category_id: categoryId })
+                    .done(function (data) {
+                        if (!data || data.success !== true || !Array.isArray(data.items) || data.items.length === 0) {
+                            $subcat.html('<option value="">--- No sub-categories ---</option>');
+                            return;
+                        }
+                        var opts = '<option value="">--- Choose sub-category ---</option>';
+                        data.items.forEach(function (item) {
+                            var sel = (preselectId && parseInt(item.subcategory_id) === preselectId) ? ' selected' : '';
+                            opts += '<option value="' + item.subcategory_id + '"' + sel + '>' + item.subcategory_name + '</option>';
+                        });
+                        $subcat.html(opts).prop('disabled', false);
+                    })
+                    .fail(function () {
+                        $subcat.html('<option value="">--- Failed to load ---</option>');
+                    });
+            }
+
+            // On page load: if a category is already selected, load its subcategories
+            var initialCat = parseInt($cat.val());
+            if (initialCat) {
+                loadSubcategories(initialCat, currentSubcatId);
+            }
+
+            $cat.on('change', function () {
+                var catId = parseInt($(this).val());
+                if (catId) {
+                    loadSubcategories(catId, 0);
+                } else {
+                    $subcat.prop('disabled', true).html('<option value="">--- Choose category first ---</option>');
+                }
+            });
+        })();
+    </script>
 
     <script>
         function confirmReopen(id) {

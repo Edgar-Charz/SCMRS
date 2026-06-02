@@ -85,37 +85,6 @@ if (isset($_SESSION['message'])) {
                     <p class="mb-0 opacity-75">Here's an overview of your complaints and quick actions.</p>
                 </div>
 
-                <?php if ($pendingInfoCount > 0): ?>
-                    <a href="track_complaints.php?filter=awaiting_student_response" class="text-decoration-none">
-                        <div class="alert alert-warning d-flex align-items-center mb-3 shadow-sm" role="alert"
-                            style="border-left: 5px solid #f59e0b; border-radius: 10px; cursor: pointer;">
-                            <i class="fas fa-exclamation-circle fa-lg me-3 text-warning"></i>
-                            <div class="flex-grow-1">
-                                <strong><?= $pendingInfoCount ?>
-                                    complaint<?= $pendingInfoCount > 1 ? 's require' : ' requires' ?> your
-                                    response.</strong>
-                                <span class="ms-2 text-muted small">A staff member has requested more information &mdash;
-                                    click to respond &rarr;</span>
-                            </div>
-                            <span class="badge bg-warning text-dark fs-6"><?= $pendingInfoCount ?></span>
-                        </div>
-                    </a>
-                <?php endif; ?>
-
-                <?php if ($total_resolved > 0): ?>
-                    <a href="track_complaints.php?filter=resolved" class="text-decoration-none">
-                        <div class="alert alert-success d-flex align-items-center mb-4 shadow-sm" role="alert"
-                            style="border-left: 5px solid #10b981; border-radius: 10px; cursor: pointer;">
-                            <i class="fas fa-check-circle fa-lg me-3 text-success"></i>
-                            <div class="flex-grow-1">
-                                <strong><?= $total_resolved ?> complaint<?= $total_resolved > 1 ? 's have' : ' has' ?> been
-                                    resolved.</strong>
-                                <span class="ms-2 text-muted small">Click to view resolutions &rarr;</span>
-                            </div>
-                            <span class="badge bg-success fs-6"><?= $total_resolved ?></span>
-                        </div>
-                    </a>
-                <?php endif; ?>
 
                 <div class="row g-3 mb-4">
 
