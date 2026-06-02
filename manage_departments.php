@@ -9,10 +9,15 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/Admin.php";
+require_once "includes/csrf.php";
 
 $db = new Database();
 $conn = $db->connect();
 $admin = new Admin($conn);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
+}
 
 // Handle Add
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_department'])) {
@@ -169,6 +174,7 @@ $departments = $admin->getAllDepartmentsWithStats();
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <form action="manage_departments.php" method="POST">
+                            <?= csrf_field() ?>
                             <div class="modal-body px-4 py-3">
                                 <div class="mb-3">
                                     <label class="form-label fw-bold small">Department Name <span class="text-danger">*</span></label>
@@ -197,6 +203,7 @@ $departments = $admin->getAllDepartmentsWithStats();
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <form action="manage_departments.php" method="POST">
+                            <?= csrf_field() ?>
                             <input type="hidden" name="department_id" id="edit_dept_id">
                             <div class="modal-body px-4 py-3">
                                 <div class="mb-3">

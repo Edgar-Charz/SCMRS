@@ -11,6 +11,7 @@ $adminId = $_SESSION['user_id'];
 require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/Admin.php";
+require_once "includes/csrf.php";
 
 $db    = new Database();
 $conn  = $db->connect();
@@ -30,8 +31,15 @@ if (!$complaint) {
     exit;
 }
 
+if (in_array($complaint['complaint_status'], ['resolved', 'rejected'], true)) {
+    $_SESSION['message_error'] = "Complaint #$complaintId is already closed and cannot be modified.";
+    header("Location: manage_complaints.php");
+    exit;
+}
+
 // Handle response submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
     $responseAction = $_POST['response_action'] ?? '';
     $responseText   = trim($_POST['response'] ?? '');
 
@@ -243,6 +251,7 @@ function statusBadge($status)
                     <?php endif; ?>
 
                     <form method="POST" action="respond_complaint.php?id=<?= $complaintId ?>">
+                        <?= csrf_field() ?>
                         <input type="hidden" name="response_action" id="responseAction" value="">
 
                         <div class="mb-4">

@@ -9,17 +9,23 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/Admin.php";
+require_once "includes/csrf.php";
 
 $db = new Database();
 $conn = $db->connect();
 $admin = new Admin($conn);
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
+}
+
 // Handle Add
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
-    $name = trim($_POST['category_name'] ?? '');
-    $desc = trim($_POST['category_description'] ?? '');
+    $name   = trim($_POST['category_name'] ?? '');
+    $desc   = trim($_POST['category_description'] ?? '');
+    $deptId = (int) ($_POST['auto_assign_department_id'] ?? 0);
     if ($name !== '') {
-        $admin->addCategory($name, $desc, $_SESSION['user_id']);
+        $admin->addCategory($name, $desc, $_SESSION['user_id'], $deptId ?: null);
         $_SESSION['message'] = "Category '{$name}' added successfully.";
     } else {
         $_SESSION['message_error'] = "Category name is required.";
@@ -30,12 +36,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
 
 // Handle Edit
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_category'])) {
-    $id = (int) ($_POST['category_id'] ?? 0);
-    $name = trim($_POST['category_name'] ?? '');
-    $desc = trim($_POST['category_description'] ?? '');
+    $id     = (int) ($_POST['category_id'] ?? 0);
+    $name   = trim($_POST['category_name'] ?? '');
+    $desc   = trim($_POST['category_description'] ?? '');
     $status = in_array($_POST['status'] ?? '', ['active', 'inactive']) ? $_POST['status'] : 'active';
+    $deptId = (int) ($_POST['auto_assign_department_id'] ?? 0);
     if ($id && $name !== '') {
-        $admin->updateCategory($id, $name, $desc, $status);
+        $admin->updateCategory($id, $name, $desc, $status, $deptId ?: null);
         $_SESSION['message'] = "Category updated successfully.";
     } else {
         $_SESSION['message_error'] = "Category name is required.";
@@ -111,6 +118,7 @@ if (isset($_GET['delete_subcategory']) && is_numeric($_GET['delete_subcategory']
 
 $categories = $admin->getAllCategoriesWithStats();
 $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
+$departments = $admin->getAllDepartments();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -171,6 +179,7 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
                                     <th>#</th>
                                     <th>CATEGORY NAME</th>
                                     <th>DESCRIPTION</th>
+                                    <th class="text-center">DEFAULT DEPT</th>
                                     <th class="text-center">COMPLAINTS</th>
                                     <th class="text-center">STATUS</th>
                                     <th class="text-center">SUBCATEGORIES</th>
@@ -186,6 +195,15 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
                                             <td><?= htmlspecialchars($cat['category_name']) ?></td>
                                             <td class="text-muted small">
                                                 <?= htmlspecialchars($cat['category_description'] ?? '—') ?>
+                                            </td>
+                                            <td class="text-center">
+                                                <?php if (!empty($cat['default_dept_name'])): ?>
+                                                    <span class="badge bg-info text-white" style="font-size:0.75rem;">
+                                                        <?= htmlspecialchars($cat['default_dept_name']) ?>
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="text-muted small">—</span>
+                                                <?php endif; ?>
                                             </td>
                                             <td class="text-center">
                                                 <span class="badge bg-primary"><?= $cat['complaint_count'] ?></span>
@@ -247,6 +265,7 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <form action="manage_categories.php" method="POST">
+                            <?= csrf_field() ?>
                             <div class="modal-body px-4 py-3">
                                 <div class="mb-3">
                                     <label class="form-label fw-bold small">Category Name <span
@@ -259,6 +278,20 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
                                     <textarea name="category_description" class="form-control shadow-sm" rows="3"
                                         style="border-radius: 10px;"
                                         placeholder="Brief description of the category..."></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">
+                                        Default Department
+                                        <span class="text-muted fw-normal">(optional — auto-filters staff when assigning)</span>
+                                    </label>
+                                    <select name="auto_assign_department_id" class="form-select" style="border-radius:10px;">
+                                        <option value="0">— No default department —</option>
+                                        <?php foreach ($departments as $dept): ?>
+                                            <option value="<?= $dept['department_id'] ?>">
+                                                <?= htmlspecialchars($dept['department_name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
                                 </div>
                             </div>
                             <div class="modal-footer">
@@ -285,6 +318,7 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <form action="manage_categories.php" method="POST">
+                            <?= csrf_field() ?>
                             <input type="hidden" name="category_id" id="edit_cat_id">
                             <div class="modal-body px-4 py-3">
                                 <div class="mb-3">
@@ -297,6 +331,20 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
                                     <label class="form-label fw-bold small">Description</label>
                                     <textarea name="category_description" id="edit_cat_desc"
                                         class="form-control shadow-sm" rows="3" style="border-radius: 10px;"></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">
+                                        Default Department
+                                        <span class="text-muted fw-normal">(optional)</span>
+                                    </label>
+                                    <select name="auto_assign_department_id" id="edit_cat_dept" class="form-select" style="border-radius:10px;">
+                                        <option value="0">— No default department —</option>
+                                        <?php foreach ($departments as $dept): ?>
+                                            <option value="<?= $dept['department_id'] ?>">
+                                                <?= htmlspecialchars($dept['department_name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label fw-bold small">Status</label>
@@ -362,6 +410,7 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
                                 <div class="collapse" id="addSubForm">
                                     <div class="card card-body border-0 bg-light shadow-sm" style="border-radius:10px;">
                                         <form action="manage_categories.php" method="POST">
+                                            <?= csrf_field() ?>
                                             <input type="hidden" name="subcategory_category_id" id="sub_category_id">
                                             <div class="mb-3">
                                                 <label class="form-label fw-bold small">Subcategory Name <span
@@ -406,6 +455,7 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <form action="manage_categories.php" method="POST">
+                            <?= csrf_field() ?>
                             <input type="hidden" name="subcategory_id" id="edit_sub_id">
                             <div class="modal-body px-4 py-3">
                                 <div class="mb-3">
@@ -447,6 +497,7 @@ $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
             document.getElementById('edit_cat_name').value = cat.category_name;
             document.getElementById('edit_cat_desc').value = cat.category_description || '';
             document.getElementById('edit_cat_status').value = cat.status;
+            document.getElementById('edit_cat_dept').value = cat.auto_assign_department_id || '0';
         }
 
         // ── Subcategory helpers ───────────────────────────────────────────────

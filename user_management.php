@@ -11,6 +11,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/Admin.php";
+require_once "includes/csrf.php";
 
 $message = $error = "";
 
@@ -18,11 +19,21 @@ $db = new Database();
 $conn = $db->connect();
 $admin = new Admin($conn);
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
+}
+
 // Handle Delete Student
 if (isset($_GET['delete_student']) && is_numeric($_GET['delete_student'])) {
     $student_id = (int) $_GET['delete_student'];
     try {
+        $uStmt = $conn->prepare("SELECT username FROM users WHERE user_id = ?");
+        $uStmt->bind_param("i", $student_id);
+        $uStmt->execute();
+        $uRow = $uStmt->get_result()->fetch_assoc();
+        $uStmt->close();
         if ($admin->deleteStudent($student_id)) {
+            $admin->logActivity($adminId, 'user_deleted', 'user', $student_id, $uRow['username'] ?? "User #$student_id", 'Student account deleted');
             $_SESSION['message'] = "Student deleted successfully.";
             header("Location: user_management.php#students");
             exit;
@@ -36,7 +47,13 @@ if (isset($_GET['delete_student']) && is_numeric($_GET['delete_student'])) {
 if (isset($_GET['delete_staff']) && is_numeric($_GET['delete_staff'])) {
     $staff_id = (int) $_GET['delete_staff'];
     try {
+        $uStmt = $conn->prepare("SELECT username FROM users WHERE user_id = ?");
+        $uStmt->bind_param("i", $staff_id);
+        $uStmt->execute();
+        $uRow = $uStmt->get_result()->fetch_assoc();
+        $uStmt->close();
         if ($admin->deleteStaff($staff_id)) {
+            $admin->logActivity($adminId, 'user_deleted', 'user', $staff_id, $uRow['username'] ?? "User #$staff_id", 'Staff account deleted');
             $_SESSION['message'] = "Staff deleted successfully.";
             header("Location: user_management.php#staff");
             exit;
@@ -53,6 +70,12 @@ if (isset($_POST['approve_staff']) && is_numeric($_POST['approve_staff'])) {
     $role_id = isset($_POST['staff_role']) ? (int) $_POST['staff_role'] : null;
     try {
         if ($admin->approveStaff($staff_id, $department_id ?: null, $role_id ?: null)) {
+            $uStmt = $conn->prepare("SELECT username FROM users WHERE user_id = ?");
+            $uStmt->bind_param("i", $staff_id);
+            $uStmt->execute();
+            $uRow = $uStmt->get_result()->fetch_assoc();
+            $uStmt->close();
+            $admin->logActivity($adminId, 'staff_approved', 'user', $staff_id, $uRow['username'] ?? "User #$staff_id", 'Staff account approved');
             $_SESSION['message'] = "Staff approved successfully.";
             header("Location: user_management.php#approval");
             exit;
@@ -66,7 +89,13 @@ if (isset($_POST['approve_staff']) && is_numeric($_POST['approve_staff'])) {
 if (isset($_GET['reject_staff']) && is_numeric($_GET['reject_staff'])) {
     $staff_id = (int) $_GET['reject_staff'];
     try {
+        $uStmt = $conn->prepare("SELECT username FROM users WHERE user_id = ?");
+        $uStmt->bind_param("i", $staff_id);
+        $uStmt->execute();
+        $uRow = $uStmt->get_result()->fetch_assoc();
+        $uStmt->close();
         if ($admin->rejectStaff($staff_id)) {
+            $admin->logActivity($adminId, 'staff_rejected', 'user', $staff_id, $uRow['username'] ?? "User #$staff_id", 'Staff registration rejected and account deleted');
             $_SESSION['message'] = "Staff rejected successfully.";
             header("Location: user_management.php#approval");
             exit;
@@ -80,9 +109,15 @@ if (isset($_GET['reject_staff']) && is_numeric($_GET['reject_staff'])) {
 if (isset($_GET['demote_staff']) && is_numeric($_GET['demote_staff'])) {
     $staff_id = (int) $_GET['demote_staff'];
     try {
+        $uStmt = $conn->prepare("SELECT username FROM users WHERE user_id = ?");
+        $uStmt->bind_param("i", $staff_id);
+        $uStmt->execute();
+        $uRow = $uStmt->get_result()->fetch_assoc();
+        $uStmt->close();
         $demote_stmt = $conn->prepare("UPDATE staffs SET staff_approval_status = '0' WHERE staff_user_id = ?");
         $demote_stmt->bind_param("i", $staff_id);
         if ($demote_stmt->execute()) {
+            $admin->logActivity($adminId, 'staff_demoted', 'user', $staff_id, $uRow['username'] ?? "User #$staff_id", 'Staff approval revoked (moved back to pending)');
             $_SESSION['message'] = "Staff demoted successfully.";
             header("Location: user_management.php#approval");
             exit;
@@ -91,6 +126,79 @@ if (isset($_GET['demote_staff']) && is_numeric($_GET['demote_staff'])) {
     } catch (Exception $e) {
         $error = $e->getMessage();
     }
+}
+
+// Handle Toggle Student Status (suspend / activate)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_student_status'])) {
+    $userId        = (int) ($_POST['toggle_user_id'] ?? 0);
+    $currentStatus = $_POST['current_status'] ?? '';
+    try {
+        if ($userId && in_array($currentStatus, ['active', 'inactive'], true)) {
+            (new User($conn))->toggleStatus($userId, $currentStatus);
+            $newStatus = $currentStatus === 'active' ? 'inactive' : 'active';
+            $uStmt = $conn->prepare("SELECT username FROM users WHERE user_id = ?");
+            $uStmt->bind_param("i", $userId);
+            $uStmt->execute();
+            $uRow = $uStmt->get_result()->fetch_assoc();
+            $uStmt->close();
+            $action = $newStatus === 'inactive' ? 'user_suspended' : 'user_activated';
+            $admin->logActivity($adminId, $action, 'user', $userId, $uRow['username'] ?? "User #$userId", "Student account $newStatus");
+            $_SESSION['message'] = "Student account " . ($newStatus === 'inactive' ? 'suspended' : 'activated') . " successfully.";
+        }
+    } catch (Exception $e) {
+        $_SESSION['message_error'] = $e->getMessage();
+    }
+    header("Location: user_management.php#students");
+    exit;
+}
+
+// Handle Toggle Staff Status (suspend / activate)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_staff_status'])) {
+    $userId        = (int) ($_POST['toggle_user_id'] ?? 0);
+    $currentStatus = $_POST['current_status'] ?? '';
+    try {
+        if ($userId && in_array($currentStatus, ['active', 'inactive'], true)) {
+            (new User($conn))->toggleStatus($userId, $currentStatus);
+            $newStatus = $currentStatus === 'active' ? 'inactive' : 'active';
+            $uStmt = $conn->prepare("SELECT username FROM users WHERE user_id = ?");
+            $uStmt->bind_param("i", $userId);
+            $uStmt->execute();
+            $uRow = $uStmt->get_result()->fetch_assoc();
+            $uStmt->close();
+            $action = $newStatus === 'inactive' ? 'user_suspended' : 'user_activated';
+            $admin->logActivity($adminId, $action, 'user', $userId, $uRow['username'] ?? "User #$userId", "Staff account $newStatus");
+            $_SESSION['message'] = "Staff account " . ($newStatus === 'inactive' ? 'suspended' : 'activated') . " successfully.";
+        }
+    } catch (Exception $e) {
+        $_SESSION['message_error'] = $e->getMessage();
+    }
+    header("Location: user_management.php#staff");
+    exit;
+}
+
+// Handle Admin Password Reset
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_reset_password'])) {
+    $userId          = (int) ($_POST['reset_user_id'] ?? 0);
+    $newPassword     = $_POST['new_password'] ?? '';
+    $confirmPassword = $_POST['confirm_new_password'] ?? '';
+    $redirectTab     = in_array($_POST['redirect_tab'] ?? '', ['students', 'staff'], true) ? $_POST['redirect_tab'] : 'students';
+    try {
+        if (!$userId) throw new Exception("Invalid user.");
+        if (empty($newPassword)) throw new Exception("Password is required.");
+        if ($newPassword !== $confirmPassword) throw new Exception("Passwords do not match.");
+        $admin->adminResetPassword($userId, $newPassword);
+        $uStmt = $conn->prepare("SELECT username FROM users WHERE user_id = ?");
+        $uStmt->bind_param("i", $userId);
+        $uStmt->execute();
+        $uRow = $uStmt->get_result()->fetch_assoc();
+        $uStmt->close();
+        $admin->logActivity($adminId, 'password_reset', 'user', $userId, $uRow['username'] ?? "User #$userId", 'Password reset by admin');
+        $_SESSION['message'] = "Password for '{$uRow['username']}' reset successfully.";
+    } catch (Exception $e) {
+        $_SESSION['message_error'] = $e->getMessage();
+    }
+    header("Location: user_management.php#$redirectTab");
+    exit;
 }
 
 // Handle Add Student
@@ -110,6 +218,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['addStudentBTN'])) {
             $_SESSION['message_error'] = "Passwords do not match.";
         } else {
             $admin->addStudent($username, $email, $password, $regNum, $collegeId ?: null, $phone, $program);
+            $admin->logActivity($adminId, 'user_created', 'user', 0, $username, "Student account created by admin");
             $_SESSION['message'] = "Student '{$username}' added successfully.";
         }
     } catch (Exception $e) {
@@ -136,6 +245,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['addStaffBTN'])) {
             $_SESSION['message_error'] = "Passwords do not match.";
         } else {
             $admin->addStaffAccount($username, $email, $password, $deptId ?: null, $staffIdNum, $phone, $roleId ?: null);
+            $admin->logActivity($adminId, 'user_created', 'user', 0, $username, "Staff account created by admin");
             $_SESSION['message'] = "Staff '{$username}' added and approved successfully.";
         }
     } catch (Exception $e) {
@@ -335,6 +445,7 @@ if (isset($_SESSION['message'])) {
                                         <th>#</th>
                                         <th class="text-center">STUDENT NAME</th>
                                         <th class="text-center">REG. NUMBER</th>
+                                        <th class="text-center">STATUS</th>
                                         <th class="text-center">ACTION</th>
                                     </tr>
                                 </thead>
@@ -352,6 +463,13 @@ if (isset($_SESSION['message'])) {
                                                     <?php echo htmlspecialchars($student['student_registration_number']); ?>
                                                 </td>
                                                 <td class="text-center">
+                                                    <?php if ($student['user_status'] === 'active'): ?>
+                                                        <span class="badge bg-success">Active</span>
+                                                    <?php else: ?>
+                                                        <span class="badge bg-danger">Suspended</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td class="text-center">
                                                     <div class="d-flex justify-content-center">
                                                         <!-- View Button -->
                                                         <button type="button" class="btn btn-status btn-outline-secondary me-2"
@@ -359,6 +477,21 @@ if (isset($_SESSION['message'])) {
                                                             onclick="viewStudent(<?php echo htmlspecialchars(json_encode($student)); ?>)"
                                                             title="view">
                                                             <i class="fas fa-eye text-dark"></i>
+                                                        </button>
+
+                                                        <!-- Suspend / Activate Button -->
+                                                        <button type="button" class="btn btn-status btn-outline-secondary me-2"
+                                                            onclick="confirmToggleStatus(<?= $student['user_id'] ?>, '<?= $student['user_status'] ?>', 'student')"
+                                                            title="<?= $student['user_status'] === 'active' ? 'Suspend account' : 'Activate account' ?>">
+                                                            <i class="fas fa-<?= $student['user_status'] === 'active' ? 'user-slash' : 'user-check' ?> text-dark"></i>
+                                                        </button>
+
+                                                        <!-- Reset Password Button -->
+                                                        <button type="button" class="btn btn-status btn-outline-secondary me-2"
+                                                            data-bs-toggle="modal" data-bs-target="#resetPasswordModal"
+                                                            onclick="openResetPassword(<?= $student['user_id'] ?>, '<?= htmlspecialchars($student['username'], ENT_QUOTES) ?>', 'students')"
+                                                            title="reset password">
+                                                            <i class="fas fa-key text-dark"></i>
                                                         </button>
 
                                                         <!-- Delete Button -->
@@ -395,15 +528,12 @@ if (isset($_SESSION['message'])) {
                                                 <div class="modal-body">
                                                     <div class="container-fluid">
                                                         <div class="row g-2">
-
-                                                            <!-- Student Info -->
                                                             <div class="col-lg-6 col-sm-12 col-12">
                                                                 <label class="form-label fw-bold">Student Name</label>
                                                                 <p class="form-control" id="modal_student_name">-</p>
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
-                                                                <label class="form-label fw-bold">Registration
-                                                                    Number</label>
+                                                                <label class="form-label fw-bold">Registration Number</label>
                                                                 <p class="form-control" id="modal_student_regnum">-</p>
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
@@ -411,10 +541,21 @@ if (isset($_SESSION['message'])) {
                                                                 <p class="form-control" id="modal_student_email">-</p>
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
+                                                                <label class="form-label fw-bold">Phone Number</label>
+                                                                <p class="form-control" id="modal_student_phone">-</p>
+                                                            </div>
+                                                            <div class="col-lg-6 col-sm-12 col-12">
                                                                 <label class="form-label fw-bold">College</label>
                                                                 <p class="form-control" id="modal_student_college">-</p>
                                                             </div>
-
+                                                            <div class="col-lg-6 col-sm-12 col-12">
+                                                                <label class="form-label fw-bold">Programme</label>
+                                                                <p class="form-control" id="modal_student_program">-</p>
+                                                            </div>
+                                                            <div class="col-lg-6 col-sm-12 col-12">
+                                                                <label class="form-label fw-bold">Account Status</label>
+                                                                <p class="form-control" id="modal_student_status">-</p>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -517,6 +658,7 @@ if (isset($_SESSION['message'])) {
                                 </div>
 
                                 <form action="user_management.php" method="POST">
+                                    <?= csrf_field() ?>
                                     <div class="modal-body p-4">
                                         <div class="row g-3">
                                             <div class="col-12 col-md-6">
@@ -626,6 +768,7 @@ if (isset($_SESSION['message'])) {
                                         <th class="text-center">STAFF NAME</th>
                                         <th class="text-center">DEPARTMENT</th>
                                         <th class="text-center">ROLE</th>
+                                        <th class="text-center">STATUS</th>
                                         <th class="text-center">ACTION</th>
                                     </tr>
                                 </thead>
@@ -648,6 +791,13 @@ if (isset($_SESSION['message'])) {
                                                     <?php endif; ?>
                                                 </td>
                                                 <td class="text-center">
+                                                    <?php if ($staff['user_status'] === 'active'): ?>
+                                                        <span class="badge bg-success">Active</span>
+                                                    <?php else: ?>
+                                                        <span class="badge bg-danger">Suspended</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td class="text-center">
                                                     <div class="d-flex justify-content-center">
                                                         <!-- View Button -->
                                                         <button type="button" class="btn btn-status btn-outline-secondary me-2"
@@ -663,6 +813,21 @@ if (isset($_SESSION['message'])) {
                                                             onclick="openAssignRole(<?= $staff['user_id'] ?>, '<?= htmlspecialchars($staff['username'], ENT_QUOTES) ?>', <?= $staff['staff_role_id'] ?: 'null' ?>)"
                                                             title="assign role">
                                                             <i class="fas fa-id-badge text-dark"></i>
+                                                        </button>
+
+                                                        <!-- Suspend / Activate Button -->
+                                                        <button type="button" class="btn btn-status btn-outline-secondary me-2"
+                                                            onclick="confirmToggleStatus(<?= $staff['user_id'] ?>, '<?= $staff['user_status'] ?>', 'staff')"
+                                                            title="<?= $staff['user_status'] === 'active' ? 'Suspend account' : 'Activate account' ?>">
+                                                            <i class="fas fa-<?= $staff['user_status'] === 'active' ? 'user-slash' : 'user-check' ?> text-dark"></i>
+                                                        </button>
+
+                                                        <!-- Reset Password Button -->
+                                                        <button type="button" class="btn btn-status btn-outline-secondary me-2"
+                                                            data-bs-toggle="modal" data-bs-target="#resetPasswordModal"
+                                                            onclick="openResetPassword(<?= $staff['user_id'] ?>, '<?= htmlspecialchars($staff['username'], ENT_QUOTES) ?>', 'staff')"
+                                                            title="reset password">
+                                                            <i class="fas fa-key text-dark"></i>
                                                         </button>
 
                                                         <!-- Delete Button -->
@@ -700,26 +865,42 @@ if (isset($_SESSION['message'])) {
                                                 <div class="modal-body">
                                                     <div class="container-fluid">
                                                         <div class="row g-2">
-
-                                                            <!-- Staff Info -->
                                                             <div class="col-lg-6 col-sm-12 col-12">
                                                                 <label class="form-label fw-bold">Staff Name</label>
                                                                 <p class="form-control" id="modal_staff_name">-</p>
+                                                            </div>
+                                                            <div class="col-lg-6 col-sm-12 col-12">
+                                                                <label class="form-label fw-bold">Staff ID</label>
+                                                                <p class="form-control" id="modal_staff_id">-</p>
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
                                                                 <label class="form-label fw-bold">Email Address</label>
                                                                 <p class="form-control" id="modal_staff_email">-</p>
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
-                                                                <label class="form-label fw-bold">Department</label>
-                                                                <p class="form-control" id="modal_staff_department">-
-                                                                </p>
+                                                                <label class="form-label fw-bold">Phone Number</label>
+                                                                <p class="form-control" id="modal_staff_phone">-</p>
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
-                                                                <label class="form-label fw-bold">Status</label>
+                                                                <label class="form-label fw-bold">Department</label>
+                                                                <p class="form-control" id="modal_staff_department">-</p>
+                                                            </div>
+                                                            <div class="col-lg-6 col-sm-12 col-12">
+                                                                <label class="form-label fw-bold">Role</label>
+                                                                <p class="form-control" id="modal_staff_role">-</p>
+                                                            </div>
+                                                            <div class="col-lg-6 col-sm-12 col-12">
+                                                                <label class="form-label fw-bold">Account Status</label>
                                                                 <p class="form-control" id="modal_staff_status">-</p>
                                                             </div>
-
+                                                            <div class="col-lg-6 col-sm-12 col-12">
+                                                                <label class="form-label fw-bold">Approved By</label>
+                                                                <p class="form-control" id="modal_staff_approved_by">-</p>
+                                                            </div>
+                                                            <div class="col-lg-6 col-sm-12 col-12">
+                                                                <label class="form-label fw-bold">Approved At</label>
+                                                                <p class="form-control" id="modal_staff_approved_at">-</p>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -813,6 +994,7 @@ if (isset($_SESSION['message'])) {
                                 </div>
 
                                 <form action="user_management.php" method="POST">
+                                    <?= csrf_field() ?>
                                     <div class="modal-body p-4">
                                         <div class="row g-3">
                                             <div class="col-12 col-md-6">
@@ -1011,6 +1193,7 @@ if (isset($_SESSION['message'])) {
 
                                         <!-- Approval form -->
                                         <form action="" method="POST" class="mt-3">
+                                            <?= csrf_field() ?>
                                             <div class="row g-3 mb-3">
                                                 <div class="col-12 col-md-6">
                                                     <label class="form-label fw-bold small">Assign Department</label>
@@ -1069,6 +1252,8 @@ if (isset($_SESSION['message'])) {
                                         <th>#</th>
                                         <th class="text-center">STAFF NAME</th>
                                         <th class="text-center">DEPARTMENT</th>
+                                        <th class="text-center">APPROVED BY</th>
+                                        <th class="text-center">APPROVED AT</th>
                                         <th class="text-center">ACTION</th>
                                     </tr>
                                 </thead>
@@ -1081,6 +1266,14 @@ if (isset($_SESSION['message'])) {
                                                 <td class="text-center"><?php echo htmlspecialchars($staff['username']); ?></td>
                                                 <td class="text-center">
                                                     <?php echo htmlspecialchars($staff['department_name'] ?? 'N/A'); ?>
+                                                </td>
+                                                <td class="text-center">
+                                                    <?php echo htmlspecialchars($staff['approved_by_name'] ?? 'N/A'); ?>
+                                                </td>
+                                                <td class="text-center">
+                                                    <?php echo $staff['staff_approved_at']
+                                                        ? date('d M Y, g:i A', strtotime($staff['staff_approved_at']))
+                                                        : 'N/A'; ?>
                                                 </td>
                                                 <td class="text-center">
                                                     <div class="d-flex justify-content-center">
@@ -1105,7 +1298,7 @@ if (isset($_SESSION['message'])) {
                                         <?php endforeach; ?>
                                     <?php else: ?>
                                         <tr>
-                                            <td colspan="4" class="text-center py-4">No approved staff yet</td>
+                                            <td colspan="6" class="text-center py-4">No approved staff yet</td>
                                         </tr>
                                     <?php endif; ?>
 
@@ -1127,33 +1320,42 @@ if (isset($_SESSION['message'])) {
                                                 <div class="modal-body">
                                                     <div class="container-fluid">
                                                         <div class="row g-2">
-
-                                                            <!-- Staff Info -->
                                                             <div class="col-lg-6 col-sm-12 col-12">
                                                                 <label class="form-label fw-bold">Staff Name</label>
                                                                 <p class="form-control" id="astaff_name">-</p>
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
-                                                                <label class="form-label fw-bold">Role</label>
-                                                                <p class="form-control" id="astaff_role">-</p>
+                                                                <label class="form-label fw-bold">Staff ID</label>
+                                                                <p class="form-control" id="astaff_id">-</p>
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
                                                                 <label class="form-label fw-bold">Email Address</label>
                                                                 <p class="form-control" id="astaff_email">-</p>
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
+                                                                <label class="form-label fw-bold">Phone Number</label>
+                                                                <p class="form-control" id="astaff_phone">-</p>
+                                                            </div>
+                                                            <div class="col-lg-6 col-sm-12 col-12">
                                                                 <label class="form-label fw-bold">Department</label>
                                                                 <p class="form-control" id="astaff_dept">-</p>
+                                                            </div>
+                                                            <div class="col-lg-6 col-sm-12 col-12">
+                                                                <label class="form-label fw-bold">Role</label>
+                                                                <p class="form-control" id="astaff_role">-</p>
+                                                            </div>
+                                                            <div class="col-lg-6 col-sm-12 col-12">
+                                                                <label class="form-label fw-bold">Approved By</label>
+                                                                <p class="form-control" id="astaff_approved_by">-</p>
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
                                                                 <label class="form-label fw-bold">Approved At</label>
                                                                 <p class="form-control" id="astaff_approved_at">-</p>
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
-                                                                <label class="form-label fw-bold">Status</label>
+                                                                <label class="form-label fw-bold">Account Status</label>
                                                                 <p class="form-control" id="astaff_status">-</p>
                                                             </div>
-
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1297,6 +1499,7 @@ if (isset($_SESSION['message'])) {
                                         data-bs-dismiss="modal"></button>
                                 </div>
                                 <form action="user_management.php" method="POST">
+                                    <?= csrf_field() ?>
                                     <div class="modal-body px-4 py-3">
                                         <div class="mb-3">
                                             <label class="form-label fw-bold small">Role Name <span
@@ -1339,6 +1542,7 @@ if (isset($_SESSION['message'])) {
                                         data-bs-dismiss="modal"></button>
                                 </div>
                                 <form action="user_management.php" method="POST">
+                                    <?= csrf_field() ?>
                                     <input type="hidden" name="role_id" id="edit_role_id">
                                     <div class="modal-body px-4 py-3">
                                         <div class="mb-3">
@@ -1371,6 +1575,62 @@ if (isset($_SESSION['message'])) {
                     </div>
                 </div>
 
+                <!-- Reset Password Modal (shared) -->
+                <div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content border-0 shadow-lg" style="border-radius:12px; overflow:hidden;">
+                            <div class="modal-header text-white"
+                                style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
+                                <h5 class="modal-title fw-bold text-white">
+                                    <i class="fas fa-key me-2"></i>RESET PASSWORD
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <form action="user_management.php" method="POST">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="reset_user_id" id="reset_user_id">
+                                <input type="hidden" name="redirect_tab" id="reset_redirect_tab">
+                                <div class="modal-body px-4 py-3">
+                                    <p class="mb-3 small">Setting new password for: <strong id="reset_user_name"></strong></p>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold small">New Password <span class="text-danger">*</span></label>
+                                        <div class="pwd-wrap">
+                                            <input type="password" name="new_password" id="resetPwd"
+                                                class="form-control" placeholder="Min 8 characters" required>
+                                            <button type="button" class="pwd-eye"
+                                                onclick="togglePwd('resetPwd',this)" tabindex="-1">
+                                                <i class="fas fa-eye-slash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold small">Confirm Password <span class="text-danger">*</span></label>
+                                        <div class="pwd-wrap">
+                                            <input type="password" name="confirm_new_password" id="resetPwdConfirm"
+                                                class="form-control" placeholder="Re-enter password" required>
+                                            <button type="button" class="pwd-eye"
+                                                onclick="togglePwd('resetPwdConfirm',this)" tabindex="-1">
+                                                <i class="fas fa-eye-slash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="alert alert-warning py-2 px-3 small mb-0">
+                                        <i class="fas fa-exclamation-triangle me-1"></i>
+                                        The user must use this new password on their next login.
+                                    </div>
+                                </div>
+                                <div class="modal-footer" style="background:#f8f9fa;">
+                                    <button type="submit" name="admin_reset_password" class="btn btn-danger fw-bold"
+                                        onclick="return checkPasswords('resetPwd','resetPwdConfirm')">
+                                        <i class="fas fa-key me-1"></i>Reset Password
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Assign Role Modal (shared, lives outside tab sections) -->
                 <div class="modal fade" id="assignRoleModal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-dialog-centered">
@@ -1385,6 +1645,7 @@ if (isset($_SESSION['message'])) {
                                     data-bs-dismiss="modal"></button>
                             </div>
                             <form action="user_management.php" method="POST">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="assign_staff_user_id" id="assign_staff_user_id">
                                 <div class="modal-body px-4 py-3">
                                     <p class="mb-3">Assigning role to: <strong id="assign_staff_name"></strong></p>
@@ -1464,28 +1725,41 @@ if (isset($_SESSION['message'])) {
         }
 
         function viewStudent(student) {
-            document.getElementById('modal_student_name').textContent = student.username || '-';
-            document.getElementById('modal_student_regnum').textContent = student.student_registration_number || '-';
-            document.getElementById('modal_student_email').textContent = student.user_email || '-';
-            document.getElementById('modal_student_college').textContent = student.college_name || '-';
+            document.getElementById('modal_student_name').textContent    = student.username || '-';
+            document.getElementById('modal_student_regnum').textContent  = student.student_registration_number || '-';
+            document.getElementById('modal_student_email').textContent   = student.user_email || '-';
+            document.getElementById('modal_student_phone').textContent   = student.user_phone_number || 'Not provided';
+            document.getElementById('modal_student_college').textContent = student.college_name || 'Not specified';
+            document.getElementById('modal_student_program').textContent = student.student_program || 'Not specified';
+            document.getElementById('modal_student_status').textContent  = student.user_status === 'active' ? 'Active' : 'Suspended';
         }
 
         function viewStaff(staff) {
-            document.getElementById('modal_staff_name').textContent = staff.username || '-';
-            document.getElementById('modal_staff_email').textContent = staff.user_email || '-';
-            document.getElementById('modal_staff_department').textContent = staff.department_name || '-';
-            document.getElementById('modal_staff_status').textContent = staff.user_status || '-';
+            document.getElementById('modal_staff_name').textContent        = staff.username || '-';
+            document.getElementById('modal_staff_id').textContent          = staff.staff_id || '-';
+            document.getElementById('modal_staff_email').textContent       = staff.user_email || '-';
+            document.getElementById('modal_staff_phone').textContent       = staff.user_phone_number || 'Not provided';
+            document.getElementById('modal_staff_department').textContent  = staff.department_name || 'Unassigned';
+            document.getElementById('modal_staff_role').textContent        = staff.role_name || 'Unassigned';
+            document.getElementById('modal_staff_status').textContent      = staff.user_status === 'active' ? 'Active' : 'Suspended';
+            document.getElementById('modal_staff_approved_by').textContent = staff.approved_by_name || 'N/A';
+            document.getElementById('modal_staff_approved_at').textContent = staff.staff_approved_at
+                ? new Date(staff.staff_approved_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                : 'N/A';
         }
 
         function viewApprovedStaff(staff) {
-            document.getElementById('astaff_name').textContent = staff.username || '-';
-            document.getElementById('astaff_role').textContent = staff.role_name || 'Officer';
-            document.getElementById('astaff_email').textContent = staff.user_email || '-';
-            document.getElementById('astaff_dept').textContent = staff.department_name || 'Unassigned';
-            document.getElementById('astaff_approved_at').textContent = staff.staff_approved_at
-                ? new Date(staff.staff_approved_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-                : '-';
-            document.getElementById('astaff_status').textContent = staff.user_status || '-';
+            document.getElementById('astaff_name').textContent         = staff.username || '-';
+            document.getElementById('astaff_id').textContent           = staff.staff_id || '-';
+            document.getElementById('astaff_email').textContent        = staff.user_email || '-';
+            document.getElementById('astaff_phone').textContent        = staff.user_phone_number || 'Not provided';
+            document.getElementById('astaff_dept').textContent         = staff.department_name || 'Unassigned';
+            document.getElementById('astaff_role').textContent         = staff.role_name || 'Unassigned';
+            document.getElementById('astaff_approved_by').textContent  = staff.approved_by_name || 'N/A';
+            document.getElementById('astaff_approved_at').textContent  = staff.staff_approved_at
+                ? new Date(staff.staff_approved_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                : 'N/A';
+            document.getElementById('astaff_status').textContent = staff.user_status === 'active' ? 'Active' : 'Suspended';
         }
 
         function confirmDeleteStudent(studentId) {
@@ -1567,6 +1841,51 @@ if (isset($_SESSION['message'])) {
             document.getElementById('assign_staff_name').textContent = username;
             const select = document.getElementById('assign_role_id');
             select.value = currentRoleId || '';
+        }
+
+        function confirmToggleStatus(userId, currentStatus, type) {
+            var isSuspending = currentStatus === 'active';
+            Swal.fire({
+                icon: isSuspending ? 'warning' : 'question',
+                title: isSuspending ? 'Suspend Account?' : 'Activate Account?',
+                text: isSuspending
+                    ? 'The user will not be able to log in while suspended.'
+                    : 'The user will be allowed to log in again.',
+                showCancelButton: true,
+                confirmButtonColor: isSuspending ? '#d33' : '#28a745',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: isSuspending ? 'Yes, suspend' : 'Yes, activate',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    var form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = 'user_management.php';
+                    var fields = {
+                        'csrf_token': _csrfToken,
+                        'toggle_user_id': userId,
+                        'current_status': currentStatus
+                    };
+                    fields['toggle_' + type + '_status'] = '1';
+                    Object.entries(fields).forEach(function([k, v]) {
+                        var input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = k;
+                        input.value = v;
+                        form.appendChild(input);
+                    });
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            });
+        }
+
+        function openResetPassword(userId, username, tab) {
+            document.getElementById('reset_user_id').value = userId;
+            document.getElementById('reset_user_name').textContent = username;
+            document.getElementById('reset_redirect_tab').value = tab;
+            document.getElementById('resetPwd').value = '';
+            document.getElementById('resetPwdConfirm').value = '';
         }
     </script>
 

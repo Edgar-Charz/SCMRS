@@ -33,7 +33,7 @@ $categories    = $admin->getAllCategories();
 
 $isFiltered = $filterDept || $filterCategory || $filterDateFrom || $filterDateTo;
 
-// ── Chart data (JSON) ──────────────────────────────────────────────────────
+// Chart data (JSON) 
 $total = (int)$stats['total'];
 
 // Status doughnut
@@ -132,7 +132,7 @@ function fmtHours($val): string
                     </ol>
                 </nav>
 
-                <!-- ── Filter Card ─────────────────────────────────────── -->
+                <!-- Filter Card -->
                 <div class="container-card shadow-sm mb-4">
                     <h4 class="mb-3 fw-bold"><i class="fas fa-filter me-2"></i>Filter</h4>
                     <form method="GET" action="reports.php" id="filterForm">
@@ -173,7 +173,7 @@ function fmtHours($val): string
                                     value="<?= htmlspecialchars($filterDateTo ?? '') ?>">
                             </div>
                         </div>
-                        <div class="d-flex gap-2 mt-3">
+                        <div class="d-flex gap-2 mt-3 flex-wrap align-items-center">
                             <button type="submit" class="btn btn-primary p-3 fw-bold" style="border-radius:10px;">
                                 <i class="fas fa-search me-1"></i> Apply Filter
                             </button>
@@ -185,11 +185,73 @@ function fmtHours($val): string
                                     <i class="fas fa-info-circle me-1"></i>Filtered results
                                 </span>
                             <?php endif; ?>
+                            <div class="ms-auto">
+                                <div class="dropdown">
+                                    <button class="btn btn-success fw-bold dropdown-toggle p-3" type="button"
+                                        data-bs-toggle="dropdown" aria-expanded="false" style="border-radius:10px;">
+                                        <i class="fas fa-download me-1"></i> Export
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-1"
+                                        style="border-radius:12px; min-width:230px;">
+                                        <li>
+                                            <h6 class="dropdown-header small text-uppercase">
+                                                <i class="fas fa-file-pdf me-1 text-danger"></i>PDF
+                                            </h6>
+                                        </li>
+                                        <li>
+                                            <button class="dropdown-item small" type="button" onclick="exportFullReportPDF()">
+                                                <i class="fas fa-file-alt me-2 text-danger"></i>Full Report (all tables)
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button class="dropdown-item small" type="button" onclick="exportAnalyticsPDF()">
+                                                <i class="fas fa-chart-bar me-2 text-danger"></i>Analytics Charts PDF
+                                            </button>
+                                        </li>
+                                        <li><hr class="dropdown-divider my-1"></li>
+                                        <li>
+                                            <h6 class="dropdown-header small text-uppercase">
+                                                <i class="fas fa-file-csv me-1 text-success"></i>CSV
+                                            </h6>
+                                        </li>
+                                        <li>
+                                            <button class="dropdown-item small" type="button"
+                                                onclick="exportCSV('tbl_department','report-by-department.csv')">
+                                                <i class="fas fa-building me-2 text-muted"></i>By Department
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button class="dropdown-item small" type="button"
+                                                onclick="exportCSV('tbl_category','report-by-category.csv')">
+                                                <i class="fas fa-tags me-2 text-muted"></i>By Category
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button class="dropdown-item small" type="button"
+                                                onclick="exportCSV('tbl_staff','report-by-staff.csv')">
+                                                <i class="fas fa-user-tie me-2 text-muted"></i>By Staff
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button class="dropdown-item small" type="button"
+                                                onclick="exportCSV('tbl_monthly','report-monthly-trend.csv')">
+                                                <i class="fas fa-chart-line me-2 text-muted"></i>Monthly Trend
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button class="dropdown-item small" type="button"
+                                                onclick="exportCSV('tbl_oldest','report-oldest-pending.csv')">
+                                                <i class="fas fa-hourglass-end me-2 text-muted"></i>Oldest Pending
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                     </form>
                 </div>
 
-                <!-- ── Summary Stats (always visible) ─────────────────── -->
+                <!-- Summary Stats (always visible) -->
                 <div class="row g-3 mb-4">
                     <div class="col-6 col-md-4 col-lg-2">
                         <div class="stat-card bg-stat p-3 text-center shadow-sm">
@@ -229,7 +291,7 @@ function fmtHours($val): string
                     </div>
                 </div>
 
-                <!-- ── Tab Navigation ──────────────────────────────────── -->
+                <!-- Tab Navigation -->
                 <ul class="nav nav-tabs mb-4 fw-bold" id="reportTabs">
                     <li class="nav-item">
                         <button class="nav-link <?= $activeTab === 'reports' ? 'active' : '' ?>" onclick="switchReportTab('reports')">
@@ -243,9 +305,7 @@ function fmtHours($val): string
                     </li>
                 </ul>
 
-                <!-- ════════════════════════════════════════════════════════
-                     TAB: REPORTS
-                ════════════════════════════════════════════════════════ -->
+                <!-- TAB: REPORTS -->
                 <div id="tab-reports" <?= $activeTab !== 'reports' ? 'style="display:none;"' : '' ?>>
 
                     <!-- Complaints by Department -->
@@ -526,19 +586,26 @@ function fmtHours($val): string
                         </div>
                     </div>
 
-                </div><!-- /tab-reports -->
+                </div>
+                <!-- /tab-reports -->
 
-                <!-- ════════════════════════════════════════════════════════
-                     TAB: ANALYTICS
-                ════════════════════════════════════════════════════════ -->
+                <!-- TAB: ANALYTICS -->
                 <div id="tab-analytics" <?= $activeTab !== 'analytics' ? 'style="display:none;"' : '' ?>>
+
+                    <div class="d-flex justify-content-end mb-3">
+                        <button class="btn btn-danger fw-bold" onclick="exportAnalyticsPDF()" style="border-radius:10px;">
+                            <i class="fas fa-file-pdf me-1"></i> Export Charts PDF
+                        </button>
+                    </div>
 
                     <!-- Row 1: Status doughnut + Avg resolution + Priority pie -->
                     <div class="row g-4 mb-4">
                         <div class="col-12 col-md-5">
                             <div class="container-card shadow-sm h-100">
-                                <h6 class="fw-bold mb-3"><i class="fas fa-chart-pie me-2"></i>
-Complaints by Status</h6>
+                                <h6 class="fw-bold mb-3">
+                                    <i class="fas fa-chart-pie me-2"></i>
+                                    Complaints by Status
+                                </h6>
                                 <div style="max-height:260px; display:flex; justify-content:center;">
                                     <canvas id="chartStatus"></canvas>
                                 </div>
@@ -630,9 +697,11 @@ Complaints by Status</h6>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
     <script>
-    // ── Tab switching ──────────────────────────────────────────────────────
+    // Tab switching 
     function switchReportTab(tab) {
         document.getElementById('tab-reports').style.display   = tab === 'reports'   ? '' : 'none';
         document.getElementById('tab-analytics').style.display = tab === 'analytics' ? '' : 'none';
@@ -649,7 +718,7 @@ Complaints by Status</h6>
         if (tab === 'analytics') renderCharts();
     }
 
-    // ── DataTables ─────────────────────────────────────────────────────────
+    // DataTables
     $(document).ready(function () {
         var dtOpts = {
             destroy: true, bFilter: true, sDom: 'fBtlpi', pagingType: 'numbers', ordering: true,
@@ -662,7 +731,7 @@ Complaints by Status</h6>
         $('#tbl_oldest').DataTable($.extend({}, dtOpts, { language: { searchPlaceholder: 'Search complaints...' }, paging: false, order: [[6, 'desc']] }));
     });
 
-    // ── Chart.js ───────────────────────────────────────────────────────────
+    // Chart.js 
     var chartsRendered = false;
     var BLUE   = '#0062cc';
     var GREEN  = '#16a34a';
@@ -679,7 +748,9 @@ Complaints by Status</h6>
             type: 'doughnut',
             data: {
                 labels: <?= json_encode($chartStatus['labels']) ?>,
-                datasets: [{ data: <?= json_encode($chartStatus['data']) ?>, backgroundColor: [YELLOW, BLUE, GREEN, RED], borderWidth: 2 }]
+                datasets: [{ data: <?= json_encode($chartStatus['data']) ?>, 
+                backgroundColor: [YELLOW, BLUE, GREEN, RED], 
+                borderWidth: 2 }]
             },
             options: { plugins: { legend: { position: 'bottom' } }, cutout: '60%' }
         });
@@ -689,7 +760,9 @@ Complaints by Status</h6>
             type: 'pie',
             data: {
                 labels: <?= json_encode($chartPriority['labels']) ?>,
-                datasets: [{ data: <?= json_encode($chartPriority['data']) ?>, backgroundColor: [RED, YELLOW, GREEN], borderWidth: 2 }]
+                datasets: [{ data: <?= json_encode($chartPriority['data']) ?>, 
+                backgroundColor: [RED, YELLOW, GREEN], 
+                borderWidth: 2 }]
             },
             options: { plugins: { legend: { position: 'bottom' } } }
         });
@@ -701,12 +774,39 @@ Complaints by Status</h6>
             data: {
                 labels: <?= json_encode($monthlyLabels) ?>,
                 datasets: [
-                    { label: 'Submitted', data: <?= json_encode($monthlyTotal) ?>, borderColor: BLUE, backgroundColor: 'rgba(0,98,204,0.08)', fill: true, tension: 0.35, pointRadius: 4 },
-                    { label: 'Resolved',  data: <?= json_encode($monthlyResolved) ?>, borderColor: GREEN, backgroundColor: 'rgba(22,163,74,0.08)', fill: true, tension: 0.35, pointRadius: 4 },
-                    { label: 'Pending',   data: <?= json_encode($monthlyPending) ?>, borderColor: YELLOW, backgroundColor: 'rgba(245,158,11,0.08)', fill: true, tension: 0.35, pointRadius: 4 }
+                    { 
+                        label: 'Submitted', 
+                        data: <?= json_encode($monthlyTotal) ?>, 
+                        borderColor: BLUE, 
+                        backgroundColor: 'rgba(0,98,204,0.08)', 
+                        fill: true, 
+                        tension: 0.35, 
+                        pointRadius: 4 
+                    },
+                    { 
+                        label: 'Resolved',  
+                        data: <?= json_encode($monthlyResolved) ?>, 
+                        borderColor: GREEN, 
+                        backgroundColor: 'rgba(22,163,74,0.08)', 
+                        fill: true, 
+                        tension: 0.35, 
+                        pointRadius: 4 
+                    },
+                    { 
+                        label: 'Pending',   
+                        data: <?= json_encode($monthlyPending) ?>, 
+                        borderColor: YELLOW, 
+                        backgroundColor: 'rgba(245,158,11,0.08)', 
+                        fill: true, 
+                        tension: 0.35, 
+                        pointRadius: 4 
+                    }
                 ]
             },
-            options: { plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, responsive: true }
+            options: { 
+                plugins: { legend: { position: 'top' } }, 
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, 
+                responsive: true }
         });
         <?php endif; ?>
 
@@ -717,11 +817,24 @@ Complaints by Status</h6>
             data: {
                 labels: <?= json_encode($deptLabels) ?>,
                 datasets: [
-                    { label: 'Total',    data: <?= json_encode($deptTotals) ?>,   backgroundColor: 'rgba(0,98,204,0.7)' },
-                    { label: 'Resolved', data: <?= json_encode($deptResolved) ?>, backgroundColor: 'rgba(22,163,74,0.7)' }
+                    { 
+                        label: 'Total',    
+                        data: <?= json_encode($deptTotals) ?>,   
+                        backgroundColor: 'rgba(0,98,204,0.7)' 
+                    },
+                    { 
+                        label: 'Resolved', 
+                        data: <?= json_encode($deptResolved) ?>, 
+                        backgroundColor: 'rgba(22,163,74,0.7)' 
+                    }
                 ]
             },
-            options: { indexAxis: 'y', plugins: { legend: { position: 'top' } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }, responsive: true }
+            options: { 
+                indexAxis: 'y', 
+                plugins: { legend: { position: 'top' } }, 
+                scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }, 
+                responsive: true 
+            }
         });
         <?php endif; ?>
 
@@ -731,9 +844,19 @@ Complaints by Status</h6>
             type: 'bar',
             data: {
                 labels: <?= json_encode($catLabels) ?>,
-                datasets: [{ label: 'Complaints', data: <?= json_encode($catTotals) ?>, backgroundColor: 'rgba(245,158,11,0.75)', borderRadius: 4 }]
+                datasets: [{ 
+                    label: 'Complaints', 
+                    data: <?= json_encode($catTotals) ?>, 
+                    backgroundColor: 'rgba(245,158,11,0.75)', 
+                    borderRadius: 4 
+                }]
             },
-            options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }, responsive: true }
+            options: { 
+                indexAxis: 'y', 
+                plugins: { legend: { display: false } }, 
+                scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }, 
+                responsive: true 
+            }
         });
         <?php endif; ?>
 
@@ -744,11 +867,25 @@ Complaints by Status</h6>
             data: {
                 labels: <?= json_encode($staffLabels) ?>,
                 datasets: [
-                    { label: 'Total',    data: <?= json_encode($staffTotal) ?>,   backgroundColor: 'rgba(0,98,204,0.6)', borderRadius: 4 },
-                    { label: 'Resolved', data: <?= json_encode($staffResolved) ?>, backgroundColor: 'rgba(22,163,74,0.7)', borderRadius: 4 }
+                    { 
+                        label: 'Total',    
+                        data: <?= json_encode($staffTotal) ?>,   
+                        backgroundColor: 'rgba(0,98,204,0.6)', 
+                        borderRadius: 4 
+                    },
+                    { 
+                        label: 'Resolved', 
+                        data: <?= json_encode($staffResolved) ?>, 
+                        backgroundColor: 'rgba(22,163,74,0.7)', 
+                        borderRadius: 4 
+                    }
                 ]
             },
-            options: { plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, responsive: true }
+            options: { 
+                plugins: { legend: { position: 'top' } }, 
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, 
+                responsive: true 
+            }
         });
         <?php endif; ?>
     }
@@ -757,6 +894,190 @@ Complaints by Status</h6>
     <?php if ($activeTab === 'analytics'): ?>
     document.addEventListener('DOMContentLoaded', renderCharts);
     <?php endif; ?>
+
+    // Export helpers 
+
+    var _REPORT_TITLE   = 'SCMRS — Complaints Report';
+    var _HEAD_COLOR     = [30, 58, 95];
+    var _ALT_ROW        = [245, 248, 252];
+    var _FILTER_LABEL   = <?= json_encode(
+        ($filterDept     ? 'Dept #'.$filterDept     : '') .
+        ($filterCategory ? ' | Cat #'.$filterCategory : '') .
+        ($filterDateFrom ? ' | From: '.$filterDateFrom : '') .
+        ($filterDateTo   ? ' | To: '.$filterDateTo   : '') ?: 'No filters applied'
+    ) ?>;
+
+    function _stripCell(html) {
+        var d = document.createElement('div');
+        d.innerHTML = html;
+        return (d.textContent || d.innerText || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function _tableHeaders(tableId) {
+        return Array.from(document.querySelectorAll('#' + tableId + ' thead th'))
+            .map(function(th) { return th.textContent.trim(); });
+    }
+
+    function _tableRows(tableId) {
+        var rows = [];
+        var dt = $('#' + tableId).DataTable();
+        dt.rows({ search: 'applied' }).every(function() {
+            rows.push(Array.from(this.node().querySelectorAll('td'))
+                .map(function(td) { return _stripCell(td.innerHTML); }));
+        });
+        return rows;
+    }
+
+    function _pdfHeader(doc, subtitle) {
+        doc.setFontSize(16);
+        doc.setTextColor(30, 58, 95);
+        doc.text(_REPORT_TITLE, 14, 14);
+        if (subtitle) {
+            doc.setFontSize(11);
+            doc.text(subtitle, 14, 21);
+        }
+        doc.setFontSize(8);
+        doc.setTextColor(130);
+        doc.text('Generated: ' + new Date().toLocaleString() + '   |   Filters: ' + _FILTER_LABEL,
+            14, subtitle ? 27 : 21);
+        doc.setTextColor(0);
+        return subtitle ? 33 : 27;
+    }
+
+    function _summaryTable(doc, startY) {
+        doc.autoTable({
+            head: [['Total', 'Pending', 'In Progress', 'Resolved', 'Rejected', 'Resolution Rate']],
+            body: [[
+                '<?= $total ?>',
+                '<?= $stats['pending'] ?>',
+                '<?= $stats['in_progress'] ?>',
+                '<?= $stats['resolved'] ?>',
+                '<?= $stats['rejected'] ?>',
+                '<?= $resolutionRate ?>%'
+            ]],
+            startY: startY,
+            styles: { fontSize: 9, halign: 'center', fontStyle: 'bold' },
+            headStyles: { fillColor: _HEAD_COLOR, textColor: 255, halign: 'center' }
+        });
+        return doc.lastAutoTable.finalY;
+    }
+
+    // CSV export 
+    function exportCSV(tableId, filename) {
+        var headers = _tableHeaders(tableId);
+        var rows    = _tableRows(tableId);
+        var lines   = [headers.map(function(h) { return '"' + h.replace(/"/g, '""') + '"'; }).join(',')];
+        rows.forEach(function(row) {
+            lines.push(row.map(function(c) { return '"' + c.replace(/"/g, '""') + '"'; }).join(','));
+        });
+        var blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+        var a    = document.createElement('a');
+        a.href   = URL.createObjectURL(blob);
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+    }
+
+    // Full report PDF (all tables) 
+    function exportFullReportPDF() {
+        var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
+        var y   = _pdfHeader(doc, 'Full Complaints Report');
+        y = _summaryTable(doc, y + 4);
+
+        var sections = [
+            { id: 'tbl_department', title: 'Complaints by Department' },
+            { id: 'tbl_category',   title: 'Complaints by Category' },
+            { id: 'tbl_staff',      title: 'Staff Performance' },
+            { id: 'tbl_monthly',    title: 'Monthly Trend' },
+            { id: 'tbl_oldest',     title: 'Oldest Pending Complaints' }
+        ];
+
+        var pageH = doc.internal.pageSize.getHeight();
+
+        sections.forEach(function(s) {
+            var rows = _tableRows(s.id);
+            if (!rows.length) return;
+
+            if (y + 30 > pageH - 10) { doc.addPage(); y = 15; }
+
+            doc.setFontSize(11);
+            doc.setTextColor(30, 58, 95);
+            doc.text(s.title, 14, y + 8);
+
+            doc.autoTable({
+                head: [_tableHeaders(s.id)],
+                body: rows,
+                startY: y + 12,
+                styles: { fontSize: 8, cellPadding: 2.5 },
+                headStyles: { fillColor: _HEAD_COLOR, textColor: 255 },
+                alternateRowStyles: { fillColor: _ALT_ROW },
+                didDrawPage: function() { y = 10; }
+            });
+            y = doc.lastAutoTable.finalY + 6;
+        });
+
+        doc.save('scmrs-report-' + new Date().toISOString().slice(0, 10) + '.pdf');
+    }
+
+    // Analytics charts PDF 
+    function exportAnalyticsPDF() {
+        renderCharts();
+
+        var doc   = new window.jspdf.jsPDF({ orientation: 'landscape' });
+        var pageW = doc.internal.pageSize.getWidth();
+        var pageH = doc.internal.pageSize.getHeight();
+        var y     = _pdfHeader(doc, 'Analytics Report');
+        y = _summaryTable(doc, y + 4) + 10;
+
+        var charts = [
+            { id: 'chartStatus',   title: 'Complaints by Status' },
+            { id: 'chartPriority', title: 'Priority Distribution' },
+            { id: 'chartMonthly',  title: 'Monthly Trend' },
+            { id: 'chartDept',     title: 'Top Departments' },
+            { id: 'chartCat',      title: 'Top Categories' },
+            { id: 'chartStaff',    title: 'Staff Performance' }
+        ];
+
+        // Two charts per row (side by side)
+        var col = 0;
+        var rowH = 0;
+
+        charts.forEach(function(c) {
+            var canvas = document.getElementById(c.id);
+            if (!canvas) return;
+
+            var imgData = canvas.toDataURL('image/png');
+            var colW    = (pageW - 28) / 2;
+            var imgH    = Math.min(colW * (canvas.height / canvas.width), 90);
+            var x       = col === 0 ? 14 : 14 + colW + 7;
+
+            if (col === 0 && y + imgH + 12 > pageH - 10) {
+                doc.addPage();
+                y = 15;
+            }
+
+            doc.setFontSize(9);
+            doc.setTextColor(30, 58, 95);
+            doc.text(c.title, x, y);
+            doc.addImage(imgData, 'PNG', x, y + 3, colW, imgH);
+
+            if (col === 0) {
+                rowH = imgH;
+                col  = 1;
+            } else {
+                y   += Math.max(rowH, imgH) + 14;
+                col  = 0;
+                rowH = 0;
+            }
+        });
+
+        // If last row only had one chart, advance y
+        if (col === 1) y += rowH + 14;
+
+        doc.save('scmrs-analytics-' + new Date().toISOString().slice(0, 10) + '.pdf');
+    }
     </script>
 
 </body>

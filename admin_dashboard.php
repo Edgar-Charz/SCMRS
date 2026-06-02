@@ -70,6 +70,7 @@ $pendingStaffCount = $admin->getPendingStaffCount();
     </div>
 
     <div class="d-flex">
+        <!-- Sidebar -->
         <?php require_once 'includes/sidebar.php'; ?>
 
         <div id="content" class="w-100">
@@ -99,8 +100,10 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                             style="border-left: 5px solid #f59e0b; border-radius: 10px; cursor: pointer;">
                             <i class="fas fa-user-clock fa-lg me-3 text-warning"></i>
                             <div class="flex-grow-1">
-                                <strong><?= $pendingStaffCount ?> staff member<?= $pendingStaffCount > 1 ? 's' : '' ?>
-                                    awaiting approval.</strong>
+                                <strong>
+                                    <?= $pendingStaffCount ?> staff member<?= $pendingStaffCount > 1 ? 's' : '' ?>
+                                    awaiting approval.
+                                </strong>
                                 <span class="ms-2 text-muted small">Click to review &rarr;</span>
                             </div>
                             <span class="badge bg-warning text-dark fs-6"><?= $pendingStaffCount ?></span>
@@ -281,12 +284,12 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                                             <td>
                                                 <?php
                                                 $statusMap = [
-                                                    'pending'                   => ['bg-warning text-dark', 'Pending'],
-                                                    'in_progress'               => ['bg-info text-white',    'In Progress'],
+                                                    'pending' => ['bg-warning text-dark', 'Pending'],
+                                                    'in_progress' => ['bg-info text-white', 'In Progress'],
                                                     'awaiting_student_response' => ['bg-primary text-white', 'Awaiting Response'],
-                                                    'resolved'                  => ['bg-success text-white', 'Resolved'],
-                                                    'rejected'                  => ['bg-danger text-white',  'Rejected'],
-                                                    'reopened'                  => ['bg-orange text-white',  'Reopened'],
+                                                    'resolved' => ['bg-success text-white', 'Resolved'],
+                                                    'rejected' => ['bg-danger text-white', 'Rejected'],
+                                                    'reopened' => ['bg-orange text-white', 'Reopened'],
                                                 ];
                                                 [$sCls, $sLabel] = $statusMap[$complaint_row['complaint_status']] ?? ['bg-secondary text-white', ucfirst(str_replace('_', ' ', $complaint_row['complaint_status']))];
                                                 ?>
@@ -354,21 +357,27 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                         <div class="col-4">
                             <div class="rounded-3 p-3" style="background:#eef4ff;">
                                 <i class="fas fa-user-graduate fa-2x mb-2" style="color:#0062cc;"></i>
-                                <h3 class="fw-bold mb-0" style="color:#0062cc;"><?= $roleCounts['student'] ?></h3>
+                                <h3 class="fw-bold mb-0" style="color:#0062cc;">
+                                    <?= $roleCounts['student'] ?>
+                                </h3>
                                 <p class="small mb-0 text-muted fw-semibold">Students</p>
                             </div>
                         </div>
                         <div class="col-4">
                             <div class="rounded-3 p-3" style="background:#fff8e1;">
                                 <i class="fas fa-user-tie fa-2x mb-2" style="color:#f59e0b;"></i>
-                                <h3 class="fw-bold mb-0" style="color:#f59e0b;"><?= $roleCounts['staff'] ?></h3>
+                                <h3 class="fw-bold mb-0" style="color:#f59e0b;">
+                                    <?= $roleCounts['staff'] ?>
+                                </h3>
                                 <p class="small mb-0 text-muted fw-semibold">Staff</p>
                             </div>
                         </div>
                         <div class="col-4">
                             <div class="rounded-3 p-3" style="background:#f0fdf4;">
                                 <i class="fas fa-user-shield fa-2x mb-2" style="color:#16a34a;"></i>
-                                <h3 class="fw-bold mb-0" style="color:#16a34a;"><?= $roleCounts['admin'] ?></h3>
+                                <h3 class="fw-bold mb-0" style="color:#16a34a;">
+                                    <?= $roleCounts['admin'] ?>
+                                </h3>
                                 <p class="small mb-0 text-muted fw-semibold">Admins</p>
                             </div>
                         </div>

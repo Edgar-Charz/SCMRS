@@ -23,11 +23,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $complaintId = isset($_POST['complaint_id']) ? (int) $_POST['complaint_id'] : 0;
 
     if ($action === 'assign' && $complaintId > 0) {
-        $staffId = trim($_POST['staff_id'] ?? '');
+        $staffId  = trim($_POST['staff_id'] ?? '');
         $priority = in_array($_POST['priority'] ?? '', ['low', 'medium', 'high']) ? $_POST['priority'] : 'medium';
-        $note = trim($_POST['note'] ?? '');
+        $note     = trim($_POST['note'] ?? '');
 
-        if (empty($staffId)) {
+        $target = $admin->getComplaintById($complaintId);
+        if ($target && in_array($target['complaint_status'], ['resolved', 'rejected'], true)) {
+            $error = "Complaint #$complaintId is already closed and cannot be reassigned.";
+        } elseif (empty($staffId)) {
             $error = "Please select a staff member.";
         } else {
             try {
@@ -57,8 +60,9 @@ if (isset($_SESSION['message'])) {
     unset($_SESSION['message']);
 }
 
-$complaints = $admin->getComplaints();
-$staffList = $admin->getApprovedStaff();
+$complaints  = $admin->getComplaints();
+$staffList   = $admin->getApprovedStaff();
+$departments = $admin->getAllDepartments();
 
 function statusBadge($status)
 {
@@ -155,6 +159,7 @@ function statusBadge($status)
                                     <th class="text-center">CATEGORY</th>
                                     <th class="text-center">PRIORITY</th>
                                     <th class="text-center">STATUS</th>
+                                    <th class="text-center">ASSIGNED TO</th>
                                     <th class="text-center">DATE</th>
                                     <th class="text-center">ACTION</th>
                                 </tr>
@@ -189,29 +194,54 @@ function statusBadge($status)
                                             </td>
                                             <td class="text-center"><?= statusBadge($c['complaint_status']) ?></td>
                                             <td class="text-center">
+                                                <?php if (!empty($c['assigned_staff_name'])): ?>
+                                                    <span class="small fw-semibold"><?= htmlspecialchars($c['assigned_staff_name']) ?></span>
+                                                <?php else: ?>
+                                                    <span class="text-muted small">Unassigned</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-center">
                                                 <?= date('d M Y', strtotime($c['created_at'])) ?>
                                             </td>
                                             <td class="text-center">
+                                                <?php
+                                                $isClosed   = in_array($c['complaint_status'], ['resolved', 'rejected'], true);
+                                                $isAssigned = !empty($c['assigned_staff_name']);
+                                                ?>
                                                 <div class="d-flex justify-content-center gap-1">
+                                                    <!-- View — always available -->
                                                     <a href="complaint_details.php?id=<?= $c['complaint_id'] ?>"
                                                         class="btn btn-status btn-outline-secondary" title="View Details">
                                                         <i class="fas fa-eye text-dark"></i>
                                                     </a>
-                                                    <a href="respond_complaint.php?id=<?= $c['complaint_id'] ?>"
-                                                        class="btn btn-status btn-outline-secondary" title="Respond">
-                                                        <i class="fas fa-reply text-dark"></i>
-                                                    </a>
-                                                    <button type="button"
-                                                        class="btn btn-status btn-outline-secondary btn-assign"
-                                                        data-bs-toggle="modal" data-bs-target="#assignModal"
-                                                        data-complaint-id="<?= $c['complaint_id'] ?>" title="Assign to Staff">
-                                                        <i class="fas fa-user-tag text-dark"></i>
-                                                    </button>
-                                                    <?php if ($c['complaint_status'] === 'pending'): ?>
-                                                        <button type="button" class="btn btn-status btn-outline-secondary"
-                                                            onclick="confirmDelete(<?= $c['complaint_id'] ?>)" title="Delete">
-                                                            <i class="fas fa-trash text-dark"></i>
+
+                                                    <?php if (!$isClosed): ?>
+                                                        <!-- Respond — only on open complaints -->
+                                                        <a href="respond_complaint.php?id=<?= $c['complaint_id'] ?>"
+                                                            class="btn btn-status btn-outline-secondary" title="Respond">
+                                                            <i class="fas fa-reply text-dark"></i>
+                                                        </a>
+
+                                                        <!-- Assign / Reassign — only on open complaints -->
+                                                        <button type="button"
+                                                            class="btn btn-status btn-outline-secondary btn-assign"
+                                                            data-bs-toggle="modal" data-bs-target="#assignModal"
+                                                            data-complaint-id="<?= $c['complaint_id'] ?>"
+                                                            data-staff-name="<?= htmlspecialchars($c['assigned_staff_name'] ?? '', ENT_QUOTES) ?>"
+                                                            data-priority="<?= htmlspecialchars($c['priority']) ?>"
+                                                            data-is-assigned="<?= $isAssigned ? '1' : '0' ?>"
+                                                            data-category-dept-id="<?= (int)($c['category_dept_id'] ?? 0) ?>"
+                                                            title="<?= $isAssigned ? 'Reassign to Staff' : 'Assign to Staff' ?>">
+                                                            <i class="fas fa-<?= $isAssigned ? 'user-edit' : 'user-tag' ?> text-dark"></i>
                                                         </button>
+
+                                                        <!-- Delete — pending only -->
+                                                        <?php if ($c['complaint_status'] === 'pending'): ?>
+                                                            <button type="button" class="btn btn-status btn-outline-secondary"
+                                                                onclick="confirmDelete(<?= $c['complaint_id'] ?>)" title="Delete">
+                                                                <i class="fas fa-trash text-dark"></i>
+                                                            </button>
+                                                        <?php endif; ?>
                                                     <?php endif; ?>
                                                 </div>
                                             </td>
@@ -229,14 +259,14 @@ function statusBadge($status)
 
     </div><!-- /d-flex -->
 
-    <!-- Assign Staff Modal -->
+    <!-- Assign / Reassign Staff Modal -->
     <div class="modal fade" id="assignModal" tabindex="-1" aria-labelledby="assignModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content shadow-lg rounded-3">
-                <div class="modal-header text-white" style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
+                <div class="modal-header text-white" id="assignModalHeader" style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
                     <h5 class="modal-title fw-bold text-white" id="assignModalLabel">
-                        <i class="fas fa-user-tag me-2"></i>
-                        Assign Complaint to Staff
+                        <i class="fas fa-user-tag me-2" id="assignModalIcon"></i>
+                        <span id="assignModalTitleText">Assign Complaint to Staff</span>
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
@@ -244,40 +274,78 @@ function statusBadge($status)
                     <input type="hidden" name="action" value="assign">
                     <input type="hidden" name="complaint_id" id="assignComplaintId">
                     <div class="modal-body">
+
+                        <!-- Current assignee banner (reassignment only) -->
+                        <div id="currentAssigneeInfo" class="alert alert-warning py-2 px-3 mb-3 small d-none">
+                            <i class="fas fa-user-check me-1"></i>
+                            Currently assigned to: <strong id="currentAssigneeName"></strong>
+                            <br><span class="text-muted">Saving will transfer this complaint to the selected staff member.</span>
+                        </div>
+
+                        <!-- Department filter -->
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Select Staff <span class="text-danger">*</span></label>
-                            <select name="staff_id" class="form-select" required>
-                                <option value="">-- Choose Staff --</option>
-                                <?php foreach ($staffList as $staff): ?>
-                                    <option value="<?= $staff['staff_id'] ?>">
-                                        <?= htmlspecialchars($staff['username']) ?>
-                                        <?= $staff['department_name'] ? ' — ' . htmlspecialchars($staff['department_name']) : '' ?>
+                            <label class="form-label fw-bold">
+                                Filter by Department
+                                <span class="badge bg-info text-white ms-1" id="autoDeptBadge" style="display:none;font-size:0.7rem;">
+                                    Auto-suggested
+                                </span>
+                            </label>
+                            <select id="assignDeptFilter" class="form-select">
+                                <option value="0">— All Departments —</option>
+                                <?php foreach ($departments as $dept): ?>
+                                    <option value="<?= $dept['department_id'] ?>">
+                                        <?= htmlspecialchars($dept['department_name']) ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
+                            <small class="text-muted" id="deptFilterHint" style="display:none;">
+                                <i class="fas fa-info-circle me-1"></i>Pre-selected from the complaint's category. You can change it.
+                            </small>
+                        </div>
+
+                        <!-- Staff dropdown (filtered by dept) -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Select Staff <span class="text-danger">*</span></label>
+                            <select name="staff_id" id="assignStaffSelect" class="form-select" required>
+                                <option value="">-- Choose Staff --</option>
+                                <?php foreach ($staffList as $s): ?>
+                                    <option value="<?= $s['staff_id'] ?>"
+                                        data-dept="<?= (int)($s['staff_department_id'] ?? 0) ?>">
+                                        <?= htmlspecialchars($s['username']) ?>
+                                        <?= $s['department_name'] ? ' — ' . htmlspecialchars($s['department_name']) : '' ?>
+                                        <?= $s['role_name'] ? ' (' . htmlspecialchars($s['role_name']) . ')' : '' ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small id="noStaffMsg" class="text-danger d-none">
+                                No staff in this department. Switch to "All Departments" to see everyone.
+                            </small>
                             <?php if (empty($staffList)): ?>
                                 <small class="text-danger">No approved staff available. Approve staff first.</small>
                             <?php endif; ?>
                         </div>
+
                         <div class="mb-3">
                             <label class="form-label fw-bold">Priority</label>
-                            <select name="priority" class="form-select">
+                            <select name="priority" id="assignPriority" class="form-select">
                                 <option value="low">Low</option>
                                 <option value="medium" selected>Medium</option>
                                 <option value="high">High</option>
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Note <span
-                                    class="text-muted fw-normal">(optional)</span></label>
-                            <textarea name="note" class="form-control" rows="3"
+                            <label class="form-label fw-bold" id="noteLabel">
+                                Note <span class="text-muted fw-normal">(optional)</span>
+                            </label>
+                            <textarea name="note" id="assignNote" class="form-control" rows="3"
                                 placeholder="Add instructions or details for the staff member..."></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-user-tag me-1"></i>Assign
+                        <button type="submit" class="btn btn-primary" id="assignSubmitBtn">
+                            <i class="fas fa-user-tag me-1" id="assignSubmitIcon"></i>
+                            <span id="assignSubmitText">Assign</span>
                         </button>
                     </div>
                 </form>
@@ -334,10 +402,97 @@ function statusBadge($status)
     <script src="assets/js/script.js"></script>
 
     <script>
-        // Populate assign modal with the correct complaint ID
+        // Staff filtering helpers
+        function filterStaffByDept(deptId) {
+            var select  = document.getElementById('assignStaffSelect');
+            var noMsg   = document.getElementById('noStaffMsg');
+            var visible = 0;
+            var deptInt = parseInt(deptId, 10);
+
+            Array.from(select.options).forEach(function (opt) {
+                if (!opt.value) { opt.style.display = ''; return; } // keep placeholder
+                var optDept = parseInt(opt.getAttribute('data-dept') || '0', 10);
+                var show    = (deptInt === 0 || optDept === deptInt);
+                opt.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+
+            // Reset selection if current choice is now hidden
+            var cur = select.options[select.selectedIndex];
+            if (cur && cur.value && cur.style.display === 'none') select.value = '';
+
+            noMsg.classList.toggle('d-none', visible > 0 || deptInt === 0);
+        }
+
+        document.getElementById('assignDeptFilter').addEventListener('change', function () {
+            filterStaffByDept(this.value);
+        });
+
+        // Modal open 
         document.getElementById('assignModal').addEventListener('show.bs.modal', function (event) {
-            var btn = event.relatedTarget;
-            document.getElementById('assignComplaintId').value = btn.getAttribute('data-complaint-id');
+            var btn        = event.relatedTarget;
+            var id         = btn.getAttribute('data-complaint-id');
+            var staffName  = btn.getAttribute('data-staff-name') || '';
+            var priority   = btn.getAttribute('data-priority')   || 'medium';
+            var isAssigned = btn.getAttribute('data-is-assigned') === '1';
+            var catDeptId  = parseInt(btn.getAttribute('data-category-dept-id') || '0', 10);
+
+            document.getElementById('assignComplaintId').value = id;
+
+            // Title & icon
+            document.getElementById('assignModalTitleText').textContent =
+                isAssigned ? 'Reassign Complaint #' + id : 'Assign Complaint #' + id + ' to Staff';
+            document.getElementById('assignModalIcon').className =
+                'fas ' + (isAssigned ? 'fa-user-edit' : 'fa-user-tag') + ' me-2';
+
+            // Current assignee banner
+            var banner = document.getElementById('currentAssigneeInfo');
+            if (isAssigned) {
+                document.getElementById('currentAssigneeName').textContent = staffName;
+                banner.classList.remove('d-none');
+            } else {
+                banner.classList.add('d-none');
+            }
+
+            // Pre-fill priority
+            document.getElementById('assignPriority').value = priority;
+
+            // Note field
+            var noteField = document.getElementById('assignNote');
+            var noteLabel = document.getElementById('noteLabel');
+            noteField.value = '';
+            if (isAssigned) {
+                noteLabel.innerHTML = 'Reason for Reassignment <span class="text-danger">*</span>';
+                noteField.placeholder = 'Explain why this complaint is being reassigned...';
+                noteField.required = true;
+            } else {
+                noteLabel.innerHTML = 'Note <span class="text-muted fw-normal">(optional)</span>';
+                noteField.placeholder = 'Add instructions or details for the staff member...';
+                noteField.required = false;
+            }
+
+            // Department pre-selection from category mapping
+            var deptFilter = document.getElementById('assignDeptFilter');
+            var badge      = document.getElementById('autoDeptBadge');
+            var hint       = document.getElementById('deptFilterHint');
+            if (catDeptId > 0) {
+                deptFilter.value = catDeptId;
+                badge.style.display = '';
+                hint.style.display  = '';
+            } else {
+                deptFilter.value = '0';
+                badge.style.display = 'none';
+                hint.style.display  = 'none';
+            }
+            filterStaffByDept(deptFilter.value);
+
+            // Reset staff selection
+            document.getElementById('assignStaffSelect').value = '';
+
+            // Submit button
+            document.getElementById('assignSubmitIcon').className =
+                'fas ' + (isAssigned ? 'fa-user-edit' : 'fa-user-tag') + ' me-1';
+            document.getElementById('assignSubmitText').textContent = isAssigned ? 'Reassign' : 'Assign';
         });
 
         // Open delete reason modal
