@@ -3,6 +3,7 @@ session_start();
 
 require_once "config/Database.php";
 require_once "classes/User.php";
+require_once "includes/csrf.php";
 
 $db   = new Database();
 $conn = $db->connect();
@@ -26,6 +27,7 @@ if (empty($token)) {
 
 // Handle password reset submission
 if ($validToken && isset($_POST['resetBtn'])) {
+    csrf_verify();
     $password        = $_POST['password'] ?? '';
     $confirmPassword = $_POST['confirm_password'] ?? '';
 
@@ -148,6 +150,7 @@ if ($validToken && isset($_POST['resetBtn'])) {
 
         <?php if ($validToken): ?>
         <form action="" method="POST" onsubmit="showLoader()">
+            <?= csrf_field() ?>
             <input type="hidden" name="token" value="<?= htmlspecialchars($token) ?>">
 
             <div class="mb-3 text-start">

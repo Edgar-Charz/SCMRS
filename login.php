@@ -3,6 +3,7 @@ session_start();
 
 require_once "config/Database.php";
 require_once "classes/User.php";
+require_once "includes/csrf.php";
 
 $db = new Database();
 $conn = $db->connect();
@@ -18,6 +19,7 @@ if (isset($_SESSION['message'])) {
 
 // User Login
 if (isset($_POST["loginBTN"])) {
+    csrf_verify();
 
     // User credentials
     $email = isset($_POST['email']) ? trim($_POST['email']) : '';
@@ -234,6 +236,7 @@ if (isset($_POST["loginBTN"])) {
             <!-- / Alert -->
 
             <form action="" method="POST" onsubmit="showLoader()">
+                <?= csrf_field() ?>
                 <div class="mb-2 text-start">
                     <label for="" class="form-label small fw-bold">Email Address</label>
                     <input type="email" name="email" class="form-control" placeholder="name@example.com" autocomplete

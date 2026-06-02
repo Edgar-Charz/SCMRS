@@ -1,4 +1,6 @@
 <?php
+session_start();
+require_once "includes/csrf.php";
 require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/College.php";
@@ -16,6 +18,7 @@ $message = $error = "";
 
 // Student Registration
 if (isset($_POST["registerStudentBTN"])) {
+    csrf_verify();
     try {
         $username = trim($_POST['student_name']);
         $reg_no = trim($_POST['reg_no']);
@@ -40,6 +43,7 @@ if (isset($_POST["registerStudentBTN"])) {
 
 // Staff Registration
 if (isset($_POST["registerStaffBTN"])) {
+    csrf_verify();
     try {
         $username = trim($_POST['staff_name']);
         $email = trim($_POST['staff_email']);
@@ -98,7 +102,7 @@ $departments = $department->getDepartments();
         }
 
         .split-left {
-            width: 45%; 
+            width: 45%;
             min-width: 280px;
             /* background-image: url('assets/img/campus1.jpg');
                 background-size: cover;
@@ -589,15 +593,16 @@ $departments = $department->getDepartments();
             <div class="slide-bg"></div>
 
             <img src="assets/img/logo.png" alt="UDSM" class="split-logo">
-            <div class="split-label">SCMRS &mdash; University Platform</div>
+            <div class="split-label">
+                SCMRS 
+                <!-- &mdash; University Platform -->
+            </div>
             <h2 class="split-title">Student Complaint Management &amp; Reporting System</h2>
             <p class="split-subtitle">A centralized portal where students and staff can submit, track, and resolve
                 academic complaints with full transparency.</p>
             <ul class="split-features">
                 <li><i class="fas fa-check-circle"></i> Submit complaints quickly and easily</li>
                 <li><i class="fas fa-check-circle"></i> Track resolution progress in real time</li>
-                <li><i class="fas fa-check-circle"></i> Communicate directly with responsible staff</li>
-                <li><i class="fas fa-check-circle"></i> Receive timely, documented responses</li>
             </ul>
             <div class="split-footer-line"></div>
             <p class="split-uni">University of Dar es Salaam</p>
@@ -664,6 +669,7 @@ $departments = $department->getDepartments();
                 <?php endif; ?>
 
                 <form action="" method="POST" onsubmit="showLoader()">
+                    <?= csrf_field() ?>
                     <!-- <div class="form-divider">Personal Information</div> -->
                     <div class="row g-2 mb-2">
                         <div class="col-12 col-sm-6">
@@ -786,6 +792,7 @@ $departments = $department->getDepartments();
                 <?php endif; ?>
 
                 <form action="" method="POST" onsubmit="showLoader()">
+                    <?= csrf_field() ?>
                     <!-- <div class="form-divider">Personal Information</div> -->
                     <div class="row g-2">
                         <div class="col-12 col-sm-6">
@@ -831,7 +838,7 @@ $departments = $department->getDepartments();
                         </div>
                         <div class="col-12">
                             <label class="form-label">Department
-                                <span class="fw-normal text-muted">(optional)</span>
+                                <!-- <span class="fw-normal text-muted">(optional)</span> -->
                             </label>
                             <div class="field-wrap">
                                 <i class="fas fa-building field-icon"></i>

@@ -3,6 +3,7 @@ session_start();
 
 require_once "config/Database.php";
 require_once "classes/User.php";
+require_once "includes/csrf.php";
 
 $db = new Database();
 $conn = $db->connect();
@@ -11,6 +12,7 @@ $user = new User($conn);
 $message = $error = "";
 
 if (isset($_POST['submitBtn'])) {
+    csrf_verify();
     $email = trim($_POST['email'] ?? '');
 
     if (empty($email)) {
@@ -208,6 +210,7 @@ if (isset($_POST['submitBtn'])) {
 
             <?php if (empty($message)): ?>
                 <form action="" method="POST" onsubmit="showLoader()">
+                    <?= csrf_field() ?>
                     <div class="mb-3 text-start">
                         <label class="form-label small fw-bold">Email Address</label>
                         <input type="email" name="email" class="form-control" placeholder="name@example.com"
