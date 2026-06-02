@@ -85,11 +85,9 @@ class Admin extends User
 
     public function getUserCountsByRole()
     {
-        $stmt = $this->conn->prepare(
-            "SELECT user_role, COUNT(*) AS total FROM users GROUP BY user_role"
-        );
+        $stmt = $this->conn->prepare("SELECT user_role, COUNT(*) AS total FROM users GROUP BY user_role");
         $stmt->execute();
-        $rows   = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $counts = ['student' => 0, 'staff' => 0, 'admin' => 0];
         foreach ($rows as $row) {
             $counts[$row['user_role']] = (int) $row['total'];
@@ -106,7 +104,7 @@ class Admin extends User
 
     public function getComplaints()
     {
-        $sql = "SELECT c.*, cc.category_name,
+        $sql = "SELECT c.*, cc.category_name, cc.auto_assign_department_id AS category_dept_id,
                        u.username AS student_name,
                        s.student_registration_number,
                        d.department_name,
@@ -127,7 +125,7 @@ class Admin extends User
     // Get all registered students
     public function getAllStudents()
     {
-        $sql = "SELECT users.user_id, users.username, users.user_email, users.user_status, 
+        $sql = "SELECT users.user_id, users.username, users.user_email, users.user_phone_number, users.user_status,
                            students.student_registration_number, students.student_program, colleges.college_name
                     FROM users
                     JOIN students ON users.user_id = students.student_user_id
@@ -142,14 +140,16 @@ class Admin extends User
     // Get all registered staff
     public function getAllStaff()
     {
-        $sql = "SELECT users.user_id, users.username, users.user_email, users.user_status,
-                       staffs.staff_id, staffs.staff_role_id,
+        $sql = "SELECT users.user_id, users.username, users.user_email, users.user_phone_number, users.user_status,
+                       staffs.staff_id, staffs.staff_role_id, staffs.staff_approved_at,
                        departments.department_name, departments.department_id,
-                       staff_roles.role_name, staff_roles.role_rank
+                       staff_roles.role_name, staff_roles.role_rank,
+                       approver.username AS approved_by_name
                 FROM users
                 JOIN staffs ON users.user_id = staffs.staff_user_id
                 LEFT JOIN departments  ON staffs.staff_department_id = departments.department_id
                 LEFT JOIN staff_roles  ON staffs.staff_role_id = staff_roles.role_id
+                LEFT JOIN users approver ON staffs.staff_approved_by = approver.user_id
                 WHERE users.user_role = 'staff'
                 ORDER BY users.username ASC";
         return $this->conn->query($sql)->fetch_all(MYSQLI_ASSOC);
@@ -176,14 +176,16 @@ class Admin extends User
     // Get approved staff (includes role info for escalation dropdowns)
     public function getApprovedStaff()
     {
-        $sql = "SELECT users.user_id, users.username, users.user_email, users.user_status,
-                       staffs.staff_id, staffs.staff_approval_status,
+        $sql = "SELECT users.user_id, users.username, users.user_email, users.user_phone_number, users.user_status,
+                       staffs.staff_id, staffs.staff_department_id, staffs.staff_approval_status,
                        staffs.staff_approved_at, departments.department_name,
-                       staff_roles.role_name, staff_roles.role_rank
+                       staff_roles.role_name, staff_roles.role_rank,
+                       approver.username AS approved_by_name
                     FROM users
                     JOIN staffs ON users.user_id = staffs.staff_user_id
                     LEFT JOIN departments ON staffs.staff_department_id = departments.department_id
                     LEFT JOIN staff_roles ON staffs.staff_role_id = staff_roles.role_id
+                    LEFT JOIN users approver ON staffs.staff_approved_by = approver.user_id
                     WHERE staffs.staff_approval_status = '1'
                     ORDER BY staff_roles.role_rank ASC, users.username ASC";
         $result = $this->conn->query($sql);
@@ -212,8 +214,9 @@ class Admin extends User
             $user_stmt->execute();
             $user_stmt->close();
 
-            $staff_stmt = $this->conn->prepare("UPDATE staffs SET staff_approval_status = '1' WHERE staff_user_id = ?");
-            $staff_stmt->bind_param("i", $userId);
+            $approverId = $_SESSION['user_id'];
+            $staff_stmt = $this->conn->prepare("UPDATE staffs SET staff_approval_status = '1', staff_approved_at = NOW(), staff_approved_by = ? WHERE staff_user_id = ?");
+            $staff_stmt->bind_param("ii", $approverId, $userId);
             $staff_stmt->execute();
             $staff_stmt->close();
 
@@ -317,7 +320,7 @@ class Admin extends User
     public function getStudentById($userId)
     {
         $sql = "SELECT users.user_id, users.username, users.user_email, users.user_status,
-                           students.student_registration_number, students.student_program, colleges.college_name, colleges.college_id
+                       students.student_registration_number, students.student_program, colleges.college_name, colleges.college_id
                     FROM users 
                     JOIN students ON users.user_id = students.student_user_id
                     LEFT JOIN colleges ON students.student_college_id = colleges.college_id
@@ -342,7 +345,7 @@ class Admin extends User
                     LEFT JOIN departments ON staffs.staff_department_id = departments.department_id
                     WHERE users.user_id = ? AND users.user_role = 'staff'";
         $stmt = $this->conn->prepare($sql);
-        $stmt->bind_param("i", $userId); 
+        $stmt->bind_param("i", $userId);
         $stmt->execute();
         $result = $stmt->get_result();
         $data = $result->fetch_assoc();
@@ -409,9 +412,7 @@ class Admin extends User
     // Get attachments for a complaint
     public function getComplaintAttachments($complaintId)
     {
-        $stmt = $this->conn->prepare(
-            "SELECT * FROM complaint_attachments WHERE complaint_id = ? ORDER BY uploaded_at ASC"
-        );
+        $stmt = $this->conn->prepare("SELECT * FROM complaint_attachments WHERE complaint_id = ? ORDER BY uploaded_at ASC");
         $stmt->bind_param("i", $complaintId);
         $stmt->execute();
         $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -482,6 +483,14 @@ class Admin extends User
             $oldStatus = $oldStmt->get_result()->fetch_assoc()['complaint_status'];
             $oldStmt->close();
 
+            // Look up the staff member's department so we can route the complaint there
+            $deptStmt = $this->conn->prepare("SELECT staff_department_id FROM staffs WHERE staff_id = ? LIMIT 1");
+            $deptStmt->bind_param("s", $staffId);
+            $deptStmt->execute();
+            $deptRow = $deptStmt->get_result()->fetch_assoc();
+            $deptStmt->close();
+            $staffDeptId = $deptRow ? $deptRow['staff_department_id'] : null;
+
             // Deactivate any existing active assignments
             $deactivateStmt = $this->conn->prepare(
                 "UPDATE complaint_assignments SET status = 'completed', completed_at = NOW()
@@ -493,14 +502,15 @@ class Admin extends User
 
             $stmt = $this->conn->prepare(
                 "UPDATE complaints SET priority = ?,
-                 complaint_status = 'in_progress', routed_at = NOW()
+                 complaint_status = 'in_progress', routed_at = NOW(),
+                 department_id = COALESCE(?, department_id)
                  WHERE complaint_id = ?"
             );
-            $stmt->bind_param("si", $priority, $complaintId);
+            $stmt->bind_param("sii", $priority, $staffDeptId, $complaintId);
             $stmt->execute();
             $stmt->close();
 
-            // Record in complaint_assignments junction table
+            // Record in complaint_assignments table
             $adminId = $_SESSION['user_id'];
             $assignStmt = $this->conn->prepare(
                 "INSERT INTO complaint_assignments (complaint_id, staff_id, assigned_by, is_lead, status, notes)
@@ -635,7 +645,7 @@ class Admin extends User
             $studStmt->close();
             if ($studRow) {
                 $type = $newStatus === 'resolved' ? 'complaint_resolved' : 'complaint_rejected';
-                $msg  = $newStatus === 'resolved'
+                $msg = $newStatus === 'resolved'
                     ? "Your complaint #$complaintId has been resolved."
                     : "Your complaint #$complaintId has been rejected.";
                 (new Notification($this->conn))->create($studRow['user_id'], $msg, $type, "student_complaint_details.php?id=$complaintId", $complaintId);
@@ -696,8 +706,8 @@ class Admin extends User
                 rmdir($dir);
             }
 
-            $notif       = new Notification($this->conn);
-            $reasonText  = $reason ? " Reason: $reason" : '';
+            $notif = new Notification($this->conn);
+            $reasonText = $reason ? " Reason: $reason" : '';
             $notif->create($studentUserId, "Your complaint #$complaintId has been deleted by an administrator.$reasonText", 'complaint_deleted', 'track_complaints.php', null);
             $notif->notifyAllAdmins("Complaint #$complaintId was deleted by an administrator.$reasonText", 'complaint_deleted', 'manage_complaints.php', null);
         }
@@ -705,23 +715,23 @@ class Admin extends User
         return $ok;
     }
 
-    // ── Reports ──────────────────────────────────────────────────────────────
+    // Reports 
 
     private function buildReportFilters($deptId, $categoryId, $dateFrom, $dateTo): array
     {
         $conditions = [];
-        $types      = '';
-        $params     = [];
+        $types = '';
+        $params = [];
 
         if (!empty($deptId)) {
             $conditions[] = 'c.department_id = ?';
             $types .= 'i';
-            $params[] = (int)$deptId;
+            $params[] = (int) $deptId;
         }
         if (!empty($categoryId)) {
             $conditions[] = 'c.category_id = ?';
             $types .= 'i';
-            $params[] = (int)$categoryId;
+            $params[] = (int) $categoryId;
         }
         if (!empty($dateFrom)) {
             $conditions[] = 'c.created_at >= ?';
@@ -761,12 +771,12 @@ class Admin extends User
         $stmt->close();
 
         return [
-            'total'               => (int)($row['total'] ?? 0),
-            'pending'             => (int)($row['pending'] ?? 0),
-            'in_progress'         => (int)($row['in_progress'] ?? 0),
-            'resolved'            => (int)($row['resolved'] ?? 0),
-            'rejected'            => (int)($row['rejected'] ?? 0),
-            'avg_resolution_hours'=> $row['avg_resolution_hours'] ?? null,
+            'total' => (int) ($row['total'] ?? 0),
+            'pending' => (int) ($row['pending'] ?? 0),
+            'in_progress' => (int) ($row['in_progress'] ?? 0),
+            'resolved' => (int) ($row['resolved'] ?? 0),
+            'rejected' => (int) ($row['rejected'] ?? 0),
+            'avg_resolution_hours' => $row['avg_resolution_hours'] ?? null,
         ];
     }
 
@@ -893,8 +903,8 @@ class Admin extends User
     public function getReportMonthlyTrend($dateFrom = null, $dateTo = null): array
     {
         $conditions = [];
-        $types      = '';
-        $params     = [];
+        $types = '';
+        $params = [];
 
         if (!empty($dateFrom)) {
             $conditions[] = 'created_at >= ?';
@@ -960,7 +970,7 @@ class Admin extends User
         return $data;
     }
 
-    // ── Staff Roles CRUD ─────────────────────────────────────────────────────
+    // Staff Roles CRUD 
 
     public function getAllStaffRolesWithCount()
     {
@@ -1012,7 +1022,7 @@ class Admin extends User
         $chk = $this->conn->prepare("SELECT COUNT(*) AS cnt FROM staffs WHERE staff_role_id = ?");
         $chk->bind_param("i", $id);
         $chk->execute();
-        if ((int)$chk->get_result()->fetch_assoc()['cnt'] > 0) {
+        if ((int) $chk->get_result()->fetch_assoc()['cnt'] > 0) {
             $chk->close();
             throw new Exception("Cannot delete: role is assigned to one or more staff members.");
         }
@@ -1034,7 +1044,7 @@ class Admin extends User
         return $ok;
     }
 
-    // ── Departments CRUD ─────────────────────────────────────────────────────
+    // Departments CRUD 
 
     public function getAllDepartmentsWithStats()
     {
@@ -1073,7 +1083,7 @@ class Admin extends User
         $chk = $this->conn->prepare("SELECT COUNT(*) AS cnt FROM staffs WHERE staff_department_id = ?");
         $chk->bind_param("i", $id);
         $chk->execute();
-        if ((int)$chk->get_result()->fetch_assoc()['cnt'] > 0) {
+        if ((int) $chk->get_result()->fetch_assoc()['cnt'] > 0) {
             $chk->close();
             throw new Exception("Cannot delete: department still has assigned staff members.");
         }
@@ -1085,36 +1095,55 @@ class Admin extends User
         return $ok;
     }
 
-    // ── Categories CRUD ───────────────────────────────────────────────────────
+    // Categories CRUD
 
     public function getAllCategoriesWithStats()
     {
         $sql = "SELECT cc.category_id, cc.category_name, cc.category_description, cc.status,
+                       cc.auto_assign_department_id,
+                       d.department_name AS default_dept_name,
                        COUNT(c.complaint_id) AS complaint_count
                 FROM complaint_categories cc
                 LEFT JOIN complaints c ON cc.category_id = c.category_id
-                GROUP BY cc.category_id
+                LEFT JOIN departments d ON cc.auto_assign_department_id = d.department_id
+                GROUP BY cc.category_id, d.department_name
                 ORDER BY cc.category_name ASC";
         return $this->conn->query($sql)->fetch_all(MYSQLI_ASSOC);
     }
 
-    public function addCategory($name, $description, $createdBy)
+    public function addCategory($name, $description, $createdBy, $departmentId = null)
     {
-        $stmt = $this->conn->prepare(
-            "INSERT INTO complaint_categories (category_name, category_description, created_by) VALUES (?, ?, ?)"
-        );
-        $stmt->bind_param("ssi", $name, $description, $createdBy);
+        $deptId = ($departmentId > 0) ? (int) $departmentId : null;
+        if ($deptId) {
+            $stmt = $this->conn->prepare(
+                "INSERT INTO complaint_categories (category_name, category_description, auto_assign_department_id, created_by) VALUES (?, ?, ?, ?)"
+            );
+            $stmt->bind_param("ssii", $name, $description, $deptId, $createdBy);
+        } else {
+            $stmt = $this->conn->prepare(
+                "INSERT INTO complaint_categories (category_name, category_description, created_by) VALUES (?, ?, ?)"
+            );
+            $stmt->bind_param("ssi", $name, $description, $createdBy);
+        }
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;
     }
 
-    public function updateCategory($id, $name, $description, $status)
+    public function updateCategory($id, $name, $description, $status, $departmentId = null)
     {
-        $stmt = $this->conn->prepare(
-            "UPDATE complaint_categories SET category_name = ?, category_description = ?, status = ? WHERE category_id = ?"
-        );
-        $stmt->bind_param("sssi", $name, $description, $status, $id);
+        $deptId = ($departmentId > 0) ? (int) $departmentId : null;
+        if ($deptId) {
+            $stmt = $this->conn->prepare(
+                "UPDATE complaint_categories SET category_name = ?, category_description = ?, status = ?, auto_assign_department_id = ? WHERE category_id = ?"
+            );
+            $stmt->bind_param("sssii", $name, $description, $status, $deptId, $id);
+        } else {
+            $stmt = $this->conn->prepare(
+                "UPDATE complaint_categories SET category_name = ?, category_description = ?, status = ?, auto_assign_department_id = NULL WHERE category_id = ?"
+            );
+            $stmt->bind_param("sssi", $name, $description, $status, $id);
+        }
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;
@@ -1125,7 +1154,7 @@ class Admin extends User
         $chk = $this->conn->prepare("SELECT COUNT(*) AS cnt FROM complaints WHERE category_id = ?");
         $chk->bind_param("i", $id);
         $chk->execute();
-        if ((int)$chk->get_result()->fetch_assoc()['cnt'] > 0) {
+        if ((int) $chk->get_result()->fetch_assoc()['cnt'] > 0) {
             $chk->close();
             throw new Exception("Cannot delete: category has associated complaints.");
         }
@@ -1137,7 +1166,7 @@ class Admin extends User
         return $ok;
     }
 
-    // ── Subcategories CRUD ────────────────────────────────────────────────────
+    // Subcategories CRUD 
 
     public function getAllSubcategoriesGrouped()
     {
@@ -1152,7 +1181,7 @@ class Admin extends User
         $rows = $this->conn->query($sql)->fetch_all(MYSQLI_ASSOC);
         $grouped = [];
         foreach ($rows as $row) {
-            $grouped[(int)$row['category_id']][] = $row;
+            $grouped[(int) $row['category_id']][] = $row;
         }
         return $grouped;
     }
@@ -1189,7 +1218,7 @@ class Admin extends User
         $chk = $this->conn->prepare("SELECT COUNT(*) AS cnt FROM complaints WHERE subcategory_id = ?");
         $chk->bind_param("i", $id);
         $chk->execute();
-        if ((int)$chk->get_result()->fetch_assoc()['cnt'] > 0) {
+        if ((int) $chk->get_result()->fetch_assoc()['cnt'] > 0) {
             $chk->close();
             throw new Exception("Cannot delete: subcategory has associated complaints.");
         }
@@ -1201,7 +1230,7 @@ class Admin extends User
         return $ok;
     }
 
-    // ── Add user accounts (admin-created) ────────────────────────────────────
+    // Add user accounts (admin-created)
 
     public function addStudent($username, $email, $password, $regNumber, $collegeId, $phone = null, $program = null)
     {
@@ -1218,7 +1247,7 @@ class Admin extends User
             $u->close();
 
             $prog = $program ?: null;
-            $col  = $collegeId ?: null;
+            $col = $collegeId ?: null;
             $s = $this->conn->prepare(
                 "INSERT INTO students (student_user_id, student_registration_number, student_college_id, student_program)
                  VALUES (?, ?, ?, ?)"
@@ -1250,8 +1279,8 @@ class Admin extends User
             $u->close();
 
             $deptId = $departmentId ?: null;
-            $rId    = $roleId ?: null;
-            $sId    = $staffId ?: null;
+            $rId = $roleId ?: null;
+            $sId = $staffId ?: null;
             $s = $this->conn->prepare(
                 "INSERT INTO staffs (staff_id, staff_user_id, staff_department_id, staff_role_id, staff_approval_status)
                  VALUES (?, ?, ?, ?, 1)"
@@ -1286,7 +1315,121 @@ class Admin extends User
         return $data;
     }
 
-    // ── Collaboration / info ──────────────────────────────────────────────────
+    // Account management
+
+    // Reset any user's password without requiring their current password
+    public function adminResetPassword($userId, $newPassword)
+    {
+        if (strlen($newPassword) < 8) {
+            throw new Exception("Password must be at least 8 characters.");
+        }
+        $hash = password_hash($newPassword, PASSWORD_DEFAULT);
+        $stmt = $this->conn->prepare("UPDATE users SET user_password = ? WHERE user_id = ?");
+        $stmt->bind_param("si", $hash, $userId);
+        $ok = $stmt->execute();
+        $stmt->close();
+
+        return $ok;
+    }
+
+    // Write a row to activity_logs
+    public function logActivity($adminId, $action, $targetType, $targetId, $targetName, $details = null)
+    {
+        $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+        $stmt = $this->conn->prepare(
+            "INSERT INTO activity_logs (admin_id, action, target_type, target_id, target_name, details, ip_address)
+             VALUES (?, ?, ?, ?, ?, ?, ?)"
+        );
+        if (!$stmt)
+            return;
+        $stmt->bind_param("ississs", $adminId, $action, $targetType, $targetId, $targetName, $details, $ip);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    // Paginated activity logs with optional filters
+    public function getActivityLogs(int $page = 1, int $limit = 50, ?string $action = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    {
+        $offset = ($page - 1) * $limit;
+        $conditions = [];
+        $types = '';
+        $params = [];
+
+        if ($action) {
+            $conditions[] = 'al.action = ?';
+            $types .= 's';
+            $params[] = $action;
+        }
+        if ($dateFrom) {
+            $conditions[] = 'al.created_at >= ?';
+            $types .= 's';
+            $params[] = $dateFrom . ' 00:00:00';
+        }
+        if ($dateTo) {
+            $conditions[] = 'al.created_at <= ?';
+            $types .= 's';
+            $params[] = $dateTo . ' 23:59:59';
+        }
+
+        $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
+        $sql = "SELECT al.*, u.username AS admin_name
+                  FROM activity_logs al
+                  JOIN users u ON al.admin_id = u.user_id
+                  $where
+                  ORDER BY al.created_at DESC
+                  LIMIT ? OFFSET ?";
+
+        $types .= 'ii';
+        $params[] = $limit;
+        $params[] = $offset;
+
+        $stmt = $this->conn->prepare($sql);
+        if (!$stmt)
+            return [];
+        if ($params)
+            $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $data;
+    }
+
+    public function getActivityLogsCount(?string $action = null, ?string $dateFrom = null, ?string $dateTo = null): int
+    {
+        $conditions = [];
+        $types = '';
+        $params = [];
+
+        if ($action) {
+            $conditions[] = 'action = ?';
+            $types .= 's';
+            $params[] = $action;
+        }
+        if ($dateFrom) {
+            $conditions[] = 'created_at >= ?';
+            $types .= 's';
+            $params[] = $dateFrom . ' 00:00:00';
+        }
+        if ($dateTo) {
+            $conditions[] = 'created_at <= ?';
+            $types .= 's';
+            $params[] = $dateTo . ' 23:59:59';
+        }
+
+        $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
+        $sql = "SELECT COUNT(*) AS cnt FROM activity_logs $where";
+        $stmt = $this->conn->prepare($sql);
+        if (!$stmt)
+            return 0;
+        if ($params)
+            $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $cnt = (int) $stmt->get_result()->fetch_assoc()['cnt'];
+        $stmt->close();
+        return $cnt;
+    }
+
+    // Collaboration / info
 
     // Add an internal collaboration note
     public function addCollaborationNote($complaintId, $createdBy, $noteText)

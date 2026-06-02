@@ -187,6 +187,18 @@ class Staff
         try {
             $this->conn->begin_transaction();
 
+            // Block if already resolved or rejected
+            $statusStmt = $this->conn->prepare(
+                "SELECT complaint_status FROM complaints WHERE complaint_id = ? LIMIT 1"
+            );
+            $statusStmt->bind_param('i', $complaintId);
+            $statusStmt->execute();
+            $currentStatus = $statusStmt->get_result()->fetch_assoc()['complaint_status'] ?? '';
+            $statusStmt->close();
+            if (in_array($currentStatus, ['resolved', 'rejected'])) {
+                throw new Exception("Cannot escalate a complaint that is already $currentStatus.");
+            }
+
             // Verify destination staff has a higher rank
             $rankSql = "SELECT
                             (SELECT COALESCE(sr.role_rank, 0) FROM staffs s JOIN staff_roles sr ON s.staff_role_id = sr.role_id WHERE s.staff_id = ?) AS from_rank,
@@ -197,7 +209,7 @@ class Staff
             $ranks = $rankStmt->get_result()->fetch_assoc();
             $rankStmt->close();
 
-            if ((int)$ranks['to_rank'] <= (int)$ranks['from_rank']) {
+            if ((int) $ranks['to_rank'] <= (int) $ranks['from_rank']) {
                 throw new Exception("Can only escalate to a staff member of higher rank.");
             }
 
@@ -228,22 +240,35 @@ class Staff
             $newAssignStmt->close();
 
             // Status log
-            $oldStmt = $this->conn->prepare("SELECT complaint_status FROM complaints WHERE complaint_id = ?");
-            $oldStmt->bind_param('i', $complaintId);
-            $oldStmt->execute();
-            $oldStatus = $oldStmt->get_result()->fetch_assoc()['complaint_status'];
-            $oldStmt->close();
-
             $logStmt = $this->conn->prepare(
                 "INSERT INTO complaint_status_logs
                  (complaint_id, action, old_status, new_status, performed_by, remarks)
                  VALUES (?, 'escalated', ?, 'in_progress', ?, ?)"
             );
-            $logStmt->bind_param('isis', $complaintId, $oldStatus, $forwardedByUserId, $reason);
+            $logStmt->bind_param('isis', $complaintId, $currentStatus, $forwardedByUserId, $reason);
             $logStmt->execute();
             $logStmt->close();
 
             $this->conn->commit();
+
+            // Notify the receiving staff (outside transaction — non-critical)
+            $toUserStmt = $this->conn->prepare(
+                "SELECT staff_user_id FROM staffs WHERE staff_id = ? LIMIT 1"
+            );
+            $toUserStmt->bind_param('s', $toStaffId);
+            $toUserStmt->execute();
+            $toUser = $toUserStmt->get_result()->fetch_assoc();
+            $toUserStmt->close();
+            if ($toUser) {
+                (new Notification($this->conn))->create(
+                    (int) $toUser['staff_user_id'],
+                    "Complaint #$complaintId has been escalated to you. Please review and take action.",
+                    'new_assignment',
+                    "assigned_complaint_details.php?id=$complaintId",
+                    $complaintId
+                );
+            }
+
             return true;
         } catch (Exception $e) {
             $this->conn->rollback();
@@ -314,7 +339,8 @@ class Staff
                        cc.category_name,
                        d.department_name,
                        su.username AS assigned_staff_name,
-                       sr.role_name AS staff_role_name
+                       sr.role_name AS staff_role_name,
+                       ca.target_resolution_date
                 FROM complaints c
                 JOIN students s ON c.student_id = s.student_id
                 JOIN users u ON s.student_user_id = u.user_id
@@ -328,7 +354,8 @@ class Staff
                 LIMIT 1";
 
         $stmt = $this->conn->prepare($sql);
-        if (!$stmt) return null;
+        if (!$stmt)
+            return null;
         $stmt->bind_param('si', $staffId, $complaintId);
         $stmt->execute();
         return $stmt->get_result()->fetch_assoc();
@@ -338,7 +365,8 @@ class Staff
     {
         $sql = "SELECT * FROM complaint_attachments WHERE complaint_id = ? ORDER BY uploaded_at ASC";
         $stmt = $this->conn->prepare($sql);
-        if (!$stmt) return [];
+        if (!$stmt)
+            return [];
         $stmt->bind_param('i', $complaintId);
         $stmt->execute();
         return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -352,7 +380,8 @@ class Staff
                 WHERE csl.complaint_id = ?
                 ORDER BY csl.changed_at ASC";
         $stmt = $this->conn->prepare($sql);
-        if (!$stmt) return [];
+        if (!$stmt)
+            return [];
         $stmt->bind_param('i', $complaintId);
         $stmt->execute();
         return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -366,7 +395,8 @@ class Staff
                 WHERE cn.complaint_id = ?
                 ORDER BY cn.created_at ASC";
         $stmt = $this->conn->prepare($sql);
-        if (!$stmt) return [];
+        if (!$stmt)
+            return [];
         $stmt->bind_param('i', $complaintId);
         $stmt->execute();
         return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -380,7 +410,8 @@ class Staff
                 WHERE ir.complaint_id = ?
                 ORDER BY ir.created_at ASC";
         $stmt = $this->conn->prepare($sql);
-        if (!$stmt) return [];
+        if (!$stmt)
+            return [];
         $stmt->bind_param('i', $complaintId);
         $stmt->execute();
         return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -391,9 +422,11 @@ class Staff
         $stmt = $this->conn->prepare(
             "INSERT INTO collaboration_notes (complaint_id, created_by, note_text) VALUES (?, ?, ?)"
         );
-        if (!$stmt) throw new Exception("DB error: " . $this->conn->error);
+        if (!$stmt)
+            throw new Exception("DB error: " . $this->conn->error);
         $stmt->bind_param('iis', $complaintId, $createdByUserId, $note);
-        if (!$stmt->execute()) throw new Exception("Failed to save note.");
+        if (!$stmt->execute())
+            throw new Exception("Failed to save note.");
         $stmt->close();
         return true;
     }
@@ -408,7 +441,7 @@ class Staff
             );
             $oldStmt->bind_param('i', $complaintId);
             $oldStmt->execute();
-            $old       = $oldStmt->get_result()->fetch_assoc();
+            $old = $oldStmt->get_result()->fetch_assoc();
             $oldStmt->close();
             $oldStatus = $old['complaint_status'] ?? 'in_progress';
 
@@ -467,8 +500,8 @@ class Staff
     public function respondToComplaint($complaintId, $staffUserId, $response, $action)
     {
         $statusMap = [
-            'resolve'     => 'resolved',
-            'reject'      => 'rejected',
+            'resolve' => 'resolved',
+            'reject' => 'rejected',
             'in_progress' => 'in_progress',
         ];
         if (!array_key_exists($action, $statusMap)) {
@@ -484,7 +517,7 @@ class Staff
             );
             $oldStmt->bind_param('i', $complaintId);
             $oldStmt->execute();
-            $old       = $oldStmt->get_result()->fetch_assoc();
+            $old = $oldStmt->get_result()->fetch_assoc();
             $oldStmt->close();
             $oldStatus = $old['complaint_status'] ?? 'pending';
 
@@ -533,19 +566,46 @@ class Staff
             $studStmt->close();
             if ($studRow) {
                 if ($newStatus === 'resolved') {
-                    $msg  = "Your complaint #$complaintId has been resolved.";
+                    $msg = "Your complaint #$complaintId has been resolved.";
                     $type = 'complaint_resolved';
                 } elseif ($newStatus === 'rejected') {
-                    $msg  = "Your complaint #$complaintId has been rejected.";
+                    $msg = "Your complaint #$complaintId has been rejected.";
                     $type = 'complaint_rejected';
                 } else {
-                    $msg  = "Your complaint #$complaintId is being actively worked on.";
+                    $msg = "Your complaint #$complaintId is being actively worked on.";
                     $type = 'status_change';
                 }
                 (new Notification($this->conn))->create(
-                    $studRow['user_id'], $msg, $type,
-                    "student_complaint_details.php?id=$complaintId", $complaintId
+                    $studRow['user_id'],
+                    $msg,
+                    $type,
+                    "student_complaint_details.php?id=$complaintId",
+                    $complaintId
                 );
+            }
+
+            // Notify all staff who delegated this complaint downward
+            if ($newStatus === 'resolved') {
+                $delStmt = $this->conn->prepare(
+                    "SELECT DISTINCT s.staff_user_id
+                     FROM complaint_escalations ce
+                     JOIN staffs s ON ce.from_staff_id = s.staff_id
+                     WHERE ce.complaint_id = ? AND ce.type = 'delegation'"
+                );
+                $delStmt->bind_param('i', $complaintId);
+                $delStmt->execute();
+                $delegators = $delStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                $delStmt->close();
+                $notif = new Notification($this->conn);
+                foreach ($delegators as $d) {
+                    $notif->create(
+                        (int) $d['staff_user_id'],
+                        "A complaint you delegated (#{$complaintId}) has been resolved.",
+                        'complaint_delegated_resolved',
+                        "assigned_complaint_details.php?id={$complaintId}",
+                        $complaintId
+                    );
+                }
             }
 
             return true;
@@ -572,6 +632,127 @@ class Staff
         return $cnt;
     }
 
+    // Get lower-ranked staff eligible to receive a delegation
+    public function getStaffForDelegation($fromStaffId)
+    {
+        $sql = "SELECT u.user_id, u.username, s.staff_id, d.department_name,
+                       sr.role_name, sr.role_rank
+                FROM staffs s
+                JOIN users u ON s.staff_user_id = u.user_id
+                LEFT JOIN departments d ON s.staff_department_id = d.department_id
+                LEFT JOIN staff_roles sr ON s.staff_role_id = sr.role_id
+                WHERE s.staff_approval_status = '1'
+                  AND s.staff_id != ?
+                  AND sr.role_rank < (
+                      SELECT COALESCE(sr2.role_rank, 0)
+                      FROM staffs s2
+                      LEFT JOIN staff_roles sr2 ON s2.staff_role_id = sr2.role_id
+                      WHERE s2.staff_id = ?
+                  )
+                ORDER BY sr.role_rank DESC, u.username ASC";
+
+        $stmt = $this->conn->prepare($sql);
+        if (!$stmt) return [];
+        $stmt->bind_param('ss', $fromStaffId, $fromStaffId);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    }
+
+    // Delegate a complaint downward to a lower-ranked staff member
+    public function delegateComplaint($complaintId, $fromStaffId, $toStaffId, $delegatedByUserId, $reason)
+    {
+        try {
+            $this->conn->begin_transaction();
+
+            // Block if already resolved or rejected
+            $statusStmt = $this->conn->prepare(
+                "SELECT complaint_status FROM complaints WHERE complaint_id = ? LIMIT 1"
+            );
+            $statusStmt->bind_param('i', $complaintId);
+            $statusStmt->execute();
+            $currentStatus = $statusStmt->get_result()->fetch_assoc()['complaint_status'] ?? '';
+            $statusStmt->close();
+            if (in_array($currentStatus, ['resolved', 'rejected'])) {
+                throw new Exception("Cannot delegate a complaint that is already $currentStatus.");
+            }
+
+            // Verify destination staff has a lower rank
+            $rankSql = "SELECT
+                            (SELECT COALESCE(sr.role_rank, 0) FROM staffs s JOIN staff_roles sr ON s.staff_role_id = sr.role_id WHERE s.staff_id = ?) AS from_rank,
+                            (SELECT COALESCE(sr.role_rank, 0) FROM staffs s JOIN staff_roles sr ON s.staff_role_id = sr.role_id WHERE s.staff_id = ?) AS to_rank";
+            $rankStmt = $this->conn->prepare($rankSql);
+            $rankStmt->bind_param('ss', $fromStaffId, $toStaffId);
+            $rankStmt->execute();
+            $ranks = $rankStmt->get_result()->fetch_assoc();
+            $rankStmt->close();
+
+            if ((int) $ranks['to_rank'] >= (int) $ranks['from_rank']) {
+                throw new Exception("Can only delegate to a staff member of lower rank.");
+            }
+
+            // Log the delegation
+            $escStmt = $this->conn->prepare(
+                "INSERT INTO complaint_escalations (complaint_id, from_staff_id, to_staff_id, forwarded_by, reason, type, status)
+                 VALUES (?, ?, ?, ?, ?, 'delegation', 'pending')"
+            );
+            $escStmt->bind_param('issis', $complaintId, $fromStaffId, $toStaffId, $delegatedByUserId, $reason);
+            $escStmt->execute();
+            $escStmt->close();
+
+            // Mark old assignment forwarded, create new lead assignment
+            $fwdStmt = $this->conn->prepare(
+                "UPDATE complaint_assignments SET status = 'forwarded', completed_at = NOW()
+                 WHERE complaint_id = ? AND staff_id = ? AND status = 'active'"
+            );
+            $fwdStmt->bind_param('is', $complaintId, $fromStaffId);
+            $fwdStmt->execute();
+            $fwdStmt->close();
+
+            $newAssignStmt = $this->conn->prepare(
+                "INSERT INTO complaint_assignments (complaint_id, staff_id, assigned_by, is_lead, status, notes)
+                 VALUES (?, ?, ?, 1, 'active', ?)"
+            );
+            $newAssignStmt->bind_param('isis', $complaintId, $toStaffId, $delegatedByUserId, $reason);
+            $newAssignStmt->execute();
+            $newAssignStmt->close();
+
+            // Status log
+            $logStmt = $this->conn->prepare(
+                "INSERT INTO complaint_status_logs
+                 (complaint_id, action, old_status, new_status, performed_by, remarks)
+                 VALUES (?, 'delegated', ?, 'in_progress', ?, ?)"
+            );
+            $logStmt->bind_param('isis', $complaintId, $currentStatus, $delegatedByUserId, $reason);
+            $logStmt->execute();
+            $logStmt->close();
+
+            $this->conn->commit();
+
+            // Notify the receiving staff (outside transaction — non-critical)
+            $toUserStmt = $this->conn->prepare(
+                "SELECT staff_user_id FROM staffs WHERE staff_id = ? LIMIT 1"
+            );
+            $toUserStmt->bind_param('s', $toStaffId);
+            $toUserStmt->execute();
+            $toUser = $toUserStmt->get_result()->fetch_assoc();
+            $toUserStmt->close();
+            if ($toUser) {
+                (new Notification($this->conn))->create(
+                    (int) $toUser['staff_user_id'],
+                    "Complaint #$complaintId has been delegated to you. Please handle it.",
+                    'complaint_delegated',
+                    "assigned_complaint_details.php?id=$complaintId",
+                    $complaintId
+                );
+            }
+
+            return true;
+        } catch (Exception $e) {
+            $this->conn->rollback();
+            throw new Exception($e->getMessage());
+        }
+    }
+
     // Get student feedback for a resolved complaint
     public function getComplaintFeedback($complaintId)
     {
@@ -588,6 +769,372 @@ class Staff
         $data = $stmt->get_result()->fetch_assoc();
         $stmt->close();
         return $data;
+    }
+
+    // ── Feature 1: On Hold / Resume ─────────────────────────────────────────
+
+    public function putComplaintOnHold($complaintId, $staffUserId, $reason)
+    {
+        try {
+            $this->conn->begin_transaction();
+
+            $oldStmt = $this->conn->prepare(
+                "SELECT complaint_status FROM complaints WHERE complaint_id = ? LIMIT 1"
+            );
+            $oldStmt->bind_param('i', $complaintId);
+            $oldStmt->execute();
+            $old = $oldStmt->get_result()->fetch_assoc();
+            $oldStmt->close();
+            $oldStatus = $old['complaint_status'] ?? '';
+
+            if (in_array($oldStatus, ['resolved', 'rejected'])) {
+                throw new Exception("Cannot put a $oldStatus complaint on hold.");
+            }
+
+            $updStmt = $this->conn->prepare(
+                "UPDATE complaints SET complaint_status = 'on_hold', hold_reason = ?, updated_at = NOW()
+                 WHERE complaint_id = ?"
+            );
+            $updStmt->bind_param('si', $reason, $complaintId);
+            $updStmt->execute();
+            $updStmt->close();
+
+            $logStmt = $this->conn->prepare(
+                "INSERT INTO complaint_status_logs (complaint_id, action, old_status, new_status, performed_by, remarks)
+                 VALUES (?, 'on_hold', ?, 'on_hold', ?, ?)"
+            );
+            $logStmt->bind_param('isis', $complaintId, $oldStatus, $staffUserId, $reason);
+            $logStmt->execute();
+            $logStmt->close();
+
+            $this->conn->commit();
+
+            // Notify student (outside transaction)
+            $studStmt = $this->conn->prepare(
+                "SELECT u.user_id FROM complaints c
+                 JOIN students s ON c.student_id = s.student_id
+                 JOIN users u ON s.student_user_id = u.user_id
+                 WHERE c.complaint_id = ? LIMIT 1"
+            );
+            $studStmt->bind_param('i', $complaintId);
+            $studStmt->execute();
+            $studRow = $studStmt->get_result()->fetch_assoc();
+            $studStmt->close();
+            if ($studRow) {
+                (new Notification($this->conn))->create(
+                    (int) $studRow['user_id'],
+                    "Your complaint #$complaintId has been put on hold: $reason",
+                    'status_change',
+                    "student_complaint_details.php?id=$complaintId",
+                    $complaintId
+                );
+            }
+
+            return true;
+        } catch (Exception $e) {
+            $this->conn->rollback();
+            throw new Exception($e->getMessage());
+        }
+    }
+
+    public function resumeComplaint($complaintId, $staffUserId)
+    {
+        try {
+            $this->conn->begin_transaction();
+
+            $oldStmt = $this->conn->prepare(
+                "SELECT complaint_status FROM complaints WHERE complaint_id = ? LIMIT 1"
+            );
+            $oldStmt->bind_param('i', $complaintId);
+            $oldStmt->execute();
+            $old = $oldStmt->get_result()->fetch_assoc();
+            $oldStmt->close();
+            $oldStatus = $old['complaint_status'] ?? '';
+
+            if ($oldStatus !== 'on_hold') {
+                throw new Exception("Complaint is not on hold (current status: $oldStatus).");
+            }
+
+            $updStmt = $this->conn->prepare(
+                "UPDATE complaints SET complaint_status = 'in_progress', hold_reason = NULL, updated_at = NOW()
+                 WHERE complaint_id = ?"
+            );
+            $updStmt->bind_param('i', $complaintId);
+            $updStmt->execute();
+            $updStmt->close();
+
+            $logStmt = $this->conn->prepare(
+                "INSERT INTO complaint_status_logs (complaint_id, action, old_status, new_status, performed_by, remarks)
+                 VALUES (?, 'resumed', 'on_hold', 'in_progress', ?, 'Complaint resumed from hold')"
+            );
+            $logStmt->bind_param('ii', $complaintId, $staffUserId);
+            $logStmt->execute();
+            $logStmt->close();
+
+            $this->conn->commit();
+
+            // Notify student (outside transaction)
+            $studStmt = $this->conn->prepare(
+                "SELECT u.user_id FROM complaints c
+                 JOIN students s ON c.student_id = s.student_id
+                 JOIN users u ON s.student_user_id = u.user_id
+                 WHERE c.complaint_id = ? LIMIT 1"
+            );
+            $studStmt->bind_param('i', $complaintId);
+            $studStmt->execute();
+            $studRow = $studStmt->get_result()->fetch_assoc();
+            $studStmt->close();
+            if ($studRow) {
+                (new Notification($this->conn))->create(
+                    (int) $studRow['user_id'],
+                    "Your complaint #$complaintId has been resumed and is now being actively worked on.",
+                    'status_change',
+                    "student_complaint_details.php?id=$complaintId",
+                    $complaintId
+                );
+            }
+
+            return true;
+        } catch (Exception $e) {
+            $this->conn->rollback();
+            throw new Exception($e->getMessage());
+        }
+    }
+
+    // ── Feature 2: Progress Updates ─────────────────────────────────────────
+
+    public function sendProgressUpdate($complaintId, $staffUserId, $message)
+    {
+        $insStmt = $this->conn->prepare(
+            "INSERT INTO complaint_progress_updates (complaint_id, sent_by, message) VALUES (?, ?, ?)"
+        );
+        if (!$insStmt) throw new Exception("DB error: " . $this->conn->error);
+        $insStmt->bind_param('iis', $complaintId, $staffUserId, $message);
+        if (!$insStmt->execute()) throw new Exception("Failed to save progress update.");
+        $insStmt->close();
+
+        // Notify student
+        $studStmt = $this->conn->prepare(
+            "SELECT u.user_id FROM complaints c
+             JOIN students s ON c.student_id = s.student_id
+             JOIN users u ON s.student_user_id = u.user_id
+             WHERE c.complaint_id = ? LIMIT 1"
+        );
+        $studStmt->bind_param('i', $complaintId);
+        $studStmt->execute();
+        $studRow = $studStmt->get_result()->fetch_assoc();
+        $studStmt->close();
+        if ($studRow) {
+            (new Notification($this->conn))->create(
+                (int) $studRow['user_id'],
+                "Staff has sent a progress update on your complaint #$complaintId",
+                'status_change',
+                "student_complaint_details.php?id=$complaintId",
+                $complaintId
+            );
+        }
+
+        return true;
+    }
+
+    public function getProgressUpdates($complaintId)
+    {
+        $stmt = $this->conn->prepare(
+            "SELECT pu.*, u.username AS sent_by_name
+             FROM complaint_progress_updates pu
+             LEFT JOIN users u ON pu.sent_by = u.user_id
+             WHERE pu.complaint_id = ?
+             ORDER BY pu.created_at ASC"
+        );
+        if (!$stmt) return [];
+        $stmt->bind_param('i', $complaintId);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    }
+
+    // ── Feature 3: Reject Assignment ────────────────────────────────────────
+
+    public function rejectAssignment($complaintId, $staffId, $staffUserId, $reason)
+    {
+        try {
+            $this->conn->begin_transaction();
+
+            $statusStmt = $this->conn->prepare(
+                "SELECT complaint_status FROM complaints WHERE complaint_id = ? LIMIT 1"
+            );
+            $statusStmt->bind_param('i', $complaintId);
+            $statusStmt->execute();
+            $currentStatus = $statusStmt->get_result()->fetch_assoc()['complaint_status'] ?? '';
+            $statusStmt->close();
+
+            if (in_array($currentStatus, ['resolved', 'rejected'])) {
+                throw new Exception("Cannot reject an assignment for a complaint that is already $currentStatus.");
+            }
+
+            $updAssign = $this->conn->prepare(
+                "UPDATE complaint_assignments
+                 SET status = 'rejected', rejection_reason = ?, completed_at = NOW()
+                 WHERE complaint_id = ? AND staff_id = ? AND status = 'active'"
+            );
+            $updAssign->bind_param('sis', $reason, $complaintId, $staffId);
+            $updAssign->execute();
+            $updAssign->close();
+
+            $updComp = $this->conn->prepare(
+                "UPDATE complaints SET complaint_status = 'pending', updated_at = NOW() WHERE complaint_id = ?"
+            );
+            $updComp->bind_param('i', $complaintId);
+            $updComp->execute();
+            $updComp->close();
+
+            $logStmt = $this->conn->prepare(
+                "INSERT INTO complaint_status_logs (complaint_id, action, old_status, new_status, performed_by, remarks)
+                 VALUES (?, 'assignment_rejected', ?, 'pending', ?, ?)"
+            );
+            $logStmt->bind_param('isis', $complaintId, $currentStatus, $staffUserId, $reason);
+            $logStmt->execute();
+            $logStmt->close();
+
+            $this->conn->commit();
+
+            // Notify all admins (outside transaction)
+            (new Notification($this->conn))->notifyAllAdmins(
+                "Assignment for complaint #$complaintId was rejected by staff. Reason: $reason. Reassignment needed.",
+                'new_assignment',
+                "manage_complaints.php"
+            );
+
+            return true;
+        } catch (Exception $e) {
+            $this->conn->rollback();
+            throw new Exception($e->getMessage());
+        }
+    }
+
+    // ── Feature 4: Performance Stats ────────────────────────────────────────
+
+    public function getPerformanceStats($staffId)
+    {
+        $stmt = $this->conn->prepare(
+            "SELECT
+                COUNT(*) as total_assigned,
+                SUM(CASE WHEN c.complaint_status = 'resolved' THEN 1 ELSE 0 END) as total_resolved,
+                SUM(CASE WHEN c.complaint_status = 'resolved'
+                         AND MONTH(c.resolved_at) = MONTH(NOW())
+                         AND YEAR(c.resolved_at) = YEAR(NOW()) THEN 1 ELSE 0 END) as resolved_this_month,
+                ROUND(AVG(CASE WHEN c.complaint_status = 'resolved'
+                               THEN DATEDIFF(c.resolved_at, ca.assigned_at) END), 1) as avg_resolution_days,
+                ROUND(SUM(CASE WHEN c.complaint_status = 'resolved' THEN 1 ELSE 0 END)
+                      / NULLIF(COUNT(*), 0) * 100, 1) as resolution_rate
+             FROM complaints c
+             JOIN complaint_assignments ca ON c.complaint_id = ca.complaint_id AND ca.staff_id = ?"
+        );
+        if (!$stmt) return $this->_defaultPerformanceStats();
+        $stmt->bind_param('s', $staffId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        $ratingStmt = $this->conn->prepare(
+            "SELECT ROUND(AVG(cf.rating), 1) as avg_rating
+             FROM complaint_feedback cf
+             JOIN complaints c ON cf.complaint_id = c.complaint_id
+             JOIN complaint_assignments ca ON c.complaint_id = ca.complaint_id AND ca.staff_id = ?"
+        );
+        $avgRating = null;
+        if ($ratingStmt) {
+            $ratingStmt->bind_param('s', $staffId);
+            $ratingStmt->execute();
+            $ratingRow = $ratingStmt->get_result()->fetch_assoc();
+            $ratingStmt->close();
+            $avgRating = $ratingRow['avg_rating'] ?? null;
+        }
+
+        return [
+            'total_assigned'      => (int) ($row['total_assigned'] ?? 0),
+            'total_resolved'      => (int) ($row['total_resolved'] ?? 0),
+            'resolved_this_month' => (int) ($row['resolved_this_month'] ?? 0),
+            'avg_resolution_days' => $row['avg_resolution_days'] ?? null,
+            'resolution_rate'     => $row['resolution_rate'] ?? null,
+            'avg_rating'          => $avgRating,
+        ];
+    }
+
+    private function _defaultPerformanceStats()
+    {
+        return [
+            'total_assigned'      => 0,
+            'total_resolved'      => 0,
+            'resolved_this_month' => 0,
+            'avg_resolution_days' => null,
+            'resolution_rate'     => null,
+            'avg_rating'          => null,
+        ];
+    }
+
+    // ── Feature 5: Target Resolution Date ───────────────────────────────────
+
+    public function setTargetDate($complaintId, $staffId, $targetDate)
+    {
+        if ($targetDate < date('Y-m-d')) {
+            throw new Exception("Target date cannot be in the past.");
+        }
+
+        $stmt = $this->conn->prepare(
+            "UPDATE complaint_assignments
+             SET target_resolution_date = ?
+             WHERE complaint_id = ? AND staff_id = ? AND status = 'active'"
+        );
+        if (!$stmt) throw new Exception("DB error: " . $this->conn->error);
+        $stmt->bind_param('sis', $targetDate, $complaintId, $staffId);
+        if (!$stmt->execute()) throw new Exception("Failed to set target date.");
+        $stmt->close();
+        return true;
+    }
+
+    // ── Feature 6: Department-Level View ────────────────────────────────────
+
+    public function getDepartmentComplaints($departmentId)
+    {
+        $sql = "SELECT c.complaint_id, c.complaint_title, c.complaint_status, c.created_at, c.is_anonymous,
+                       cc.category_name,
+                       u.username AS student_name,
+                       su.username AS assigned_staff_name,
+                       sr.role_name AS staff_role
+                FROM complaints c
+                LEFT JOIN complaint_categories cc ON c.category_id = cc.category_id
+                JOIN students s ON c.student_id = s.student_id
+                JOIN users u ON s.student_user_id = u.user_id
+                LEFT JOIN complaint_assignments ca ON c.complaint_id = ca.complaint_id AND ca.status = 'active'
+                LEFT JOIN staffs st ON ca.staff_id = st.staff_id
+                LEFT JOIN users su ON st.staff_user_id = su.user_id
+                LEFT JOIN staff_roles sr ON st.staff_role_id = sr.role_id
+                WHERE c.department_id = ?
+                ORDER BY c.created_at DESC";
+
+        $stmt = $this->conn->prepare($sql);
+        if (!$stmt) return [];
+        $stmt->bind_param('i', $departmentId);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    }
+
+    public function getDepartmentStats($departmentId)
+    {
+        $stmt = $this->conn->prepare(
+            "SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN complaint_status = 'pending'     THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN complaint_status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
+                SUM(CASE WHEN complaint_status = 'on_hold'     THEN 1 ELSE 0 END) as on_hold,
+                SUM(CASE WHEN complaint_status = 'resolved'    THEN 1 ELSE 0 END) as resolved,
+                SUM(CASE WHEN complaint_status = 'rejected'    THEN 1 ELSE 0 END) as rejected
+             FROM complaints WHERE department_id = ?"
+        );
+        if (!$stmt) return [];
+        $stmt->bind_param('i', $departmentId);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_assoc();
     }
 
 }

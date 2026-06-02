@@ -41,6 +41,23 @@ CREATE TABLE
 
 -- --------------------------------------------------------
 --
+-- Table structure for table `activity_logs`
+--
+CREATE TABLE
+  `activity_logs` (
+    `log_id` int (11) NOT NULL,
+    `admin_id` int (11) NOT NULL,
+    `action` varchar(100) NOT NULL,
+    `target_type` varchar(50) NOT NULL,
+    `target_id` int (11) DEFAULT NULL,
+    `target_name` varchar(255) DEFAULT NULL,
+    `details` text DEFAULT NULL,
+    `ip_address` varchar(45) DEFAULT NULL,
+    `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+--
 -- Table structure for table `colleges`
 --
 CREATE TABLE
@@ -132,8 +149,10 @@ CREATE TABLE
       'rejected',
       'awaiting_student_response',
       'resolved',
-      'reopened'
+      'reopened',
+      'on_hold'
     ) DEFAULT 'pending',
+    `hold_reason` text DEFAULT NULL,
     `is_anonymous` tinyint (1) DEFAULT 0,
     `complaint_response` text DEFAULT NULL,
     `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -154,8 +173,10 @@ CREATE TABLE
     `staff_id` varchar(20) NOT NULL,
     `assigned_by` int (11) NOT NULL COMMENT 'users.user_id of admin or escalating staff',
     `is_lead` tinyint (1) DEFAULT 1 COMMENT '1=primary handler for this complaint',
-    `status` enum ('active', 'forwarded', 'completed') DEFAULT 'active',
+    `status` enum ('active', 'forwarded', 'completed', 'rejected') DEFAULT 'active',
     `notes` text DEFAULT NULL,
+    `rejection_reason` text DEFAULT NULL,
+    `target_resolution_date` date DEFAULT NULL,
     `assigned_at` timestamp NOT NULL DEFAULT current_timestamp(),
     `completed_at` timestamp NULL DEFAULT NULL
   ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci;
@@ -317,6 +338,19 @@ CREATE TABLE
     `rating` tinyint (1) NOT NULL COMMENT '1-5 rating',
     `feedback_text` text DEFAULT NULL,
     `submitted_at` timestamp NOT NULL DEFAULT current_timestamp()
+  ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+--
+-- Table structure for table `complaint_progress_updates`
+--
+CREATE TABLE
+  `complaint_progress_updates` (
+    `update_id` int (11) NOT NULL,
+    `complaint_id` int (11) NOT NULL,
+    `sent_by` int (11) NOT NULL,
+    `message` text NOT NULL,
+    `created_at` timestamp NOT NULL DEFAULT current_timestamp()
   ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -1046,6 +1080,21 @@ VALUES
 -- Indexes for dumped tables
 --
 --
+--
+-- Indexes for table `activity_logs`
+--
+ALTER TABLE `activity_logs` ADD PRIMARY KEY (`log_id`),
+ADD KEY `idx_admin` (`admin_id`),
+ADD KEY `idx_created` (`created_at`);
+
+--
+-- AUTO_INCREMENT for table `activity_logs`
+--
+ALTER TABLE `activity_logs` MODIFY `log_id` int (11) NOT NULL AUTO_INCREMENT,
+AUTO_INCREMENT = 9;
+
+COMMIT;
+
 -- Indexes for table `collaboration_notes`
 --
 ALTER TABLE `collaboration_notes` ADD PRIMARY KEY (`note_id`),
@@ -1103,6 +1152,13 @@ ADD KEY `to_staff_id` (`to_staff_id`);
 ALTER TABLE `complaint_feedback` ADD PRIMARY KEY (`feedback_id`),
 ADD KEY `complaint_id` (`complaint_id`),
 ADD KEY `student_id` (`student_id`);
+
+--
+-- Indexes for table `complaint_progress_updates`
+--
+ALTER TABLE `complaint_progress_updates` ADD PRIMARY KEY (`update_id`),
+ADD KEY `complaint_id` (`complaint_id`),
+ADD KEY `sent_by` (`sent_by`);
 
 --
 -- Indexes for table `complaint_status_logs`
@@ -1218,6 +1274,11 @@ ALTER TABLE `complaint_escalations` MODIFY `escalation_id` int (11) NOT NULL AUT
 ALTER TABLE `complaint_feedback` MODIFY `feedback_id` int (11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `complaint_progress_updates`
+--
+ALTER TABLE `complaint_progress_updates` MODIFY `update_id` int (11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `complaint_status_logs`
 --
 ALTER TABLE `complaint_status_logs` MODIFY `log_id` int (11) NOT NULL AUTO_INCREMENT;
@@ -1314,6 +1375,12 @@ ADD CONSTRAINT `complaint_escalations_ibfk_4` FOREIGN KEY (`to_staff_id`) REFERE
 --
 ALTER TABLE `complaint_feedback` ADD CONSTRAINT `complaint_feedback_ibfk_1` FOREIGN KEY (`complaint_id`) REFERENCES `complaints` (`complaint_id`) ON DELETE CASCADE ON UPDATE CASCADE,
 ADD CONSTRAINT `complaint_feedback_ibfk_2` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `complaint_progress_updates`
+--
+ALTER TABLE `complaint_progress_updates` ADD CONSTRAINT `complaint_progress_updates_ibfk_1` FOREIGN KEY (`complaint_id`) REFERENCES `complaints` (`complaint_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+ADD CONSTRAINT `complaint_progress_updates_ibfk_2` FOREIGN KEY (`sent_by`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Constraints for table `complaint_status_logs`

@@ -71,7 +71,7 @@ class Student extends User
         return $data;
     }
 
-    // Get details of a specific complaint (ownership enforced by caller)
+    // Get details of a specific complaint
     public function readStudentComplaint($complaintId)
     {
         $stmt = $this->conn->prepare(
@@ -362,6 +362,72 @@ class Student extends User
         $cnt = (int)$stmt->get_result()->fetch_assoc()['cnt'];
         $stmt->close();
         return $cnt;
+    }
+
+    // Edit a pending complaint (only allowed while status is pending)
+    public function updateComplaint($complaintId, $studentId, $title, $description, $categoryId, $subcategoryId, $isAnonymous = 0)
+    {
+        $checkStmt = $this->conn->prepare(
+            "SELECT complaint_id FROM complaints WHERE complaint_id = ? AND student_id = ? AND complaint_status = 'pending' LIMIT 1"
+        );
+        $checkStmt->bind_param("ii", $complaintId, $studentId);
+        $checkStmt->execute();
+        $exists = $checkStmt->get_result()->fetch_assoc();
+        $checkStmt->close();
+
+        if (!$exists) {
+            throw new Exception("Complaint cannot be edited. It may have already been processed.");
+        }
+
+        $anon = $isAnonymous ? 1 : 0;
+
+        if ($subcategoryId) {
+            $stmt = $this->conn->prepare(
+                "UPDATE complaints SET complaint_title = ?, complaint_description = ?, category_id = ?, subcategory_id = ?, is_anonymous = ?, updated_at = NOW()
+                 WHERE complaint_id = ? AND student_id = ?"
+            );
+            $stmt->bind_param("ssiiiii", $title, $description, $categoryId, $subcategoryId, $anon, $complaintId, $studentId);
+        } else {
+            $stmt = $this->conn->prepare(
+                "UPDATE complaints SET complaint_title = ?, complaint_description = ?, category_id = ?, subcategory_id = NULL, is_anonymous = ?, updated_at = NOW()
+                 WHERE complaint_id = ? AND student_id = ?"
+            );
+            $stmt->bind_param("ssiiii", $title, $description, $categoryId, $anon, $complaintId, $studentId);
+        }
+
+        $ok = $stmt->execute();
+        $stmt->close();
+        return $ok;
+    }
+
+    // Delete a single attachment — verifies it belongs to a pending complaint owned by this student
+    public function deleteAttachment($attachmentId, $complaintId, $studentId)
+    {
+        $stmt = $this->conn->prepare(
+            "SELECT ca.file_path FROM complaint_attachments ca
+             JOIN complaints c ON ca.complaint_id = c.complaint_id
+             WHERE ca.attachment_id = ? AND ca.complaint_id = ? AND c.student_id = ? AND c.complaint_status = 'pending'
+             LIMIT 1"
+        );
+        $stmt->bind_param("iii", $attachmentId, $complaintId, $studentId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if (!$row) {
+            return false;
+        }
+
+        if (file_exists($row['file_path'])) {
+            unlink($row['file_path']);
+        }
+
+        $del = $this->conn->prepare("DELETE FROM complaint_attachments WHERE attachment_id = ?");
+        $del->bind_param("i", $attachmentId);
+        $del->execute();
+        $del->close();
+
+        return true;
     }
 
     // Delete a pending complaint (only allowed while status is pending)

@@ -16,7 +16,8 @@ class Database
             $this->dbname
         );
         if ($this->conn->connect_error) {
-            die("Connection failed: " . $this->conn->connect_error);
+            error_log("DB connection failed: " . $this->conn->connect_error);
+            die("A database error occurred. Please try again later.");
         }
         return $this->conn;
     }

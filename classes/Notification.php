@@ -112,15 +112,20 @@ class Notification
     // Human-readable time-ago
     public static function timeAgo($datetime)
     {
-        $now  = new DateTime();
+        $now = new DateTime();
         $past = new DateTime($datetime);
         $diff = $now->diff($past);
 
-        if ($diff->y > 0) return $diff->y . 'y ago';
-        if ($diff->m > 0) return $diff->m . 'mo ago';
-        if ($diff->d > 0) return $diff->d . 'd ago';
-        if ($diff->h > 0) return $diff->h . 'h ago';
-        if ($diff->i > 0) return $diff->i . 'm ago';
+        if ($diff->y > 0)
+            return $diff->y . 'y ago';
+        if ($diff->m > 0)
+            return $diff->m . 'mo ago';
+        if ($diff->d > 0)
+            return $diff->d . 'd ago';
+        if ($diff->h > 0)
+            return $diff->h . 'h ago';
+        if ($diff->i > 0)
+            return $diff->i . 'm ago';
         return 'just now';
     }
 
@@ -128,18 +133,20 @@ class Notification
     public static function typeIcon($type)
     {
         $map = [
-            'status_change'      => 'fa-sync-alt text-info',
-            'new_assignment'     => 'fa-tasks text-primary',
-            'request_info'       => 'fa-question-circle text-warning',
-            'new_complaint'      => 'fa-file-alt text-danger',
-            'new_registration'   => 'fa-user-plus text-success',
-            'staff_approved'     => 'fa-check-circle text-success',
-            'staff_rejected'     => 'fa-times-circle text-danger',
-            'info_responded'     => 'fa-reply text-primary',
+            'status_change' => 'fa-sync-alt text-info',
+            'new_assignment' => 'fa-tasks text-primary',
+            'request_info' => 'fa-question-circle text-warning',
+            'new_complaint' => 'fa-file-alt text-danger',
+            'new_registration' => 'fa-user-plus text-success',
+            'staff_approved' => 'fa-check-circle text-success',
+            'staff_rejected' => 'fa-times-circle text-danger',
+            'info_responded' => 'fa-reply text-primary',
             'complaint_rejected' => 'fa-ban text-danger',
             'complaint_resolved' => 'fa-check-double text-success',
-            'complaint_deleted'  => 'fa-trash text-danger',
-            'complaint_reopened' => 'fa-redo text-warning',
+            'complaint_deleted' => 'fa-trash text-danger',
+            'complaint_reopened'           => 'fa-redo text-warning',
+            'complaint_delegated_resolved' => 'fa-check-double text-success',
+            'complaint_delegated'          => 'fa-level-down-alt text-info',
         ];
         return $map[$type] ?? 'fa-bell text-secondary';
     }

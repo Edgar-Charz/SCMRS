@@ -28,7 +28,7 @@ class Complaint
                 throw new Exception("Database error");
             }
 
-            $subcategoryVal = !empty($subcategory_id) ? (int)$subcategory_id : null;
+            $subcategoryVal = !empty($subcategory_id) ? (int) $subcategory_id : null;
             $insertComplaintStmt->bind_param("iiiisss", $student_id, $category_id, $subcategoryVal, $department_id, $title, $description, $is_anonymous);
             if (!$insertComplaintStmt->execute()) {
                 throw new Exception("Failed to create new complaint." . $insertComplaintStmt->error);
@@ -38,7 +38,7 @@ class Complaint
             $insertComplaintStmt->close();
 
             // Handle file attachments
-            $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+            $allowed_types = ['image/jpeg', 'image/png', 'application/pdf'];
             $max_size = 5 * 1024 * 1024;
 
             if (!empty($_FILES['attachments']['name'][0])) {
@@ -51,18 +51,25 @@ class Complaint
                     if ($_FILES['attachments']['error'][$key] !== UPLOAD_ERR_OK) {
                         continue;
                     }
-                    $file_type = $_FILES['attachments']['type'][$key];
+
+                    // Detect MIME type from actual file contents, not browser-supplied header
+                    $finfo = new finfo(FILEINFO_MIME_TYPE);
+                    $file_type = $finfo->file($tmp_name);
+
                     $file_size = $_FILES['attachments']['size'][$key];
                     if (!in_array($file_type, $allowed_types) || $file_size > $max_size) {
                         continue;
                     }
-                    $file_name   = $_FILES['attachments']['name'][$key];
+
+                    // Strip any path components from the original name
+                    $file_name = basename($_FILES['attachments']['name'][$key]);
                     $unique_name = uniqid() . '_' . time() . '_' . $file_name;
                     $target_path = $upload_dir . $unique_name;
 
                     if (move_uploaded_file($tmp_name, $target_path)) {
                         $attach_stmt = $this->conn->prepare(
-                            "INSERT INTO complaint_attachments (complaint_id, uploaded_by, file_name, file_path, file_type, file_size) VALUES (?, ?, ?, ?, ?, ?)"
+                            "INSERT INTO complaint_attachments (complaint_id, uploaded_by, file_name, file_path, file_type, file_size) 
+                                VALUES (?, ?, ?, ?, ?, ?)"
                         );
                         $attach_stmt->bind_param("issssi", $complaintId, $user_id, $file_name, $target_path, $file_type, $file_size);
                         $attach_stmt->execute();
