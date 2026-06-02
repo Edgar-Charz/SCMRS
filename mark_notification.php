@@ -9,6 +9,11 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once 'config/Database.php';
 require_once 'classes/Notification.php';
+require_once 'includes/csrf.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
+}
 
 $db = new Database();
 $conn = $db->connect();

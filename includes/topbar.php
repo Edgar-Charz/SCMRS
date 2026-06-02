@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../includes/csrf.php';
+
 $_topbarRole = $_SESSION['user_role'] ?? 'student';
 $_topbarName = htmlspecialchars($_SESSION['username'] ?? 'User');
 $_topbarAvatar = strtoupper(substr($_SESSION['username'] ?? 'U', 0, 1));
@@ -53,16 +55,20 @@ if (isset($_SESSION['user_id'])) {
                     <!-- Header -->
                     <div class="d-flex align-items-center justify-content-between px-3 py-2"
                         style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f); color:#fff;">
+
                         <span class="fw-bold" style="font-size:.9rem;">
-                            <i class="fas fa-bell me-1"></i>Notifications
+                            <i class="fas fa-bell me-1"></i>
+                            Notifications
                             <?php if ($_notifUnread > 0): ?>
                                 <span class="badge bg-danger ms-1" style="font-size:.65rem;"><?= $_notifUnread ?></span>
                             <?php endif; ?>
                         </span>
+
                         <?php if ($_notifUnread > 0): ?>
                             <button class="btn btn-sm text-white p-0 border-0"
                                 style="font-size:.75rem; opacity:.85; background:none;" onclick="markAllRead()">
-                                <i class="fas fa-check-double me-1"></i>Mark all read
+                                <i class="fas fa-check-double me-1"></i>
+                                Mark all read
                             </button>
                         <?php endif; ?>
                     </div>
@@ -74,6 +80,7 @@ if (isset($_SESSION['user_id'])) {
                                 <i class="fas fa-bell-slash fa-2x mb-2 d-block"></i>
                                 <small>No notifications yet</small>
                             </div>
+
                         <?php else: ?>
                             <?php foreach ($_notifItems as $n): ?>
                                 <div class="notif-item d-flex align-items-start gap-2 px-3 py-2 border-bottom"
@@ -114,7 +121,8 @@ if (isset($_SESSION['user_id'])) {
                     <div class="text-center py-2" style="border-top:1px solid #e9ecef;">
                         <a href="notifications.php" class="small text-decoration-none fw-semibold"
                             style="color:var(--udsm-blue);">
-                            View all notifications <i class="fas fa-arrow-right ms-1" style="font-size:.7rem;"></i>
+                            View all notifications
+                            <i class="fas fa-arrow-right ms-1" style="font-size:.7rem;"></i>
                         </a>
                     </div>
                 </div>
@@ -201,8 +209,12 @@ if (isset($_SESSION['user_id'])) {
                                 <i class="fas fa-sign-out-alt text-danger" style="font-size:.85rem;"></i>
                             </span>
                             <div>
-                                <div class="small fw-semibold text-danger">Sign Out</div>
-                                <div class="text-muted" style="font-size:.71rem;">End your current session</div>
+                                <div class="small fw-semibold text-danger">
+                                    Sign Out
+                                </div>
+                                <div class="text-muted" style="font-size:.71rem;">
+                                    End your current session
+                                </div>
                             </div>
                         </a>
                     </li>
@@ -215,11 +227,13 @@ if (isset($_SESSION['user_id'])) {
 </nav>
 
 <script>
+    var _csrfToken = <?= json_encode(csrf_token()) ?>;
+
     function markAllRead() {
         fetch('mark_notification.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'action=mark_all'
+            body: 'action=mark_all&csrf_token=' + encodeURIComponent(_csrfToken)
         }).then(function () {
             document.querySelectorAll('.notif-item').forEach(function (el) {
                 el.style.background = '#fff';
@@ -247,7 +261,7 @@ if (isset($_SESSION['user_id'])) {
                 fetch('mark_notification.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'action=mark_read&id=' + id
+                    body: 'action=mark_read&id=' + id + '&csrf_token=' + encodeURIComponent(_csrfToken)
                 }).then(function () {
                     if (link) window.location.href = link;
                 });

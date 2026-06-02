@@ -8,6 +8,7 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once "config/Database.php";
 require_once "classes/User.php";
+require_once "includes/csrf.php";
 
 $db = new Database();
 $conn = $db->connect();
@@ -15,6 +16,10 @@ $user = new User($conn);
 
 $userId = (int) $_SESSION['user_id'];
 $role = $_SESSION['user_role'];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
+}
 
 // Handle Update Username
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['updateUsernameBTN'])) {
@@ -203,6 +208,7 @@ $homeLink = match ($role) {
                     </div>
 
                     <form action="profile.php" method="POST" id="contactForm" novalidate>
+                        <?= csrf_field() ?>
                         <div class="row g-3">
                             <div class="col-12 col-md-6">
                                 <label class="form-label fw-bold small">Current Email</label>
@@ -250,6 +256,7 @@ $homeLink = match ($role) {
                 <div class="container-card shadow-sm mb-4">
                     <h4 class="mb-3 fw-bold"><i class="fas fa-user-edit me-2"></i>Change Username</h4>
                     <form action="profile.php" method="POST">
+                        <?= csrf_field() ?>
                         <div class="row">
                             <div class="col-12 col-md-6 mb-3">
                                 <label class="form-label fw-bold small">Current Username</label>
@@ -277,6 +284,7 @@ $homeLink = match ($role) {
                 <div class="container-card shadow-sm mb-4">
                     <h4 class="mb-3 fw-bold"><i class="fas fa-lock me-2"></i>Change Password</h4>
                     <form action="profile.php" method="POST">
+                        <?= csrf_field() ?>
                         <div class="row">
                             <div class="col-12 mb-3">
                                 <label class="form-label fw-bold small">
