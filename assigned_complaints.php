@@ -86,6 +86,7 @@ function formatStatusLabel($status)
         </div>
     </div>
 
+    <?php $_staffSidebarRank = (int)($staffDetails['role_rank'] ?? 0); ?>
     <div class="d-flex">
         <?php require_once 'includes/sidebar.php'; ?>
 
@@ -204,10 +205,15 @@ function formatStatusLabel($status)
                                             </td>
                                             <td class="text-center"><?= htmlspecialchars(date('Y-m-d', strtotime($complaint['created_at']))) ?></td>
                                             <td class="text-center">
-                                                <div class="d-flex justify-content-center">
-                                                    <a href="assigned_complaint_details.php?id=<?= urlencode($complaint['complaint_id']) ?>" class="btn btn-status btn-outline-secondary" title="View / Respond">
+                                                <div class="d-flex justify-content-center gap-1">
+                                                    <a href="assigned_complaint_details.php?id=<?= urlencode($complaint['complaint_id']) ?>" class="btn btn-status btn-outline-secondary" title="View Details">
                                                         <i class="fas fa-eye text-dark"></i>
                                                     </a>
+                                                    <?php if (!in_array($complaint['complaint_status'], ['resolved', 'rejected'], true)): ?>
+                                                        <a href="respond_assigned_complaint.php?id=<?= urlencode($complaint['complaint_id']) ?>" class="btn btn-status btn-outline-primary" title="Respond">
+                                                            <i class="fas fa-reply"></i>
+                                                        </a>
+                                                    <?php endif; ?>
                                                 </div>
                                             </td>
                                         </tr>

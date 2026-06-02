@@ -34,19 +34,20 @@ $complaintCounts = $isApproved ? $staff->getStaffComplaintCounts($staffDetails['
     'resolved' => 0,
     'rejected' => 0,
 ];
-$recentComplaints       = $isApproved ? $staff->getRecentAssignedComplaints($staffDetails['staff_id']) : [];
-$studentRespondedCount  = $isApproved ? $staff->getStudentRespondedCount($staffDetails['staff_id']) : 0;
+$recentComplaints = $isApproved ? $staff->getRecentAssignedComplaints($staffDetails['staff_id']) : [];
+$studentRespondedCount = $isApproved ? $staff->getStudentRespondedCount($staffDetails['staff_id']) : 0;
+$performanceStats = $isApproved ? $staff->getPerformanceStats($staffDetails['staff_id']) : [];
 
 function formatStatusBadgeClass($status)
 {
     return match (strtolower($status)) {
-        'pending'                   => 'bg-danger',
+        'pending' => 'bg-danger',
         'in_progress', 'in progress' => 'bg-warning',
-        'resolved'                  => 'bg-success',
-        'rejected'                  => 'bg-secondary',
+        'resolved' => 'bg-success',
+        'rejected' => 'bg-secondary',
         'awaiting_student_response' => 'bg-info',
-        'reopened'                  => 'bg-orange',
-        default                     => 'bg-secondary',
+        'reopened' => 'bg-orange',
+        default => 'bg-secondary',
     };
 }
 
@@ -83,6 +84,7 @@ function formatStatusLabel($status)
         </div>
     </div>
 
+    <?php $_staffSidebarRank = (int) ($staffDetails['role_rank'] ?? 0); ?>
     <div class="d-flex">
         <?php require_once 'includes/sidebar.php'; ?>
 
@@ -129,23 +131,29 @@ function formatStatusLabel($status)
                 <?php else: ?>
 
                     <?php if ($studentRespondedCount > 0): ?>
-                        <a href="assigned_complaints.php" class="text-decoration-none">
-                            <div class="alert alert-success d-flex align-items-center mb-4 shadow-sm" role="alert"
-                                style="border-left: 5px solid #16a34a; border-radius: 10px; cursor: pointer;">
-                                <i class="fas fa-reply fa-lg me-3 text-success"></i>
+                        <div id="respondedAlert" class="alert alert-success alert-dismissible d-flex align-items-center mb-4 shadow-sm" role="alert"
+                            style="border-left: 5px solid #16a34a; border-radius: 10px;">
+                            <i class="fas fa-reply fa-lg me-3 text-success flex-shrink-0"></i>
+                            <a href="assigned_complaints.php" class="text-decoration-none text-reset flex-grow-1 d-flex align-items-center"
+                                style="cursor:pointer;">
                                 <div class="flex-grow-1">
-                                    <strong><?= $studentRespondedCount ?> complaint<?= $studentRespondedCount > 1 ? 's have' : ' has' ?> a student response waiting.</strong>
-                                    <span class="ms-2 text-muted small">A student has replied to your information request &mdash; click to review &rarr;</span>
+                                    <strong><?= $studentRespondedCount ?>
+                                        complaint<?= $studentRespondedCount > 1 ? 's have' : ' has' ?> a student response
+                                        waiting.</strong>
+                                    <span class="ms-2 text-muted small">A student has replied to your information request
+                                        &mdash; click to review &rarr;</span>
                                 </div>
-                                <span class="badge bg-success fs-6"><?= $studentRespondedCount ?></span>
-                            </div>
-                        </a>
+                                <span class="badge bg-success fs-6 me-2"><?= $studentRespondedCount ?></span>
+                            </a>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
+                        </div>
                     <?php endif; ?>
 
                     <div class="row g-3 mb-4">
                         <div class="col-12 col-md-6 col-lg-3">
                             <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
-                                <div style="width:48px;height:48px;border-radius:12px;background:rgba(79,70,229,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <div
+                                    style="width:48px;height:48px;border-radius:12px;background:rgba(79,70,229,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                     <i class="fas fa-folder-open fa-lg" style="color:#4f46e5;"></i>
                                 </div>
                                 <div class="text-end">
@@ -157,7 +165,8 @@ function formatStatusLabel($status)
 
                         <div class="col-12 col-md-6 col-lg-3">
                             <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
-                                <div style="width:48px;height:48px;border-radius:12px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <div
+                                    style="width:48px;height:48px;border-radius:12px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                     <i class="fas fa-clock fa-lg" style="color:#f59e0b;"></i>
                                 </div>
                                 <div class="text-end">
@@ -169,11 +178,13 @@ function formatStatusLabel($status)
 
                         <div class="col-12 col-md-6 col-lg-3">
                             <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
-                                <div style="width:48px;height:48px;border-radius:12px;background:rgba(2,132,199,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <div
+                                    style="width:48px;height:48px;border-radius:12px;background:rgba(2,132,199,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                     <i class="fas fa-spinner fa-spin fa-lg" style="color:#0284c7;"></i>
                                 </div>
                                 <div class="text-end">
-                                    <h2 class="mb-0 fw-bold" style="color:#0284c7;"><?= $complaintCounts['in_progress'] ?></h2>
+                                    <h2 class="mb-0 fw-bold" style="color:#0284c7;"><?= $complaintCounts['in_progress'] ?>
+                                    </h2>
                                     <p class="mb-0 fw-bold small">In Progress</p>
                                 </div>
                             </div>
@@ -181,7 +192,8 @@ function formatStatusLabel($status)
 
                         <div class="col-12 col-md-6 col-lg-3">
                             <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
-                                <div style="width:48px;height:48px;border-radius:12px;background:rgba(22,163,74,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <div
+                                    style="width:48px;height:48px;border-radius:12px;background:rgba(22,163,74,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                     <i class="fas fa-check-circle fa-lg" style="color:#16a34a;"></i>
                                 </div>
                                 <div class="text-end">
@@ -191,6 +203,69 @@ function formatStatusLabel($status)
                             </div>
                         </div>
 
+                    </div>
+
+                    <!-- Performance Stats -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-12 col-md-6 col-lg-3">
+                            <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                                <div
+                                    style="width:48px;height:48px;border-radius:12px;background:rgba(13,202,240,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <i class="fas fa-clock fa-lg" style="color:#0dcaf0;"></i>
+                                </div>
+                                <div class="text-end">
+                                    <h2 class="mb-0 fw-bold" style="color:#0dcaf0;">
+                                        <?= $performanceStats['avg_resolution_days'] ?? '--' ?>
+                                    </h2>
+                                    <p class="mb-0 fw-bold small">Avg Resolution (days)</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-3">
+                            <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                                <div
+                                    style="width:48px;height:48px;border-radius:12px;background:rgba(22,163,74,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <i class="fas fa-calendar-check fa-lg" style="color:#16a34a;"></i>
+                                </div>
+                                <div class="text-end">
+                                    <h2 class="mb-0 fw-bold" style="color:#16a34a;">
+                                        <?= $performanceStats['resolved_this_month'] ?? 0 ?>
+                                    </h2>
+                                    <p class="mb-0 fw-bold small">Resolved This Month</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-3">
+                            <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                                <div
+                                    style="width:48px;height:48px;border-radius:12px;background:rgba(99,102,241,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <i class="fas fa-percent fa-lg" style="color:#6366f1;"></i>
+                                </div>
+                                <div class="text-end">
+                                    <h2 class="mb-0 fw-bold" style="color:#6366f1;">
+                                        <?= $performanceStats['resolution_rate'] ?? '--' ?>%
+                                    </h2>
+                                    <p class="mb-0 fw-bold small">Resolution Rate</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-3">
+                            <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                                <div
+                                    style="width:48px;height:48px;border-radius:12px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <i class="fas fa-star fa-lg text-warning"></i>
+                                </div>
+                                <div class="text-end">
+                                    <h2 class="mb-0 fw-bold" style="color:#f59e0b;">
+                                        <?= $performanceStats['avg_rating'] ?? '--' ?>
+                                    </h2>
+                                    <p class="mb-0 fw-bold small">Avg Rating / 5</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="row g-3 mb-4">
@@ -249,6 +324,35 @@ function formatStatusLabel($status)
 
         </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var userId = <?= (int)$_SESSION['user_id'] ?>;
+            var count  = <?= (int)$studentRespondedCount ?>;
+            var key    = 'scmrs_dismissed_responded_' + userId + '_' + count;
+            var alertEl = document.getElementById('respondedAlert');
+
+            if (!alertEl) return;
+
+            // Hide immediately if already dismissed
+            if (count > 0 && localStorage.getItem(key)) {
+                alertEl.style.display = 'none';
+            }
+
+            // Save to localStorage when Bootstrap closes the alert
+            alertEl.addEventListener('closed.bs.alert', function () {
+                localStorage.setItem(key, '1');
+            });
+
+            // Also dismiss when the link is clicked
+            var link = alertEl.querySelector('a');
+            if (link) {
+                link.addEventListener('click', function () {
+                    localStorage.setItem(key, '1');
+                });
+            }
+        });
+    </script>
 
     <script src="assets/js/jquery-3.6.0.min.js"></script>
     <script src="assets/js/bootstrap.bundle.min.js"></script>

@@ -8,6 +8,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'staff') {
 
 require_once 'config/Database.php';
 require_once 'classes/Staff.php';
+require_once 'includes/csrf.php';
 
 $db   = new Database();
 $conn = $db->connect();
@@ -40,6 +41,7 @@ if (!$complaint) {
 $message = $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
     $action = $_POST['action'] ?? '';
 
     if ($action === 'add_note') {
@@ -106,6 +108,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = $e->getMessage();
             }
         }
+
+    } elseif ($action === 'delegate') {
+        $toStaffId = trim($_POST['to_staff_id'] ?? '');
+        $reason    = trim($_POST['reason'] ?? '');
+        if (empty($toStaffId) || empty($reason)) {
+            $error = "Select a staff member and provide a reason.";
+        } else {
+            try {
+                $staff->delegateComplaint($complaintId, $staffId, $toStaffId, $userId, $reason);
+                $_SESSION['message'] = "Complaint #$complaintId has been delegated.";
+                header("Location: assigned_complaints.php");
+                exit;
+            } catch (Exception $e) {
+                $error = $e->getMessage();
+            }
+        }
+
+    } elseif ($action === 'on_hold') {
+        $holdReason = trim($_POST['hold_reason'] ?? '');
+        if (empty($holdReason)) {
+            $error = "Hold reason cannot be empty.";
+        } else {
+            try {
+                $staff->putComplaintOnHold($complaintId, $userId, $holdReason);
+                $_SESSION['message'] = "Complaint #$complaintId has been put on hold.";
+                header("Location: assigned_complaint_details.php?id=$complaintId");
+                exit;
+            } catch (Exception $e) {
+                $error = $e->getMessage();
+            }
+        }
+
+    } elseif ($action === 'resume') {
+        try {
+            $staff->resumeComplaint($complaintId, $userId);
+            $_SESSION['message'] = "Complaint #$complaintId has been resumed.";
+            header("Location: assigned_complaint_details.php?id=$complaintId");
+            exit;
+        } catch (Exception $e) {
+            $error = $e->getMessage();
+        }
+
+    } elseif ($action === 'progress_update') {
+        $updateMessage = trim($_POST['update_message'] ?? '');
+        if (empty($updateMessage)) {
+            $error = "Progress update message cannot be empty.";
+        } else {
+            try {
+                $staff->sendProgressUpdate($complaintId, $userId, $updateMessage);
+                $_SESSION['message'] = "Progress update sent to student.";
+                header("Location: assigned_complaint_details.php?id=$complaintId");
+                exit;
+            } catch (Exception $e) {
+                $error = $e->getMessage();
+            }
+        }
+
+    } elseif ($action === 'reject_assignment') {
+        $rejectionReason = trim($_POST['rejection_reason'] ?? '');
+        if (empty($rejectionReason)) {
+            $error = "Rejection reason cannot be empty.";
+        } else {
+            try {
+                $staff->rejectAssignment($complaintId, $staffId, $userId, $rejectionReason);
+                $_SESSION['message'] = "Assignment for complaint #$complaintId has been rejected. Admins have been notified.";
+                header("Location: assigned_complaints.php");
+                exit;
+            } catch (Exception $e) {
+                $error = $e->getMessage();
+            }
+        }
+
+    } elseif ($action === 'set_target_date') {
+        $targetDate = trim($_POST['target_date'] ?? '');
+        if (empty($targetDate)) {
+            $error = "Please select a target date.";
+        } else {
+            try {
+                $staff->setTargetDate($complaintId, $staffId, $targetDate);
+                $_SESSION['message'] = "Target resolution date set to " . date('d M Y', strtotime($targetDate)) . ".";
+                header("Location: assigned_complaint_details.php?id=$complaintId");
+                exit;
+            } catch (Exception $e) {
+                $error = $e->getMessage();
+            }
+        }
     }
 
     $complaint = $staff->getComplaintById($complaintId, $staffId);
@@ -130,7 +218,9 @@ $infoRequests       = $staff->getInformationRequests($complaintId);
 $statusLogs         = $staff->getComplaintStatusLogs($complaintId);
 $escalationHistory  = $staff->getEscalationHistoryForComplaint($complaintId);
 $staffForEscalation = $staff->getStaffForEscalation($staffId);
+$staffForDelegation = $staff->getStaffForDelegation($staffId);
 $feedback           = $staff->getComplaintFeedback($complaintId);
+$progressUpdates    = $staff->getProgressUpdates($complaintId);
 
 $isClosed       = in_array($complaint['complaint_status'], ['resolved', 'rejected']);
 $studentDisplay = $complaint['is_anonymous'] ? 'Anonymous Student' : htmlspecialchars($complaint['student_name'] ?? 'N/A');
@@ -145,6 +235,7 @@ function statusBadge($status)
         'resolved'                  => ['bg-success text-white', 'Resolved'],
         'rejected'                  => ['bg-danger text-white',  'Rejected'],
         'reopened'                  => ['bg-orange text-white',  'Reopened'],
+        'on_hold'                   => ['bg-secondary text-white', 'On Hold'],
     ];
     [$class, $label] = $map[$status] ?? ['bg-secondary text-white', ucwords(str_replace('_', ' ', $status))];
     return "<span class=\"badge $class\">$label</span>";
@@ -178,6 +269,7 @@ function statusBadge($status)
         </div>
     </div>
 
+    <?php $_staffSidebarRank = (int)($staffDetails['role_rank'] ?? 0); ?>
     <div class="d-flex">
         <?php require_once 'includes/sidebar.php'; ?>
 
@@ -217,7 +309,7 @@ function statusBadge($status)
                     </div>
                 <?php endif; ?>
 
-                <!-- ── Complaint Details ──────────────────────────────── -->
+                <!-- Complaint Details -->
                 <div class="container-card shadow-sm">
                     <div class="mb-3 pb-2" style="border-bottom: 2px solid #e9ecef;">
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -342,7 +434,7 @@ function statusBadge($status)
                     <?php endif; ?>
                 </div>
 
-                <!-- ── Respond / Resolve ──────────────────────────────── -->
+                <!-- Respond / Resolve -->
                 <div class="container-card shadow-sm">
                     <h4 class="mb-3 fw-bold"><i class="fas fa-reply me-2"></i>Submit Response</h4>
 
@@ -354,6 +446,7 @@ function statusBadge($status)
                         </div>
                     <?php else: ?>
                         <form method="POST" action="assigned_complaint_details.php?id=<?= $complaintId ?>">
+                            <?= csrf_field() ?>
                             <input type="hidden" name="action" value="respond">
                             <input type="hidden" name="response_action" id="responseAction" value="">
 
@@ -388,7 +481,7 @@ function statusBadge($status)
                     <?php endif; ?>
                 </div>
 
-                <!-- ── Collaboration Notes ───────────────────────────── -->
+                <!-- Collaboration Notes -->
                 <div class="container-card shadow-sm">
                     <h4 class="mb-3 fw-bold"><i class="fas fa-sticky-note me-2"></i>Collaboration Notes</h4>
 
@@ -410,6 +503,7 @@ function statusBadge($status)
                     <?php endif; ?>
 
                     <form method="POST" action="assigned_complaint_details.php?id=<?= $complaintId ?>" class="mt-3">
+                        <?= csrf_field() ?>
                         <input type="hidden" name="action" value="add_note">
                         <div class="mb-3">
                             <label class="form-label fw-bold">Add a Note</label>
@@ -424,7 +518,7 @@ function statusBadge($status)
                     </form>
                 </div>
 
-                <!-- ── Information Requests List ─────────────────────── -->
+                <!-- Information Requests List -->
                 <?php if (!empty($infoRequests)): ?>
                     <div class="container-card shadow-sm">
                         <h4 class="mb-3 fw-bold">
@@ -469,7 +563,7 @@ function statusBadge($status)
                     </div>
                 <?php endif; ?>
 
-                <!-- ── Request Information from Student ──────────────── -->
+                <!-- Request Information from Student -->
                 <?php if (!$isClosed): ?>
                     <div class="container-card shadow-sm">
                         <h4 class="mb-3 fw-bold">
@@ -484,6 +578,7 @@ function statusBadge($status)
                         <?php endif; ?>
 
                         <form method="POST" action="assigned_complaint_details.php?id=<?= $complaintId ?>">
+                            <?= csrf_field() ?>
                             <input type="hidden" name="action" value="request_info">
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Request Message</label>
@@ -500,7 +595,7 @@ function statusBadge($status)
                     </div>
                 <?php endif; ?>
 
-                <!-- ── Escalate Complaint ────────────────────────────── -->
+                <!-- Escalate Complaint -->
                 <?php if (!$isClosed && !empty($staffForEscalation)): ?>
                     <div class="container-card shadow-sm">
                         <h4 class="mb-3 fw-bold">
@@ -511,6 +606,7 @@ function statusBadge($status)
                         </p>
 
                         <form method="POST" action="assigned_complaint_details.php?id=<?= $complaintId ?>">
+                            <?= csrf_field() ?>
                             <input type="hidden" name="action" value="escalate">
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Escalate To <span class="text-danger">*</span></label>
@@ -545,16 +641,217 @@ function statusBadge($status)
                     </div>
                 <?php endif; ?>
 
-                <!-- ── Escalation History ─────────────────────────────── -->
+                <!-- Delegate Complaint -->
+                <?php if (!$isClosed && !empty($staffForDelegation)): ?>
+                    <div class="container-card shadow-sm">
+                        <h4 class="mb-3 fw-bold">
+                            <i class="fas fa-level-down-alt me-2"></i>Delegate Complaint
+                        </h4>
+                        <p class="text-muted small mb-3">
+                            Assign this complaint to a lower-ranked staff member to handle on your behalf.
+                            You will be notified when it is resolved.
+                        </p>
+
+                        <form method="POST" action="assigned_complaint_details.php?id=<?= $complaintId ?>">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="action" value="delegate">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Delegate To <span class="text-danger">*</span></label>
+                                <select name="to_staff_id" class="form-select" required>
+                                    <option value="">-- Select Staff Member --</option>
+                                    <?php foreach ($staffForDelegation as $s): ?>
+                                        <option value="<?= $s['staff_id'] ?>">
+                                            <?= htmlspecialchars($s['username']) ?>
+                                            <?php if ($s['role_name']): ?>
+                                                (<?= htmlspecialchars($s['role_name']) ?>)
+                                            <?php endif; ?>
+                                            <?php if ($s['department_name']): ?>
+                                                — <?= htmlspecialchars($s['department_name']) ?>
+                                            <?php endif; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Reason <span class="text-danger">*</span></label>
+                                <textarea name="reason" class="form-control p-3" rows="3"
+                                    style="border-radius:10px; border:1px solid #e0e6ed;"
+                                    placeholder="Explain what you need the staff member to handle..."
+                                    required></textarea>
+                            </div>
+                            <button type="button" class="btn btn-info fw-bold w-100 p-3 text-white"
+                                style="border-radius:10px;"
+                                onclick="confirmDelegate()">
+                                <i class="fas fa-level-down-alt me-1"></i>Delegate
+                            </button>
+                        </form>
+                    </div>
+                <?php endif; ?>
+
+                <!-- Target Resolution Date -->
+                <?php if (!$isClosed): ?>
+                <div class="container-card shadow-sm">
+                    <h4 class="mb-3 fw-bold"><i class="fas fa-calendar-alt me-2 text-info"></i>Target Resolution Date</h4>
+
+                    <?php if (!empty($complaint['target_resolution_date'])): ?>
+                        <p class="mb-3">
+                            <i class="fas fa-flag me-1 text-info"></i>
+                            Current target: <strong><?= date('d M Y', strtotime($complaint['target_resolution_date'])) ?></strong>
+                        </p>
+                    <?php else: ?>
+                        <p class="text-muted small mb-3">No target date set yet.</p>
+                    <?php endif; ?>
+
+                    <form method="POST" action="assigned_complaint_details.php?id=<?= $complaintId ?>">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="action" value="set_target_date">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Set Target Date</label>
+                            <input type="date" name="target_date" class="form-control"
+                                min="<?= date('Y-m-d') ?>"
+                                value="<?= htmlspecialchars($complaint['target_resolution_date'] ?? '') ?>"
+                                style="border-radius:10px; border:1px solid #e0e6ed;" required>
+                        </div>
+                        <button type="submit" class="btn btn-info fw-bold w-100 p-3 text-white"
+                            style="border-radius:10px;">
+                            <i class="fas fa-calendar-check me-1"></i>Set Target Date
+                        </button>
+                    </form>
+                </div>
+                <?php endif; ?>
+
+                <!-- Send Progress Update-->
+                <?php if (!$isClosed): ?>
+                <div class="container-card shadow-sm">
+                    <h4 class="mb-3 fw-bold"><i class="fas fa-bullhorn me-2" style="color:#0dcaf0;"></i>Send Progress Update to Student</h4>
+
+                    <?php if (!empty($progressUpdates)): ?>
+                        <?php foreach ($progressUpdates as $pu): ?>
+                            <div class="mb-2 p-3 rounded"
+                                style="background:#f0fbff; border-left:4px solid #0dcaf0;">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <strong><?= htmlspecialchars($pu['sent_by_name'] ?? 'Staff') ?></strong>
+                                    <small class="text-muted">
+                                        <?= date('d M Y, g:i A', strtotime($pu['created_at'])) ?>
+                                    </small>
+                                </div>
+                                <div><?= nl2br(htmlspecialchars($pu['message'])) ?></div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <p class="text-muted small">No progress updates sent yet.</p>
+                    <?php endif; ?>
+
+                    <form method="POST" action="assigned_complaint_details.php?id=<?= $complaintId ?>" class="mt-3">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="action" value="progress_update">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Update Message</label>
+                            <textarea name="update_message" class="form-control p-3" rows="3"
+                                style="border-radius:10px; border:1px solid #e0e6ed;"
+                                placeholder="Describe the current progress to the student..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn fw-bold w-100 p-3 text-white"
+                            style="border-radius:10px; background-color:#0dcaf0;">
+                            <i class="fas fa-paper-plane me-1"></i>Send Update
+                        </button>
+                    </form>
+                </div>
+                <?php endif; ?>
+
+                <!-- Put On Hold -->
+                <?php if (!$isClosed && $complaint['complaint_status'] !== 'on_hold'): ?>
+                <div class="container-card shadow-sm">
+                    <h4 class="mb-3 fw-bold"><i class="fas fa-pause-circle me-2 text-secondary"></i>Put Complaint On Hold</h4>
+                    <p class="text-muted small mb-3">Use this when waiting on a third party outside the system.</p>
+
+                    <form method="POST" action="assigned_complaint_details.php?id=<?= $complaintId ?>">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="action" value="on_hold">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Hold Reason <span class="text-danger">*</span></label>
+                            <textarea name="hold_reason" class="form-control p-3" rows="3"
+                                style="border-radius:10px; border:1px solid #e0e6ed;"
+                                placeholder="Explain why this complaint is being put on hold..."
+                                required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-secondary fw-bold w-100 p-3"
+                            style="border-radius:10px;">
+                            <i class="fas fa-pause me-1"></i>Put On Hold
+                        </button>
+                    </form>
+                </div>
+                <?php endif; ?>
+
+                <!-- Resume from Hold -->
+                <?php if ($complaint['complaint_status'] === 'on_hold'): ?>
+                <div class="container-card shadow-sm" style="border-left:4px solid #6c757d;">
+                    <h4 class="mb-3 fw-bold"><i class="fas fa-pause-circle me-2 text-secondary"></i>Complaint is On Hold</h4>
+
+                    <?php if (!empty($complaint['hold_reason'])): ?>
+                        <div class="p-3 rounded mb-3" style="background:#f8f9fa; border-left:4px solid #6c757d;">
+                            <strong>Hold Reason:</strong>
+                            <div class="mt-1"><?= nl2br(htmlspecialchars($complaint['hold_reason'])) ?></div>
+                        </div>
+                    <?php endif; ?>
+
+                    <form method="POST" action="assigned_complaint_details.php?id=<?= $complaintId ?>">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="action" value="resume">
+                        <button type="submit" class="btn btn-success fw-bold w-100 p-3"
+                            style="border-radius:10px;">
+                            <i class="fas fa-play me-1"></i>Resume Complaint
+                        </button>
+                    </form>
+                </div>
+                <?php endif; ?>
+
+                <!-- Reject Assignment -->
+                <?php if (!$isClosed): ?>
+                <div class="container-card shadow-sm" style="border:1px solid #f8d7da;">
+                    <h4 class="mb-3 fw-bold text-danger"><i class="fas fa-times-circle me-2"></i>Reject This Assignment</h4>
+                    <div class="alert alert-warning py-2 small mb-3">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        Use only if this complaint was incorrectly assigned to you. Admin will be notified to reassign.
+                    </div>
+
+                    <form method="POST" action="assigned_complaint_details.php?id=<?= $complaintId ?>" id="rejectAssignmentForm">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="action" value="reject_assignment">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Rejection Reason <span class="text-danger">*</span></label>
+                            <textarea name="rejection_reason" class="form-control p-3" rows="3"
+                                style="border-radius:10px; border:1px solid #e0e6ed;"
+                                placeholder="Explain why you are rejecting this assignment..."
+                                required></textarea>
+                        </div>
+                        <button type="button" class="btn btn-danger fw-bold w-100 p-3"
+                            style="border-radius:10px;"
+                            onclick="confirmRejectAssignment()">
+                            <i class="fas fa-times me-1"></i>Reject Assignment
+                        </button>
+                    </form>
+                </div>
+                <?php endif; ?>
+
+                <!-- Transfer History (Escalations & Delegations) -->
                 <?php if (!empty($escalationHistory)): ?>
                     <div class="container-card shadow-sm">
                         <h4 class="mb-3 fw-bold">
-                            <i class="fas fa-exchange-alt me-2"></i>Escalation History
+                            <i class="fas fa-exchange-alt me-2"></i>Transfer History
                         </h4>
-                        <?php foreach ($escalationHistory as $esc): ?>
-                            <div class="mb-2 p-3 rounded" style="background:#fff8e1; border-left:4px solid #ffc107;">
-                                <div class="d-flex justify-content-between mb-1">
+                        <?php foreach ($escalationHistory as $esc):
+                            $isDelegation = ($esc['type'] ?? 'escalation') === 'delegation';
+                            $borderColor  = $isDelegation ? '#0dcaf0' : '#ffc107';
+                            $bgColor      = $isDelegation ? '#e8f7fb'  : '#fff8e1';
+                            $icon         = $isDelegation ? 'fa-level-down-alt text-info' : 'fa-level-up-alt text-warning';
+                            $label        = $isDelegation ? 'Delegation' : 'Escalation';
+                            $badgeCls     = $isDelegation ? 'bg-info'    : 'bg-warning text-dark';
+                        ?>
+                            <div class="mb-2 p-3 rounded" style="background:<?= $bgColor ?>; border-left:4px solid <?= $borderColor ?>;">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
                                     <span>
+                                        <i class="fas <?= $icon ?> me-1"></i>
                                         <strong><?= htmlspecialchars($esc['from_staff_name']) ?></strong>
                                         <?php if ($esc['from_role']): ?>
                                             <small class="text-muted">(<?= htmlspecialchars($esc['from_role']) ?>)</small>
@@ -565,9 +862,12 @@ function statusBadge($status)
                                             <small class="text-muted">(<?= htmlspecialchars($esc['to_role']) ?>)</small>
                                         <?php endif; ?>
                                     </span>
-                                    <small class="text-muted">
-                                        <?= date('d M Y', strtotime($esc['escalated_at'])) ?>
-                                    </small>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge <?= $badgeCls ?>" style="font-size:0.7rem;"><?= $label ?></span>
+                                        <small class="text-muted">
+                                            <?= date('d M Y', strtotime($esc['escalated_at'])) ?>
+                                        </small>
+                                    </div>
                                 </div>
                                 <div class="small text-muted">
                                     <strong>Reason:</strong> <?= htmlspecialchars($esc['reason']) ?>
@@ -577,7 +877,7 @@ function statusBadge($status)
                     </div>
                 <?php endif; ?>
 
-                <!-- ── Student Feedback ──────────────────────────────── -->
+                <!-- Student Feedback -->
                 <?php if ($complaint['complaint_status'] === 'resolved'): ?>
                     <div class="container-card shadow-sm">
                         <h4 class="mb-3 fw-bold">
@@ -616,7 +916,7 @@ function statusBadge($status)
                     </div>
                 <?php endif; ?>
 
-                <!-- ── Complaint Timeline ─────────────────────────────── -->
+                <!-- Complaint Timeline -->
                 <div class="container-card shadow-sm">
                     <h4 class="mb-3 fw-bold">
                         <i class="fas fa-history me-2"></i>Complaint Timeline
@@ -702,7 +1002,7 @@ function statusBadge($status)
             Swal.fire({
                 icon: 'warning',
                 title: 'Escalate Complaint?',
-                text: 'This will reassign the complaint to the selected staff member.',
+                text: 'This will reassign the complaint to the selected higher-ranked staff member.',
                 showCancelButton: true,
                 confirmButtonColor: '#ffc107',
                 cancelButtonColor: '#6c757d',
@@ -711,6 +1011,40 @@ function statusBadge($status)
             }).then(function (result) {
                 if (result.isConfirmed) {
                     document.querySelector('form input[name="action"][value="escalate"]').closest('form').submit();
+                }
+            });
+        }
+
+        function confirmDelegate() {
+            Swal.fire({
+                icon: 'info',
+                title: 'Delegate Complaint?',
+                text: 'This will assign the complaint to the selected staff member. You will be notified when it is resolved.',
+                showCancelButton: true,
+                confirmButtonColor: '#0dcaf0',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, delegate',
+                cancelButtonText: 'Cancel'
+            }).then(function (result) {
+                if (result.isConfirmed) {
+                    document.querySelector('form input[name="action"][value="delegate"]').closest('form').submit();
+                }
+            });
+        }
+
+        function confirmRejectAssignment() {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Reject This Assignment?',
+                text: 'This will return the complaint to pending status. All admins will be notified to reassign it.',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, reject assignment',
+                cancelButtonText: 'Cancel'
+            }).then(function (result) {
+                if (result.isConfirmed) {
+                    document.getElementById('rejectAssignmentForm').submit();
                 }
             });
         }
