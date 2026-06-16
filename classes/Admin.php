@@ -237,28 +237,56 @@ class Admin extends User
             }
 
             $this->conn->commit();
+        } catch (Exception $e) {
+            $this->conn->rollback();
+            throw new Exception("Approval error: " . $e->getMessage());
+        }
 
+        try {
             (new Notification($this->conn))->create(
                 $userId,
                 "Your staff account has been approved. You can now access your dashboard.",
                 'staff_approved',
                 'staff_dashboard.php'
             );
-
-            return true;
-        } catch (Exception $e) {
-            $this->conn->rollback();
-            throw new Exception("Approval error: " . $e->getMessage());
+        } catch (Throwable $e) {
+            error_log('[approveStaff] Notification failed: ' . $e->getMessage());
         }
+
+        return true;
     }
 
     // Reject staff
     public function rejectStaff($userId)
     {
         try {
+            // Fetch email/name before deleting so we can notify the user
+            $uStmt = $this->conn->prepare("SELECT username, user_email FROM users WHERE user_id = ? AND user_role = 'staff' LIMIT 1");
+            $uStmt->bind_param("i", $userId);
+            $uStmt->execute();
+            $uRow = $uStmt->get_result()->fetch_assoc();
+            $uStmt->close();
+
             $stmt = $this->conn->prepare("DELETE FROM users WHERE user_id = ? AND user_role = 'staff'");
             $stmt->bind_param("i", $userId);
-            return $stmt->execute();
+            $ok = $stmt->execute();
+            $stmt->close();
+
+            if ($ok && $uRow && !empty($uRow['user_email'])) {
+                try {
+                    require_once __DIR__ . '/Mailer.php';
+                    $body = Mailer::buildBody(
+                        $uRow['username'],
+                        "Unfortunately, your staff account registration has not been approved. Please contact the administrator for more information.",
+                        null
+                    );
+                    EmailQueue::enqueue($this->conn, $uRow['user_email'], $uRow['username'], 'Your Staff Account Was Not Approved', $body);
+                } catch (Throwable $e) {
+                    error_log('[rejectStaff] Email notification failed: ' . $e->getMessage());
+                }
+            }
+
+            return $ok;
         } catch (Exception $e) {
             throw new Exception("Rejection error: " . $e->getMessage());
         }

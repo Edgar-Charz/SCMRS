@@ -458,15 +458,18 @@ class Student extends User
         $stmt->close();
 
         if ($ok) {
-            // Notify admins about deletion
-            require_once __DIR__ . '/Notification.php';
-            $reasonText = $reason ? " Reason: $reason" : '';
-            (new Notification($this->conn))->notifyAllAdmins(
-                "Complaint #$complaintId was deleted by the student.$reasonText",
-                'complaint_deleted',
-                'manage_complaints.php',
-                null
-            );
+            try {
+                require_once __DIR__ . '/Notification.php';
+                $reasonText = $reason ? " Reason: $reason" : '';
+                (new Notification($this->conn))->notifyAllAdmins(
+                    "Complaint #$complaintId was deleted by the student.$reasonText",
+                    'complaint_deleted',
+                    'manage_complaints.php',
+                    $complaintId
+                );
+            } catch (Throwable $e) {
+                error_log('[deleteComplaint] Notification failed: ' . $e->getMessage());
+            }
         }
 
         return $ok;

@@ -32,12 +32,19 @@ class Notification
 
     public function create($userId, $message, $type, $link = null, $complaintId = null)
     {
-        // In-app notification (unchanged)
-        $stmt = $this->conn->prepare(
-            "INSERT INTO notifications (user_id, complaint_id, message, type, link)
-             VALUES (?, ?, ?, ?, ?)"
-        );
-        $stmt->bind_param("iisss", $userId, $complaintId, $message, $type, $link);
+        if ($complaintId !== null) {
+            $stmt = $this->conn->prepare(
+                "INSERT INTO notifications (user_id, complaint_id, message, type, link)
+                 VALUES (?, ?, ?, ?, ?)"
+            );
+            $stmt->bind_param("iisss", $userId, $complaintId, $message, $type, $link);
+        } else {
+            $stmt = $this->conn->prepare(
+                "INSERT INTO notifications (user_id, message, type, link)
+                 VALUES (?, ?, ?, ?)"
+            );
+            $stmt->bind_param("isss", $userId, $message, $type, $link);
+        }
         $stmt->execute();
         $stmt->close();
 

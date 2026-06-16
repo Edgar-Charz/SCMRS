@@ -104,32 +104,6 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                     </ol>
                 </nav>
 
-                <!-- Alert -->
-                <div aria-live="polite" aria-atomic="true"
-                    class="position-fixed top-0 start-50 translate-middle-x p-3 w-100"
-                    style="z-index: 1100; max-width: 800px;">
-                    <?php if (!empty($message) || !empty($error)):
-                        $type = !empty($message) ? 'success' : 'danger';
-                        $text = !empty($message) ? $message : $error;
-                        $icon = ($type === 'success') ? 'fa-check-circle' : 'fa-exclamation-circle';
-                        ?>
-                        <div id="livetoast"
-                            class="toast show align-items-center text-white bg-<?php echo $type ?> border-0 w-100"
-                            role="alert" aria-live="assertive" aria-atomic="true">
-                            <div class="d-flex">
-                                <div class="toast-body">
-                                    <i class="fas <?php echo $icon; ?> me-2"></i>
-                                    <?php echo htmlspecialchars($text); ?>
-                                </div>
-                                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
-                                    aria-label="Close">
-
-                                </button>
-                            </div>
-                        </div>
-                    <?php endif; ?>
-                </div>
-                <!-- / Alert -->
 
 
                 <!-- <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 6px solid var(--warning); padding: var(--spacing-lg); border-radius: var(--radius-lg); margin-bottom: var(--spacing-xl);">

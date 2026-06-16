@@ -33,6 +33,7 @@ if (isset($_POST["registerStudentBTN"])) {
                 'new_registration',
                 'user_management.php#students'
             );
+            $_SESSION['message'] = "Account created successfully. You can now log in.";
             header("Location: login.php");
             exit;
         }
@@ -59,6 +60,7 @@ if (isset($_POST["registerStaffBTN"])) {
                 'new_registration',
                 'user_management.php#approval'
             );
+            $_SESSION['message'] = "Registration submitted. An admin will review and approve your account before you can log in.";
             header("Location: login.php");
             exit;
         }
