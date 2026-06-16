@@ -1,5 +1,5 @@
-﻿<?php
-session_start();
+<?php
+require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'student') {
     header("Location: login.php");
@@ -20,7 +20,7 @@ $message = $error = "";
 
 $studentId = $student->getStudentId($userId);
 
-// Handle Delete (POST only — safer than GET)
+// Handle Delete 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_complaint') {
     $comp_id = (int) ($_POST['complaint_id'] ?? 0);
     $reason = trim($_POST['delete_reason'] ?? '');
@@ -149,7 +149,7 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                             </li>
                             <li class="nav-item" role="presentation">
                                 <a href="track_complaints.php?filter=awaiting_student_response"
-                                    class="nav-link <?php echo $filter === 'awaiting_student_response' ? 'active' : ''; ?>"
+                                    class="nav-link <?php echo $filter === STATUS_AWAITING_RESPONSE ? 'active' : ''; ?>"
                                     style="<?php echo $action_needed_count > 0 ? 'border-bottom: 2px solid var(--warning);' : ''; ?>">
                                     <i class="fas fa-user-check"></i> Awaiting your response
                                     <span
@@ -158,28 +158,28 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                             </li>
                             <li class="nav-item" role="presentation">
                                 <a href="track_complaints.php?filter=pending"
-                                    class="nav-link <?php echo $filter === 'pending' ? 'active' : ''; ?>">
+                                    class="nav-link <?php echo $filter === STATUS_PENDING ? 'active' : ''; ?>">
                                     <i class="fas fa-clock"></i> Pending
                                     <span class="badge btn-primary me-2"><?php echo $counts['pending']; ?></span>
                                 </a>
                             </li>
                             <li class="nav-item" role="presentation">
                                 <a href="track_complaints.php?filter=in_progress"
-                                    class="nav-link <?php echo $filter === 'in_progress' ? 'active' : ''; ?>">
+                                    class="nav-link <?php echo $filter === STATUS_IN_PROGRESS ? 'active' : ''; ?>">
                                     <i class="fas fa-spinner"></i> In Progress
                                     <span class="badge btn-primary me-2"><?php echo $counts['in_progress']; ?></span>
                                 </a>
                             </li>
                             <li class="nav-item" role="presentation">
                                 <a href="track_complaints.php?filter=resolved"
-                                    class="nav-link <?php echo $filter === 'resolved' ? 'active' : ''; ?>">
+                                    class="nav-link <?php echo $filter === STATUS_RESOLVED ? 'active' : ''; ?>">
                                     <i class="fas fa-check-circle"></i> Resolved
                                     <span class="badge btn-primary me-2"><?php echo $counts['resolved']; ?></span>
                                 </a>
                             </li>
                             <li class="nav-item" role="presentation">
                                 <a href="track_complaints.php?filter=rejected"
-                                    class="nav-link <?php echo $filter === 'rejected' ? 'active' : ''; ?>">
+                                    class="nav-link <?php echo $filter === STATUS_REJECTED ? 'active' : ''; ?>">
                                     <i class="fas fa-times-circle"></i> Rejected
                                     <span class="badge btn-primary me-2"><?php echo $counts['rejected']; ?></span>
                                 </a>
@@ -200,13 +200,13 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                                 <span
                                     class="badge <?php echo strtolower(str_replace('_', '-', $complaint_row['complaint_status'])); ?>">
                                     <i class="fas <?php
-                                    if ($complaint_row['complaint_status'] === 'pending')
+                                    if ($complaint_row['complaint_status'] === STATUS_PENDING)
                                         echo 'fa-clock';
-                                    elseif ($complaint_row['complaint_status'] === 'in_progress')
+                                    elseif ($complaint_row['complaint_status'] === STATUS_IN_PROGRESS)
                                         echo 'fa-spinner';
-                                    elseif ($complaint_row['complaint_status'] === 'awaiting_student_response')
+                                    elseif ($complaint_row['complaint_status'] === STATUS_AWAITING_RESPONSE)
                                         echo 'fa-user-check';
-                                    elseif ($complaint_row['complaint_status'] === 'resolved')
+                                    elseif ($complaint_row['complaint_status'] === STATUS_RESOLVED)
                                         echo 'fa-check-circle';
                                     else
                                         echo 'fa-times-circle';
@@ -259,13 +259,13 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                                     class="btn btn-primary">
                                     <i class="fas fa-eye"></i> View
                                 </a>
-                                <?php if ($complaint_row['complaint_status'] === 'pending'): ?>
+                                <?php if ($complaint_row['complaint_status'] === STATUS_PENDING): ?>
                                     <a href="edit_student_complaint.php?id=<?php echo $complaint_row['complaint_id']; ?>"
                                         class="btn btn-warning text-dark fw-bold">
                                         <i class="fas fa-edit"></i> Edit
                                     </a>
                                 <?php endif; ?>
-                                <?php if ($complaint_row['complaint_status'] === 'pending' && empty($complaint_row['pending_requests'])): ?>
+                                <?php if ($complaint_row['complaint_status'] === STATUS_PENDING && empty($complaint_row['pending_requests'])): ?>
                                     <button type="button" class="btn btn-danger"
                                         onclick="confirmDelete(<?php echo $complaint_row['complaint_id']; ?>)">
                                         <i class="fas fa-trash"></i> Delete
@@ -284,7 +284,7 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                                 You haven't submitted any complaints yet. Start by creating your first complaint!
                             <?php else: ?>
                                 You don't have any
-                                <?php echo $filter === 'awaiting_student_response' ? 'complaints awaiting your response' : ucfirst(str_replace('_', ' ', $filter)); ?>
+                                <?php echo $filter === STATUS_AWAITING_RESPONSE ? 'complaints awaiting your response' : ucfirst(str_replace('_', ' ', $filter)); ?>
                                 complaints at the moment.
                             <?php endif; ?>
                         </p>

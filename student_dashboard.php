@@ -1,5 +1,5 @@
-﻿<?php
-session_start();
+<?php
+require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'student') {
     header("Location: login.php");
@@ -190,12 +190,12 @@ if (isset($_SESSION['message'])) {
                                             <td>
                                                 <?php
                                                 $statusMap = [
-                                                    'pending'                   => ['bg-warning text-dark', 'Pending'],
-                                                    'in_progress'               => ['bg-info text-white',    'In Progress'],
-                                                    'awaiting_student_response' => ['bg-primary text-white', 'Awaiting Response'],
-                                                    'resolved'                  => ['bg-success text-white', 'Resolved'],
-                                                    'rejected'                  => ['bg-danger text-white',  'Rejected'],
-                                                    'reopened'                  => ['bg-orange text-white',  'Reopened'],
+                                                    STATUS_PENDING => ['bg-warning text-dark', 'Pending'],
+                                                    STATUS_IN_PROGRESS => ['bg-info text-white',    'In Progress'],
+                                                    STATUS_AWAITING_RESPONSE => ['bg-primary text-white', 'Awaiting Response'],
+                                                    STATUS_RESOLVED => ['bg-success text-white', 'Resolved'],
+                                                    STATUS_REJECTED => ['bg-danger text-white',  'Rejected'],
+                                                    STATUS_REOPENED => ['bg-orange text-white',  'Reopened'],
                                                 ];
                                                 [$sCls, $sLabel] = $statusMap[$complaint_row['complaint_status']] ?? ['bg-secondary text-white', ucfirst(str_replace('_', ' ', $complaint_row['complaint_status']))];
                                                 ?>

@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'student') {
     header("Location: login.php");
@@ -29,7 +29,7 @@ if ($complaintId <= 0) {
 
 // Load complaint — verify ownership and pending status
 $complaint = $student->readStudentComplaint($complaintId);
-if (!$complaint || (int)$complaint['student_id'] !== (int)$studentId || $complaint['complaint_status'] !== 'pending') {
+if (!$complaint || (int)$complaint['student_id'] !== (int)$studentId || $complaint['complaint_status'] !== STATUS_PENDING) {
     $_SESSION['message_error'] = "Complaint not found or cannot be edited.";
     header("Location: track_complaints.php");
     exit;
@@ -49,6 +49,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (empty($title) || empty($description) || $categoryId <= 0) {
         $error = "Title, category, and description are required.";
+    } elseif (mb_strlen($title) < 10) {
+        $error = "Complaint title must be at least 10 characters.";
+    } elseif (mb_strlen($title) > 200) {
+        $error = "Complaint title must not exceed 200 characters.";
+    } elseif (mb_strlen($description) < 30) {
+        $error = "Description must be at least 30 characters.";
+    } elseif (mb_strlen($description) > 5000) {
+        $error = "Description must not exceed 5,000 characters.";
     } else {
         try {
             // Update core complaint fields
@@ -189,8 +197,8 @@ $categories  = $category->getCategories();
                                     style="border-radius:10px;border:1px solid #e0e6ed;"
                                     placeholder="e.g. Issue with hostel facilities"
                                     value="<?= htmlspecialchars($complaint['complaint_title']) ?>"
-                                    maxlength="200" required>
-                                <div class="char-count"><span id="titleCount">0</span>/200 characters</div>
+                                    minlength="10" maxlength="200" required>
+                                <div class="char-count"><span id="titleCount">0</span>/200 characters (min 10)</div>
                             </div>
 
                             <div class="col-12 col-md-6 mb-3">
@@ -232,9 +240,11 @@ $categories  = $category->getCategories();
                         <h4 class="mb-3 fw-bold"><i class="fas fa-align-left me-2"></i>Complaint Description</h4>
 
                         <label class="form-label fw-bold">Description <span class="text-danger">*</span></label>
-                        <textarea name="description" class="form-control p-3 shadow-sm" rows="10"
+                        <textarea name="description" id="description" class="form-control p-3 shadow-sm" rows="10"
                             style="border-radius:8px;border:1px solid #e0e6ed;"
-                            placeholder="Please describe your complaint in detail..." required><?= htmlspecialchars($complaint['complaint_description']) ?></textarea>
+                            placeholder="Please describe your complaint in detail..."
+                            minlength="30" maxlength="5000" required><?= htmlspecialchars($complaint['complaint_description']) ?></textarea>
+                        <div class="char-count"><span id="descCount">0</span>/5000 characters (min 30)</div>
                         <small class="form-hint">
                             <i class="fas fa-info-circle"></i> Provide a detailed description. The more information you give, the better we can help.
                         </small>
@@ -337,15 +347,16 @@ $categories  = $category->getCategories();
     <script src="assets/js/script.js"></script>
 
     <script>
-        // Title character counter
-        const titleInput = document.getElementById('title');
-        const titleCount = document.getElementById('titleCount');
-        if (titleInput && titleCount) {
-            titleCount.textContent = titleInput.value.length;
-            titleInput.addEventListener('input', function () {
-                titleCount.textContent = this.value.length;
-            });
+        // Character counters
+        function wireCounter(inputId, countId) {
+            var el = document.getElementById(inputId);
+            var counter = document.getElementById(countId);
+            if (!el || !counter) return;
+            counter.textContent = el.value.length;
+            el.addEventListener('input', function() { counter.textContent = this.value.length; });
         }
+        wireCounter('title', 'titleCount');
+        wireCounter('description', 'descCount');
 
         // Delete checkbox warning banner
         const deleteWarning = document.getElementById('deleteWarning');

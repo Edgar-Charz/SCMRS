@@ -1,5 +1,5 @@
-﻿<?php
-session_start();
+<?php
+require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'student') {
     header("Location: login.php");
@@ -36,7 +36,7 @@ if (!$complaint_details || (int)$complaint_details['student_id'] !== (int)$stude
 
 $message = $error = "";
 
-// ── Handle: edit complaint ───────────────────────────────────────────────
+// Edit complaint 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit_complaint') {
     $editTitle    = trim($_POST['edit_title'] ?? '');
     $editDesc     = trim($_POST['edit_description'] ?? '');
@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// ── Handle: reopen complaint ─────────────────────────────────────────────
+// Reopen complaint 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'reopen_complaint') {
     try {
         $notif      = new Notification($conn);
@@ -98,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// ── Handle: submit feedback ──────────────────────────────────────────────
+// Submit feedback
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'submit_feedback') {
     $rating       = (int)($_POST['rating'] ?? 0);
     $feedbackText = trim($_POST['feedback_text'] ?? '');
@@ -135,7 +135,7 @@ $all_categories       = $category->getCategories();
 
 $has_pending_request = false;
 foreach ($complaint_info_req as $req) {
-    if ($req['status'] === 'pending') {
+    if ($req['status'] === STATUS_PENDING) {
         $has_pending_request = true;
         break;
     }
@@ -144,12 +144,12 @@ foreach ($complaint_info_req as $req) {
 function statusBadge($status): string
 {
     $map = [
-        'pending'                   => ['bg-warning text-dark', 'Pending'],
-        'in_progress'               => ['bg-info text-white',   'In Progress'],
-        'awaiting_student_response' => ['bg-primary text-white','Awaiting Your Response'],
-        'resolved'                  => ['bg-success text-white','Resolved'],
-        'rejected'                  => ['bg-danger text-white', 'Rejected'],
-        'reopened'                  => ['bg-warning text-dark', 'Reopened'],
+        STATUS_PENDING => ['bg-warning text-dark', 'Pending'],
+        STATUS_IN_PROGRESS => ['bg-info text-white',   'In Progress'],
+        STATUS_AWAITING_RESPONSE => ['bg-primary text-white','Awaiting Your Response'],
+        STATUS_RESOLVED => ['bg-success text-white','Resolved'],
+        STATUS_REJECTED => ['bg-danger text-white', 'Rejected'],
+        STATUS_REOPENED => ['bg-warning text-dark', 'Reopened'],
     ];
     [$cls, $label] = $map[$status] ?? ['bg-secondary text-white', ucfirst(str_replace('_', ' ', $status))];
     return "<span class=\"badge $cls\">$label</span>";
@@ -239,7 +239,7 @@ function statusBadge($status): string
                     <?php endif; ?>
                 </nav>
 
-                <!-- ── Complaint Details ──────────────────────────── -->
+                <!-- Complaint Details  -->
                 <div class="container-card shadow-sm mb-4">
                     <div class="mb-3 pb-2" style="border-bottom:2px solid #e9ecef;">
                         <div class="d-flex justify-content-between align-items-center">
@@ -349,8 +349,8 @@ function statusBadge($status): string
                     <?php endif; ?>
                 </div>
 
-                <!-- ── Edit Complaint (pending only) ────────────── -->
-                <?php if ($complaint_details['complaint_status'] === 'pending'): ?>
+                <!-- Edit Complaint (pending only) -->
+                <?php if ($complaint_details['complaint_status'] === STATUS_PENDING): ?>
                 <div class="container-card shadow-sm mb-4" style="border-left:4px solid #4f46e5;">
                     <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                         <div>
@@ -370,7 +370,7 @@ function statusBadge($status): string
                 </div>
                 <?php endif; ?>
 
-                <!-- ── Information Requests ──────────────────────── -->
+                <!-- Information Requests -->
                 <?php if (!empty($complaint_info_req)): ?>
                     <div class="container-card shadow-sm mb-4" id="info-requests">
                         <h5 class="fw-bold mb-3">
@@ -379,10 +379,10 @@ function statusBadge($status): string
 
                         <?php foreach ($complaint_info_req as $req): ?>
                             <div class="mb-3 p-3 rounded"
-                                style="background:#fafafa;border-left:4px solid <?= $req['status'] === 'pending' ? '#f59e0b' : '#22c55e' ?>;">
+                                style="background:#fafafa;border-left:4px solid <?= $req['status'] === STATUS_PENDING ? '#f59e0b' : '#22c55e' ?>;">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
                                     <strong><?= htmlspecialchars($req['username']) ?> asked:</strong>
-                                    <span class="badge <?= $req['status'] === 'pending' ? 'bg-warning text-dark' : 'bg-success' ?>">
+                                    <span class="badge <?= $req['status'] === STATUS_PENDING ? 'bg-warning text-dark' : 'bg-success' ?>">
                                         <?= ucfirst($req['status']) ?>
                                     </span>
                                 </div>
@@ -393,7 +393,7 @@ function statusBadge($status): string
                                         <strong>Your response:</strong>
                                         <div class="mt-1 text-muted"><?= nl2br(htmlspecialchars($req['student_response'])) ?></div>
                                     </div>
-                                <?php elseif ($req['status'] === 'pending'): ?>
+                                <?php elseif ($req['status'] === STATUS_PENDING): ?>
                                     <form method="POST"
                                         action="student_complaint_details.php?id=<?= $complaintId ?>#info-requests">
                                         <input type="hidden" name="action" value="respond_info_request">
@@ -419,8 +419,8 @@ function statusBadge($status): string
                     </div>
                 <?php endif; ?>
 
-                <!-- ── Feedback ──────────────────────────────────── -->
-                <?php if ($complaint_details['complaint_status'] === 'resolved'): ?>
+                <!-- Feedback -->
+                <?php if ($complaint_details['complaint_status'] === STATUS_RESOLVED): ?>
                     <div class="container-card shadow-sm mb-4">
                         <h5 class="fw-bold mb-3">
                             <i class="fas fa-star me-2"></i>Rate This Resolution
@@ -472,9 +472,9 @@ function statusBadge($status): string
                     </div>
                 <?php endif; ?>
 
-                <!-- ── Reopen Complaint ─────────────────────────── -->
+                <!-- Reopen Complaint -->
                 <?php
-                $canReopen = $complaint_details['complaint_status'] === 'resolved'
+                $canReopen = $complaint_details['complaint_status'] === STATUS_RESOLVED
                     && (new DateTime())->diff(new DateTime($complaint_details['updated_at']))->days <= 7;
                 ?>
                 <?php if ($canReopen): ?>
@@ -499,7 +499,7 @@ function statusBadge($status): string
                 </div>
                 <?php endif; ?>
 
-                <!-- ── Complaint Timeline ────────────────────────── -->
+                <!-- Complaint Timeline -->
                 <?php if (!empty($complaint_history)): ?>
                     <div class="container-card shadow-sm mb-4">
                         <h5 class="fw-bold mb-3">
