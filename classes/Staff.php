@@ -127,7 +127,8 @@ class Staff
     {
         $sql = "SELECT complaints.complaint_id, complaints.complaint_title, complaints.complaint_status, complaints.created_at,
                        complaints.is_anonymous, users.username AS student_name,
-                       students.student_registration_number, complaint_categories.category_name
+                       students.student_registration_number, complaint_categories.category_name,
+                       ca.target_resolution_date
                 FROM complaints
                 JOIN complaint_assignments ca ON complaints.complaint_id = ca.complaint_id AND ca.staff_id = ? AND ca.status = 'active'
                 JOIN students ON complaints.student_id = students.student_id

@@ -1530,9 +1530,10 @@ class Admin extends User
         );
 
         $stmt = $this->conn->prepare(
-            "SELECT ca.complaint_id, c.complaint_title
+            "SELECT ca.complaint_id, c.complaint_title, s.staff_user_id
              FROM complaint_assignments ca
              JOIN complaints c ON ca.complaint_id = c.complaint_id
+             JOIN staffs s ON ca.staff_id = s.staff_id
              WHERE ca.status = 'active'
                AND ca.target_resolution_date IS NOT NULL
                AND ca.target_resolution_date < NOW()
@@ -1548,13 +1549,22 @@ class Admin extends User
         $notif = new Notification($this->conn);
 
         foreach ($rows as $row) {
-            $cid   = (int) $row['complaint_id'];
-            $title = $row['complaint_title'];
+            $cid         = (int) $row['complaint_id'];
+            $title       = $row['complaint_title'];
+            $staffUserId = (int) $row['staff_user_id'];
 
             $notif->notifyAllAdmins(
                 "Complaint #$cid \"{$title}\" has passed its resolution deadline.",
                 'complaint_overdue',
                 "complaint_details.php?id=$cid",
+                $cid
+            );
+
+            $notif->create(
+                $staffUserId,
+                "Complaint #$cid \"{$title}\" has passed its resolution deadline. Please take action or escalate.",
+                'complaint_overdue',
+                "assigned_complaint_details.php?id=$cid",
                 $cid
             );
 

@@ -8,6 +8,7 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'staff') 
 
 require_once 'config/Database.php';
 require_once 'classes/Staff.php';
+require_once 'classes/Admin.php';
 
 $db = new Database();
 $conn = $db->connect();
@@ -33,6 +34,12 @@ $complaintCounts = $isApproved ? $staff->getStaffComplaintCounts($staffDetails['
     STATUS_REJECTED => 0,
 ];
 $assignedComplaints = $isApproved ? $staff->getAssignedComplaints($staffDetails['staff_id']) : [];
+
+if ($isApproved) {
+    (new Admin($conn))->notifyOverdueComplaints();
+}
+
+$now = new DateTime();
 
 function formatStatusBadgeClass($status)
 {
@@ -187,13 +194,19 @@ function formatStatusLabel($status)
                                     <th class="text-center">CATEGORY</th>
                                     <th class="text-center">STATUS</th>
                                     <th class="text-center">DATE</th>
+                                    <th class="text-center">DEADLINE</th>
                                     <th class="text-center">ACTIONS</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php if (!empty($assignedComplaints)): ?>
                                     <?php foreach ($assignedComplaints as $index => $complaint): ?>
-                                        <tr>
+                                        <?php
+                                            $deadline   = !empty($complaint['target_resolution_date']) ? new DateTime($complaint['target_resolution_date']) : null;
+                                            $isOpen     = !in_array($complaint['complaint_status'], [STATUS_RESOLVED, STATUS_REJECTED, 'deleted'], true);
+                                            $isOverdue  = $deadline && $isOpen && $deadline < $now;
+                                        ?>
+                                        <tr <?= $isOverdue ? 'class="table-danger"' : '' ?>>
                                             <td>#<?= htmlspecialchars($complaint['complaint_id']) ?></td>
                                             <td class="text-center"><?= htmlspecialchars($complaint['complaint_title']) ?></td>
                                             <td class="text-center"><?= $complaint['is_anonymous'] ? '<em class="text-muted">Anonymous</em>' : htmlspecialchars($complaint['student_name'] ?? 'N/A') ?></td>
@@ -205,11 +218,23 @@ function formatStatusLabel($status)
                                             </td>
                                             <td class="text-center"><?= htmlspecialchars(date('Y-m-d', strtotime($complaint['created_at']))) ?></td>
                                             <td class="text-center">
+                                                <?php if ($deadline): ?>
+                                                    <?php if ($isOverdue): ?>
+                                                        <span class="badge bg-danger">Overdue</span><br>
+                                                        <small class="text-danger fw-semibold"><?= $deadline->format('d M Y') ?></small>
+                                                    <?php else: ?>
+                                                        <small class="text-muted"><?= $deadline->format('d M Y') ?></small>
+                                                    <?php endif; ?>
+                                                <?php else: ?>
+                                                    <small class="text-muted">—</small>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-center">
                                                 <div class="d-flex justify-content-center gap-1">
                                                     <a href="assigned_complaint_details.php?id=<?= urlencode($complaint['complaint_id']) ?>" class="btn btn-status btn-outline-secondary" title="View Details">
                                                         <i class="fas fa-eye text-dark"></i>
                                                     </a>
-                                                    <?php if (!in_array($complaint['complaint_status'], [STATUS_RESOLVED, STATUS_REJECTED], true)): ?>
+                                                    <?php if ($isOpen): ?>
                                                         <a href="respond_assigned_complaint.php?id=<?= urlencode($complaint['complaint_id']) ?>" class="btn btn-status btn-outline-primary" title="Respond">
                                                             <i class="fas fa-reply"></i>
                                                         </a>
@@ -220,7 +245,7 @@ function formatStatusLabel($status)
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="7" class="text-center">No assigned complaints found.</td>
+                                        <td colspan="8" class="text-center">No assigned complaints found.</td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>
