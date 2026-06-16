@@ -65,6 +65,12 @@
                     <span class="link-text">Audit Log</span>
                 </a>
             </li>
+            <li>
+                <a href="email_queue.php">
+                    <i class="fas fa-envelope-open-text me-2"></i>
+                    <span class="link-text">Email Queue</span>
+                </a>
+            </li>
 
         <?php elseif ($sidebarRole === 'staff'): ?>
             <?php $_staffSidebarRank = $_staffSidebarRank ?? 0; ?>

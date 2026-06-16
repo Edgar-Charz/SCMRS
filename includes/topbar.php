@@ -41,12 +41,10 @@ if (isset($_SESSION['user_id'])) {
                     data-bs-toggle="dropdown" aria-expanded="false"
                     style="background: rgba(255,255,255,0.12); border-radius: 50%; width:38px; height:38px; display:flex; align-items:center; justify-content:center;">
                     <i class="fas fa-bell" style="font-size:1rem;"></i>
-                    <?php if ($_notifUnread > 0): ?>
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                            style="font-size:0.6rem; min-width:18px; padding:3px 5px;">
-                            <?= $_notifUnread > 99 ? '99+' : $_notifUnread ?>
-                        </span>
-                    <?php endif; ?>
+                    <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger<?= $_notifUnread > 0 ? '' : ' d-none' ?>"
+                        style="font-size:0.6rem; min-width:18px; padding:3px 5px;">
+                        <?= $_notifUnread > 99 ? '99+' : max(0, $_notifUnread) ?>
+                    </span>
                 </button>
 
                 <div class="dropdown-menu dropdown-menu-end shadow-lg border-0 p-0" aria-labelledby="notifDropdown"
@@ -268,4 +266,24 @@ if (isset($_SESSION['user_id'])) {
             });
         });
     });
+
+    // Poll for unread count every 60 s and update the bell badge without a page reload
+    (function () {
+        function updateBadge(count) {
+            var badge = document.getElementById('notifBadge');
+            if (!badge) return;
+            if (count > 0) {
+                badge.textContent = count > 99 ? '99+' : count;
+                badge.classList.remove('d-none');
+            } else {
+                badge.classList.add('d-none');
+            }
+        }
+        setInterval(function () {
+            fetch('ajax/notification_count.php')
+                .then(function (r) { return r.json(); })
+                .then(function (d) { updateBadge(d.count || 0); })
+                .catch(function () {});
+        }, 60000);
+    })();
 </script>
