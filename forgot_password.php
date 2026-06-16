@@ -1,8 +1,9 @@
-<?php
-session_start();
+﻿<?php
+require_once 'config/session.php';
 
 require_once "config/Database.php";
 require_once "classes/User.php";
+require_once "classes/Mailer.php";
 require_once "includes/csrf.php";
 
 $db = new Database();
@@ -23,19 +24,26 @@ if (isset($_POST['submitBtn'])) {
         $token = $user->createPasswordResetToken($email);
 
         if ($token) {
-            $resetLink = "http://" . $_SERVER['HTTP_HOST'] . "/scmrs/reset_password.php?token=" . $token;
+            $cfg       = require 'config/email.php';
+            $scheme    = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $resetLink = "{$scheme}://{$_SERVER['SERVER_NAME']}/scmrs/reset_password.php?token=" . urlencode($token);
 
-            $to = $email;
-            $subject = "UDSM SCMRS - Password Reset Request";
-            $body = "Hello,\n\n"
-                . "You requested a password reset for your UDSM Complaints System account.\n\n"
-                . "Click the link below to reset your password (valid for 1 hour):\n"
-                . $resetLink . "\n\n"
-                . "If you did not request this, please ignore this email.\n\n"
-                . "UDSM Student Complaints Management System";
-            $headers = "From: noreply@udsm.ac.tz\r\nX-Mailer: PHP/" . phpversion();
+            $message_body = "You requested a password reset for your UDSM SCMRS account. "
+                . "Click the button below to set a new password. This link is valid for 1 hour. "
+                . "If you did not request this, you can safely ignore this email.";
 
-            mail($to, $subject, $body, $headers);
+            $htmlBody = Mailer::buildBody(
+                'SCMRS User',
+                $message_body,
+                "reset_password.php?token=" . urlencode($token),
+                'Reset My Password'
+            );
+
+            try {
+                Mailer::send($email, '', "UDSM SCMRS — Password Reset Request", $htmlBody);
+            } catch (Throwable $e) {
+                error_log('[ForgotPassword] Mail error: ' . $e->getMessage());
+            }
         }
 
         // Always show success to avoid user enumeration

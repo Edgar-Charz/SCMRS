@@ -1,15 +1,15 @@
-<?php
-session_start();
+﻿<?php
+require_once 'config/session.php';
 
 require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "includes/csrf.php";
 
-$db   = new Database();
+$db = new Database();
 $conn = $db->connect();
 $user = new User($conn);
 
-$token   = trim($_GET['token'] ?? '');
+$token = trim($_GET['token'] ?? '');
 $message = $error = "";
 $validToken = false;
 
@@ -28,7 +28,7 @@ if (empty($token)) {
 // Handle password reset submission
 if ($validToken && isset($_POST['resetBtn'])) {
     csrf_verify();
-    $password        = $_POST['password'] ?? '';
+    $password = $_POST['password'] ?? '';
     $confirmPassword = $_POST['confirm_password'] ?? '';
 
     if (empty($password) || empty($confirmPassword)) {
@@ -71,44 +71,110 @@ if ($validToken && isset($_POST['resetBtn'])) {
     <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="assets/css/auth-style.css">
     <style>
-        body { background-color: #001a52; position: relative; }
+        body {
+            background-color: #001a52;
+            position: relative;
+        }
 
         .slide-bg {
-            position: fixed; inset: 0;
-            background-size: cover; background-position: center;
-            opacity: 0; z-index: 0;
+            position: fixed;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+            z-index: 0;
             animation: campusSlide 25s infinite;
         }
-        .slide-bg:nth-child(1) { background-image: url('assets/img/campus1.jpg'); animation-delay:  0s; }
-        .slide-bg:nth-child(2) { background-image: url('assets/img/campus2.jpg'); animation-delay:  5s; }
-        .slide-bg:nth-child(3) { background-image: url('assets/img/campus3.jpg'); animation-delay: 10s; }
-        .slide-bg:nth-child(4) { background-image: url('assets/img/campus4.jpg'); animation-delay: 15s; }
-        .slide-bg:nth-child(5) { background-image: url('assets/img/campus5.jpg'); animation-delay: 20s; }
+
+        .slide-bg:nth-child(1) {
+            background-image: url('assets/img/campus1.jpg');
+            animation-delay: 0s;
+        }
+
+        .slide-bg:nth-child(2) {
+            background-image: url('assets/img/campus2.jpg');
+            animation-delay: 5s;
+        }
+
+        .slide-bg:nth-child(3) {
+            background-image: url('assets/img/campus3.jpg');
+            animation-delay: 10s;
+        }
+
+        .slide-bg:nth-child(4) {
+            background-image: url('assets/img/campus4.jpg');
+            animation-delay: 15s;
+        }
+
+        .slide-bg:nth-child(5) {
+            background-image: url('assets/img/campus5.jpg');
+            animation-delay: 20s;
+        }
 
         @keyframes campusSlide {
-            0%   { opacity: 0; }  7%  { opacity: 1; }
-            27%  { opacity: 1; }  33% { opacity: 0; }  100% { opacity: 0; }
+            0% {
+                opacity: 0;
+            }
+
+            7% {
+                opacity: 1;
+            }
+
+            27% {
+                opacity: 1;
+            }
+
+            33% {
+                opacity: 0;
+            }
+
+            100% {
+                opacity: 0;
+            }
         }
 
         body::before {
-            content: ''; position: fixed; inset: 0; z-index: 1;
-            background: linear-gradient(160deg, rgba(0,10,40,.82) 0%, rgba(0,35,100,.72) 50%, rgba(0,60,100,.68) 100%);
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            background: linear-gradient(160deg, rgba(0, 10, 40, .82) 0%, rgba(0, 35, 100, .72) 50%, rgba(0, 60, 100, .68) 100%);
             pointer-events: none;
         }
-        body::after { content: none; }
 
-        .auth-wrap { display: flex; flex-direction: column; align-items: center; position: relative; z-index: 2; width: 100%; max-width: 375px; }
+        body::after {
+            content: none;
+        }
+
+        .auth-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 375px;
+        }
 
         .brand-logo {
-            width: 86px; height: 86px;
-            border: 3px solid rgba(253,216,53,0.9);
-            box-shadow: 0 0 0 5px rgba(253,216,53,0.12), 0 8px 28px rgba(0,0,0,0.5);
+            width: 86px;
+            height: 86px;
+            border: 3px solid rgba(253, 216, 53, 0.9);
+            box-shadow: 0 0 0 5px rgba(253, 216, 53, 0.12), 0 8px 28px rgba(0, 0, 0, 0.5);
             margin-bottom: -30px;
-            position: relative; z-index: 3;
+            position: relative;
+            z-index: 3;
             background: #fff;
         }
 
-        .auth-card { position: relative; z-index: 2; background: #fff; box-shadow: 0 24px 64px rgba(0,0,0,.35), 0 4px 16px rgba(0,0,0,.2); padding-top: 48px; }
+        .auth-card {
+            position: relative;
+            z-index: 2;
+            background: #fff;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, .35), 0 4px 16px rgba(0, 0, 0, .2);
+            padding-top: 48px;
+        }
+
     </style>
 </head>
 
@@ -129,64 +195,65 @@ if ($validToken && isset($_POST['resetBtn'])) {
     <div class="slide-bg"></div>
 
     <div class="auth-wrap">
-    <img src="assets/img/logo.png" alt="UDSM Logo" class="rounded-circle brand-logo">
-    <div class="auth-card text-center">
-        <h4 class="fw-bold mb-1">Reset Password</h4>
-        <p class="text-muted small mb-4">Enter and confirm your new password.</p>
+        <img src="assets/img/logo.png" alt="UDSM Logo" class="rounded-circle brand-logo">
+        <div class="auth-card text-center">
+            <h4 class="fw-bold mb-1">Reset Password</h4>
+            <p class="text-muted small mb-4">Enter and confirm your new password.</p>
 
-        <?php if (!empty($error)): ?>
-            <div class="alert alert-danger text-start mb-3" id="errorAlert">
-                <span style="display:flex; align-items:center; gap:0.5rem; font-size:15px;">
-                    <i class="fas fa-exclamation-circle"></i>
-                    <?= htmlspecialchars($error) ?>
-                    <button onclick="document.getElementById('errorAlert').style.display='none'"
-                        style="background:none;border:none;color:inherit;cursor:pointer;opacity:0.7;transition:opacity 0.2s;margin-left:auto;"
-                        onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </span>
-            </div>
-        <?php endif; ?>
-
-        <?php if ($validToken): ?>
-        <form action="" method="POST" onsubmit="showLoader()">
-            <?= csrf_field() ?>
-            <input type="hidden" name="token" value="<?= htmlspecialchars($token) ?>">
-
-            <div class="mb-3 text-start">
-                <label class="form-label small fw-bold">New Password</label>
-                <div class="pwd-wrap">
-                    <input type="password" id="resetPwd" name="password" class="form-control"
-                        placeholder="Min. 8 chars, uppercase, number, symbol" required>
-                    <button type="button" class="pwd-eye" onclick="togglePwd('resetPwd',this)" tabindex="-1">
-                        <i class="fas fa-eye-slash"></i>
-                    </button>
+            <?php if (!empty($error)): ?>
+                <div class="alert alert-danger text-start mb-3" id="errorAlert">
+                    <span style="display:flex; align-items:center; gap:0.5rem; font-size:15px;">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <?= htmlspecialchars($error) ?>
+                        <button onclick="document.getElementById('errorAlert').style.display='none'"
+                            style="background:none;border:none;color:inherit;cursor:pointer;opacity:0.7;transition:opacity 0.2s;margin-left:auto;"
+                            onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </span>
                 </div>
-            </div>
-            <div class="mb-4 text-start">
-                <label class="form-label small fw-bold">Confirm New Password</label>
-                <div class="pwd-wrap">
-                    <input type="password" id="resetCpwd" name="confirm_password" class="form-control"
-                        placeholder="Repeat your new password" required>
-                    <button type="button" class="pwd-eye" onclick="togglePwd('resetCpwd',this)" tabindex="-1">
-                        <i class="fas fa-eye-slash"></i>
-                    </button>
-                </div>
-            </div>
-            <button type="submit" name="resetBtn" class="btn btn-primary w-100 mb-3">
-                Reset Password <i class="fas fa-lock ms-1"></i>
-            </button>
-        </form>
-        <?php else: ?>
-        <a href="forgot_password.php" class="btn btn-primary w-100 mb-3">
-            Request New Reset Link <i class="fas fa-arrow-right ms-1"></i>
-        </a>
-        <?php endif; ?>
+            <?php endif; ?>
 
-        <p class="small mb-0">
-            <a href="login.php" class="fw-bold text-decoration-none" style="color: var(--udsm-blue);">Back to Login</a>
-        </p>
-    </div><!-- /.auth-card -->
+            <?php if ($validToken): ?>
+                <form action="" method="POST" onsubmit="showLoader()">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="token" value="<?= htmlspecialchars($token) ?>">
+
+                    <div class="mb-3 text-start">
+                        <label class="form-label small fw-bold">New Password</label>
+                        <div class="pwd-wrap">
+                            <input type="password" id="resetPwd" name="password" class="form-control"
+                                placeholder="Min. 8 chars, uppercase, number, symbol" required>
+                            <button type="button" class="pwd-eye" onclick="togglePwd('resetPwd',this)" tabindex="-1">
+                                <i class="fas fa-eye-slash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-4 text-start">
+                        <label class="form-label small fw-bold">Confirm New Password</label>
+                        <div class="pwd-wrap">
+                            <input type="password" id="resetCpwd" name="confirm_password" class="form-control"
+                                placeholder="Repeat your new password" required>
+                            <button type="button" class="pwd-eye" onclick="togglePwd('resetCpwd',this)" tabindex="-1">
+                                <i class="fas fa-eye-slash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" name="resetBtn" class="btn btn-primary w-100 mb-3">
+                        Reset Password <i class="fas fa-lock ms-1"></i>
+                    </button>
+                </form>
+            <?php else: ?>
+                <a href="forgot_password.php" class="btn btn-primary w-100 mb-3">
+                    Request New Reset Link <i class="fas fa-arrow-right ms-1"></i>
+                </a>
+            <?php endif; ?>
+
+            <p class="small mb-0">
+                <a href="login.php" class="fw-bold text-decoration-none" style="color: var(--udsm-blue);">Back to
+                    Login</a>
+            </p>
+        </div><!-- /.auth-card -->
     </div><!-- /.auth-wrap -->
 
     <script src="assets/js/auth-script.js"></script>

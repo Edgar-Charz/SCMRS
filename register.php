@@ -1,5 +1,5 @@
-<?php
-session_start();
+﻿<?php
+require_once 'config/session.php';
 require_once "includes/csrf.php";
 require_once "config/Database.php";
 require_once "classes/User.php";
@@ -69,6 +69,10 @@ if (isset($_POST["registerStaffBTN"])) {
 
 $colleges = $college->getColleges();
 $departments = $department->getDepartments();
+
+// Which form was submitted? Used to sticky-fill non-password fields on error.
+$studentPost = isset($_POST['registerStudentBTN']);
+$staffPost   = isset($_POST['registerStaffBTN']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -677,7 +681,8 @@ $departments = $department->getDepartments();
                             <div class="field-wrap">
                                 <i class="fas fa-user field-icon"></i>
                                 <input type="text" id="s_name" class="form-control icon-input" name="student_name"
-                                    placeholder="Enter your full name" oninput="capitalizeWords(this)" required>
+                                    placeholder="Enter your full name" oninput="this.value=this.value.replace(/[0-9]/g,''); capitalizeWords(this)"
+                                    value="<?= $studentPost ? htmlspecialchars($_POST['student_name'] ?? '') : '' ?>" required>
                                 <div class="invalid-feedback"></div>
                             </div>
                         </div>
@@ -689,7 +694,7 @@ $departments = $department->getDepartments();
                                     placeholder="202X-04-XXXXX" pattern="^202[0-9]-04-[0-9]{5}$"
                                     title="Use format 202X-04-XXXXX" maxlength="13" minlength="13"
                                     oninput="this.value=this.value.toUpperCase().replace(/[^0-9-]/g,'').slice(0,13)"
-                                    required>
+                                    value="<?= $studentPost ? htmlspecialchars($_POST['reg_no'] ?? '') : '' ?>" required>
                                 <div class="invalid-feedback"></div>
                             </div>
                         </div>
@@ -698,7 +703,8 @@ $departments = $department->getDepartments();
                             <div class="field-wrap">
                                 <i class="fas fa-envelope field-icon"></i>
                                 <input type="email" id="s_email" class="form-control icon-input" name="student_email"
-                                    placeholder="email@udsm.ac.tz" required>
+                                    placeholder="email@udsm.ac.tz"
+                                    value="<?= $studentPost ? htmlspecialchars($_POST['student_email'] ?? '') : '' ?>" required>
                                 <div class="invalid-feedback"></div>
                             </div>
                         </div>
@@ -709,7 +715,8 @@ $departments = $department->getDepartments();
                                 <input type="text" id="s_phone" class="form-control icon-input" name="phone_number"
                                     placeholder="0XXXXXXXXX" inputmode="numeric" pattern="^0[0-9]{9}$"
                                     title="Enter 10 digits starting with 0" maxlength="10" minlength="10"
-                                    oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)" required>
+                                    oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)"
+                                    value="<?= $studentPost ? htmlspecialchars($_POST['phone_number'] ?? '') : '' ?>" required>
                                 <div class="invalid-feedback"></div>
                             </div>
                         </div>
@@ -800,7 +807,8 @@ $departments = $department->getDepartments();
                             <div class="field-wrap">
                                 <i class="fas fa-user field-icon"></i>
                                 <input type="text" id="st_name" class="form-control icon-input" name="staff_name"
-                                    placeholder="Enter your full name" oninput="capitalizeWords(this)" required>
+                                    placeholder="Enter your full name" oninput="this.value=this.value.replace(/[0-9]/g,''); capitalizeWords(this)"
+                                    value="<?= $staffPost ? htmlspecialchars($_POST['staff_name'] ?? '') : '' ?>" required>
                                 <div class="invalid-feedback"></div>
                             </div>
                         </div>
@@ -812,7 +820,7 @@ $departments = $department->getDepartments();
                                     placeholder="UDSM-STAFF-XXXXX" pattern="^UDSM-STAFF-[0-9]{5}$"
                                     title="Use format UDSM-STAFF-XXXXX" maxlength="16" minlength="16"
                                     oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,16)"
-                                    required>
+                                    value="<?= $staffPost ? htmlspecialchars($_POST['staff_id'] ?? '') : '' ?>" required>
                                 <div class="invalid-feedback"></div>
                             </div>
                         </div>
@@ -821,7 +829,8 @@ $departments = $department->getDepartments();
                             <div class="field-wrap">
                                 <i class="fas fa-envelope field-icon"></i>
                                 <input type="email" id="st_email" class="form-control icon-input" name="staff_email"
-                                    placeholder="staff@udsm.ac.tz" required>
+                                    placeholder="staff@udsm.ac.tz"
+                                    value="<?= $staffPost ? htmlspecialchars($_POST['staff_email'] ?? '') : '' ?>" required>
                                 <div class="invalid-feedback"></div>
                             </div>
                         </div>
@@ -832,7 +841,8 @@ $departments = $department->getDepartments();
                                 <input type="text" id="st_phone" class="form-control icon-input" name="phone_number"
                                     placeholder="0XXXXXXXXX" inputmode="numeric" pattern="^0[0-9]{9}$"
                                     title="Enter 10 digits starting with 0" maxlength="10" minlength="10"
-                                    oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)" required>
+                                    oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)"
+                                    value="<?= $staffPost ? htmlspecialchars($_POST['phone_number'] ?? '') : '' ?>" required>
                                 <div class="invalid-feedback"></div>
                             </div>
                         </div>
@@ -845,7 +855,8 @@ $departments = $department->getDepartments();
                                 <select class="form-select icon-input" name="staff_department">
                                     <option value="">-- Select Department --</option>
                                     <?php while ($dept = $departments->fetch_assoc()): ?>
-                                        <option value="<?= $dept['department_id'] ?>">
+                                        <option value="<?= $dept['department_id'] ?>"
+                                            <?= ($staffPost && ($_POST['staff_department'] ?? '') == $dept['department_id']) ? 'selected' : '' ?>>
                                             <?= htmlspecialchars($dept['department_name']) ?>
                                         </option>
                                     <?php endwhile; ?>
@@ -921,6 +932,109 @@ $departments = $department->getDepartments();
     </script>
     <script src="assets/plugins/toastr/toastr.min.js"></script>
     <script src="assets/plugins/toastr/toastr.js"></script>
+    <script>
+    // Inline blur-based field validation for both registration forms
+    (function () {
+        function fieldError(input, msg) {
+            input.classList.add('is-invalid');
+            var fb = input.parentElement.querySelector('.invalid-feedback');
+            if (fb) fb.textContent = msg;
+        }
+        function fieldOk(input) {
+            input.classList.remove('is-invalid');
+            var fb = input.parentElement.querySelector('.invalid-feedback');
+            if (fb) fb.textContent = '';
+        }
+        function validEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+        function validPhone(v) { return /^0[0-9]{9}$/.test(v); }
+        function validPwd(v)   {
+            return v.length >= 8 && /[A-Z]/.test(v) && /[a-z]/.test(v) && /[0-9]/.test(v) && /\W/.test(v);
+        }
+
+        function wireText(id, check) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('blur',  function() { check(this); });
+            el.addEventListener('input', function() { if (this.classList.contains('is-invalid')) check(this); });
+        }
+        function wireConfirmPwd(pwdId, cpwdId) {
+            var pwd  = document.getElementById(pwdId);
+            var cpwd = document.getElementById(cpwdId);
+            if (!pwd || !cpwd) return;
+            cpwd.addEventListener('blur', function() {
+                if (!this.value) fieldError(this, 'Please confirm your password.');
+                else if (this.value !== pwd.value) fieldError(this, 'Passwords do not match.');
+                else fieldOk(this);
+            });
+            // re-check confirm when primary password changes
+            pwd.addEventListener('input', function() {
+                if (cpwd.classList.contains('is-invalid') && cpwd.value === this.value) fieldOk(cpwd);
+            });
+        }
+
+        // ── Student form ──────────────────────────────────────────────────────
+        wireText('s_name', function(el) {
+            var v = el.value.trim();
+            if (!v) fieldError(el, 'Full name is required.');
+            else    fieldOk(el);
+        });
+        wireText('s_reg_no', function(el) {
+            var v = el.value.trim();
+            if (!v)                                          fieldError(el, 'Registration number is required.');
+            else if (!/^202[0-9]-04-[0-9]{5}$/.test(v))    fieldError(el, 'Use format 202X-04-XXXXX (e.g. 2024-04-12345).');
+            else                                             fieldOk(el);
+        });
+        wireText('s_email', function(el) {
+            var v = el.value.trim();
+            if (!v)             fieldError(el, 'Email address is required.');
+            else if (!validEmail(v)) fieldError(el, 'Enter a valid email address.');
+            else                fieldOk(el);
+        });
+        wireText('s_phone', function(el) {
+            var v = el.value.trim();
+            if (!v)              fieldError(el, 'Phone number is required.');
+            else if (!validPhone(v)) fieldError(el, 'Enter 10 digits starting with 0 (e.g. 0712345678).');
+            else                 fieldOk(el);
+        });
+        wireText('s_pwd', function(el) {
+            if (!el.value)          fieldError(el, 'Password is required.');
+            else if (!validPwd(el.value)) fieldError(el, 'Must be 8+ chars with uppercase, lowercase, number & symbol.');
+            else                    fieldOk(el);
+        });
+        wireConfirmPwd('s_pwd', 's_cpwd');
+
+        // ── Staff form ────────────────────────────────────────────────────────
+        wireText('st_name', function(el) {
+            var v = el.value.trim();
+            if (!v) fieldError(el, 'Full name is required.');
+            else    fieldOk(el);
+        });
+        wireText('st_staff_id', function(el) {
+            var v = el.value.trim();
+            if (!v)                                       fieldError(el, 'Staff ID is required.');
+            else if (!/^UDSM-STAFF-[0-9]{5}$/.test(v))  fieldError(el, 'Use format UDSM-STAFF-XXXXX.');
+            else                                          fieldOk(el);
+        });
+        wireText('st_email', function(el) {
+            var v = el.value.trim();
+            if (!v)              fieldError(el, 'Email address is required.');
+            else if (!validEmail(v)) fieldError(el, 'Enter a valid email address.');
+            else                 fieldOk(el);
+        });
+        wireText('st_phone', function(el) {
+            var v = el.value.trim();
+            if (!v)              fieldError(el, 'Phone number is required.');
+            else if (!validPhone(v)) fieldError(el, 'Enter 10 digits starting with 0.');
+            else                 fieldOk(el);
+        });
+        wireText('st_pwd', function(el) {
+            if (!el.value)           fieldError(el, 'Password is required.');
+            else if (!validPwd(el.value)) fieldError(el, 'Must be 8+ chars with uppercase, lowercase, number & symbol.');
+            else                     fieldOk(el);
+        });
+        wireConfirmPwd('st_pwd', 'st_cpwd');
+    })();
+    </script>
 </body>
 
 </html>

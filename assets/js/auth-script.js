@@ -306,4 +306,10 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("st_pwd"),
     document.getElementById("st_cpwd"),
   );
+
+  // Reset password form
+  watchPasswordPair(
+    document.getElementById("resetPwd"),
+    document.getElementById("resetCpwd"),
+  );
 });

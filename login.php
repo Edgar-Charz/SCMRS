@@ -1,5 +1,5 @@
-<?php
-session_start();
+﻿<?php
+require_once 'config/session.php';
 
 require_once "config/Database.php";
 require_once "classes/User.php";
@@ -26,14 +26,21 @@ if (isset($_POST["loginBTN"])) {
     $password = $_POST['password'] ?? '';
 
     // Validate user credentials
+    $clientIp = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+
     if (empty($email) || empty($password)) {
         $error = "All fields are required";
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = "Invalid email format";
+    } elseif ($user->isIpRateLimited($clientIp)) {
+        $error = "Too many failed login attempts from your IP. Please try again in 15 minutes.";
     } else {
         $result = $user->userLogin($email, $password);
 
         if ($result['status'] === true) {
+
+            // Issue a fresh session ID to prevent session fixation attacks
+            session_regenerate_id(true);
 
             // Session
             $_SESSION['user_id'] = $result['user_id'];
@@ -60,6 +67,7 @@ if (isset($_POST["loginBTN"])) {
                     break;
             }
         } else {
+            $user->recordFailedIpAttempt($clientIp);
             $error = $result['message'];
         }
     }
