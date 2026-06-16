@@ -1,5 +1,5 @@
-﻿<?php
-session_start();
+<?php
+require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'staff') {
     header('Location: login.php');
@@ -27,26 +27,26 @@ $departmentName = $staffDetails['department_name'] ?? 'Unassigned';
 $staffEmail = $staffDetails['user_email'] ?? '';
 $complaintCounts = $isApproved ? $staff->getStaffComplaintCounts($staffDetails['staff_id']) : [
     'total' => 0,
-    'pending' => 0,
-    'in_progress' => 0,
-    'resolved' => 0,
-    'rejected' => 0,
+    STATUS_PENDING => 0,
+    STATUS_IN_PROGRESS => 0,
+    STATUS_RESOLVED => 0,
+    STATUS_REJECTED => 0,
 ];
 $assignedComplaints = $isApproved ? $staff->getAssignedComplaints($staffDetails['staff_id']) : [];
 
 function formatStatusBadgeClass($status)
 {
     switch (strtolower($status)) {
-        case 'pending':
+        case STATUS_PENDING:
             return 'bg-danger';
-        case 'in_progress':
+        case STATUS_IN_PROGRESS:
         case 'in progress':
             return 'bg-warning';
-        case 'resolved':
+        case STATUS_RESOLVED:
             return 'bg-success';
-        case 'rejected':
+        case STATUS_REJECTED:
             return 'bg-secondary';
-        case 'awaiting_student_response':
+        case STATUS_AWAITING_RESPONSE:
             return 'bg-info';
         default:
             return 'bg-secondary';
@@ -209,7 +209,7 @@ function formatStatusLabel($status)
                                                     <a href="assigned_complaint_details.php?id=<?= urlencode($complaint['complaint_id']) ?>" class="btn btn-status btn-outline-secondary" title="View Details">
                                                         <i class="fas fa-eye text-dark"></i>
                                                     </a>
-                                                    <?php if (!in_array($complaint['complaint_status'], ['resolved', 'rejected'], true)): ?>
+                                                    <?php if (!in_array($complaint['complaint_status'], [STATUS_RESOLVED, STATUS_REJECTED], true)): ?>
                                                         <a href="respond_assigned_complaint.php?id=<?= urlencode($complaint['complaint_id']) ?>" class="btn btn-status btn-outline-primary" title="Respond">
                                                             <i class="fas fa-reply"></i>
                                                         </a>

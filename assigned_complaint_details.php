@@ -1,5 +1,5 @@
-﻿<?php
-session_start();
+<?php
+require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'staff') {
     header("Location: login.php");
@@ -222,19 +222,19 @@ $staffForDelegation = $staff->getStaffForDelegation($staffId);
 $feedback           = $staff->getComplaintFeedback($complaintId);
 $progressUpdates    = $staff->getProgressUpdates($complaintId);
 
-$isClosed       = in_array($complaint['complaint_status'], ['resolved', 'rejected']);
+$isClosed       = in_array($complaint['complaint_status'], [STATUS_RESOLVED, STATUS_REJECTED]);
 $studentDisplay = $complaint['is_anonymous'] ? 'Anonymous Student' : htmlspecialchars($complaint['student_name'] ?? 'N/A');
 $studentUserId  = (int) ($complaint['student_user_id'] ?? 0);
 
 function statusBadge($status)
 {
     $map = [
-        'pending'                   => ['bg-warning text-dark',  'Pending'],
-        'in_progress'               => ['bg-info text-white',    'In Progress'],
-        'awaiting_student_response' => ['bg-primary text-white', 'Awaiting Response'],
-        'resolved'                  => ['bg-success text-white', 'Resolved'],
-        'rejected'                  => ['bg-danger text-white',  'Rejected'],
-        'reopened'                  => ['bg-orange text-white',  'Reopened'],
+        STATUS_PENDING => ['bg-warning text-dark',  'Pending'],
+        STATUS_IN_PROGRESS => ['bg-info text-white',    'In Progress'],
+        STATUS_AWAITING_RESPONSE => ['bg-primary text-white', 'Awaiting Response'],
+        STATUS_RESOLVED => ['bg-success text-white', 'Resolved'],
+        STATUS_REJECTED => ['bg-danger text-white',  'Rejected'],
+        STATUS_REOPENED => ['bg-orange text-white',  'Reopened'],
         'on_hold'                   => ['bg-secondary text-white', 'On Hold'],
     ];
     [$class, $label] = $map[$status] ?? ['bg-secondary text-white', ucwords(str_replace('_', ' ', $status))];
@@ -442,7 +442,7 @@ function statusBadge($status)
                         <div class="alert alert-info mb-0">
                             <i class="fas fa-info-circle me-2"></i>
                             This complaint is already
-                            <strong><?= $complaint['complaint_status'] === 'resolved' ? 'Resolved' : 'Rejected' ?></strong>.
+                            <strong><?= $complaint['complaint_status'] === STATUS_RESOLVED ? 'Resolved' : 'Rejected' ?></strong>.
                         </div>
                     <?php else: ?>
                         <form method="POST" action="assigned_complaint_details.php?id=<?= $complaintId ?>">
@@ -570,7 +570,7 @@ function statusBadge($status)
                             <i class="fas fa-question-circle me-2"></i>Request Information from Student
                         </h4>
 
-                        <?php if ($complaint['complaint_status'] === 'awaiting_student_response'): ?>
+                        <?php if ($complaint['complaint_status'] === STATUS_AWAITING_RESPONSE): ?>
                             <div class="alert alert-warning mb-3">
                                 <i class="fas fa-hourglass-half me-2"></i>
                                 Waiting for student response to a previous request.
@@ -691,7 +691,7 @@ function statusBadge($status)
                 <!-- Target Resolution Date -->
                 <?php if (!$isClosed): ?>
                 <div class="container-card shadow-sm">
-                    <h4 class="mb-3 fw-bold"><i class="fas fa-calendar-alt me-2 text-info"></i>Target Resolution Date</h4>
+                    <h4 class="mb-3 fw-bold"><i class="fas fa-calendar-alt me-2"></i>Target Resolution Date</h4>
 
                     <?php if (!empty($complaint['target_resolution_date'])): ?>
                         <p class="mb-3">
@@ -723,7 +723,7 @@ function statusBadge($status)
                 <!-- Send Progress Update-->
                 <?php if (!$isClosed): ?>
                 <div class="container-card shadow-sm">
-                    <h4 class="mb-3 fw-bold"><i class="fas fa-bullhorn me-2" style="color:#0dcaf0;"></i>Send Progress Update to Student</h4>
+                    <h4 class="mb-3 fw-bold"><i class="fas fa-bullhorn me-2"></i>Send Progress Update to Student</h4>
 
                     <?php if (!empty($progressUpdates)): ?>
                         <?php foreach ($progressUpdates as $pu): ?>
@@ -878,7 +878,7 @@ function statusBadge($status)
                 <?php endif; ?>
 
                 <!-- Student Feedback -->
-                <?php if ($complaint['complaint_status'] === 'resolved'): ?>
+                <?php if ($complaint['complaint_status'] === STATUS_RESOLVED): ?>
                     <div class="container-card shadow-sm">
                         <h4 class="mb-3 fw-bold">
                             <i class="fas fa-star me-2 text-warning"></i>Student Feedback

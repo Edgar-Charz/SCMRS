@@ -1,5 +1,5 @@
-﻿<?php
-session_start();
+<?php
+require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'staff') {
     header('Location: login.php');
@@ -29,10 +29,10 @@ $staffEmail = $staffDetails['user_email'] ?? '';
 
 $complaintCounts = $isApproved ? $staff->getStaffComplaintCounts($staffDetails['staff_id']) : [
     'total' => 0,
-    'pending' => 0,
-    'in_progress' => 0,
-    'resolved' => 0,
-    'rejected' => 0,
+    STATUS_PENDING => 0,
+    STATUS_IN_PROGRESS => 0,
+    STATUS_RESOLVED => 0,
+    STATUS_REJECTED => 0,
 ];
 $recentComplaints = $isApproved ? $staff->getRecentAssignedComplaints($staffDetails['staff_id']) : [];
 $studentRespondedCount = $isApproved ? $staff->getStudentRespondedCount($staffDetails['staff_id']) : 0;
@@ -41,12 +41,12 @@ $performanceStats = $isApproved ? $staff->getPerformanceStats($staffDetails['sta
 function formatStatusBadgeClass($status)
 {
     return match (strtolower($status)) {
-        'pending' => 'bg-danger',
+        STATUS_PENDING => 'bg-danger',
         'in_progress', 'in progress' => 'bg-warning',
-        'resolved' => 'bg-success',
-        'rejected' => 'bg-secondary',
-        'awaiting_student_response' => 'bg-info',
-        'reopened' => 'bg-orange',
+        STATUS_RESOLVED => 'bg-success',
+        STATUS_REJECTED => 'bg-secondary',
+        STATUS_AWAITING_RESPONSE => 'bg-info',
+        STATUS_REOPENED => 'bg-orange',
         default => 'bg-secondary',
     };
 }
@@ -109,7 +109,7 @@ function formatStatusLabel($status)
                     <p class="mb-0 opacity-75">Manage your assigned complaints.</p>
                 </div>
 
-                <?php if (!$isApproved): ?>
+                <!-- <?php if (!$isApproved): ?>
                     <div class="row g-3 mb-4">
                         <div class="col-12">
                             <div class="container-card shadow-sm p-4 text-center">
@@ -147,7 +147,7 @@ function formatStatusLabel($status)
                             </a>
                             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
                         </div>
-                    <?php endif; ?>
+                    <?php endif; ?> -->
 
                     <div class="row g-3 mb-4">
                         <div class="col-12 col-md-6 col-lg-3">

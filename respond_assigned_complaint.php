@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'staff') {
     header('Location: login.php');
@@ -36,7 +36,7 @@ if (!$complaint) {
     exit;
 }
 
-if (in_array($complaint['complaint_status'], ['resolved', 'rejected'], true)) {
+if (in_array($complaint['complaint_status'], [STATUS_RESOLVED, STATUS_REJECTED], true)) {
     $_SESSION['message_error'] = "Complaint #$complaintId is already closed and cannot be modified.";
     header('Location: assigned_complaints.php');
     exit;
@@ -74,12 +74,12 @@ $studentName = $complaint['is_anonymous']
 function statusBadge(string $status): string
 {
     $map = [
-        'pending'                   => ['bg-warning text-dark',  'Pending'],
-        'in_progress'               => ['bg-info text-white',    'In Progress'],
-        'awaiting_student_response' => ['bg-primary text-white', 'Awaiting Response'],
-        'resolved'                  => ['bg-success text-white', 'Resolved'],
-        'rejected'                  => ['bg-danger text-white',  'Rejected'],
-        'reopened'                  => ['bg-warning text-dark',  'Reopened'],
+        STATUS_PENDING => ['bg-warning text-dark',  'Pending'],
+        STATUS_IN_PROGRESS => ['bg-info text-white',    'In Progress'],
+        STATUS_AWAITING_RESPONSE => ['bg-primary text-white', 'Awaiting Response'],
+        STATUS_RESOLVED => ['bg-success text-white', 'Resolved'],
+        STATUS_REJECTED => ['bg-danger text-white',  'Rejected'],
+        STATUS_REOPENED => ['bg-warning text-dark',  'Reopened'],
     ];
     [$class, $label] = $map[$status] ?? ['bg-secondary text-white', ucfirst(str_replace('_', ' ', $status))];
     return "<span class=\"badge $class\">$label</span>";
