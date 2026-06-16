@@ -1,5 +1,5 @@
-<?php
-session_start();
+﻿<?php
+require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
     header("Location: login.php");
@@ -52,7 +52,18 @@ $actionMeta = [
     'password_reset' => ['label' => 'Password Reset', 'class' => 'bg-secondary'],
     'staff_approved' => ['label' => 'Staff Approved', 'class' => 'bg-success'],
     'staff_rejected' => ['label' => 'Staff Rejected', 'class' => 'bg-danger'],
-    'staff_demoted' => ['label' => 'Staff Demoted', 'class' => 'bg-warning text-dark'],
+    'staff_demoted'        => ['label' => 'Staff Demoted',          'class' => 'bg-warning text-dark'],
+    'complaint_assigned'   => ['label' => 'Complaint Assigned',     'class' => 'bg-info text-dark'],
+    'complaint_deleted'    => ['label' => 'Complaint Deleted',      'class' => 'bg-danger'],
+    'department_added'     => ['label' => 'Department Added',       'class' => 'bg-success'],
+    'department_updated'   => ['label' => 'Department Updated',     'class' => 'bg-info text-dark'],
+    'department_deleted'   => ['label' => 'Department Deleted',     'class' => 'bg-danger'],
+    'category_added'       => ['label' => 'Category Added',         'class' => 'bg-success'],
+    'category_updated'     => ['label' => 'Category Updated',       'class' => 'bg-info text-dark'],
+    'category_deleted'     => ['label' => 'Category Deleted',       'class' => 'bg-danger'],
+    'subcategory_added'    => ['label' => 'Subcategory Added',      'class' => 'bg-success'],
+    'subcategory_updated'  => ['label' => 'Subcategory Updated',    'class' => 'bg-info text-dark'],
+    'subcategory_deleted'  => ['label' => 'Subcategory Deleted',    'class' => 'bg-danger'],
 ];
 
 function actionBadge(string $action, array $meta): string

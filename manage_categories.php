@@ -1,5 +1,5 @@
 ﻿<?php
-session_start();
+require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
     header("Location: login.php");
@@ -14,6 +14,7 @@ require_once "includes/csrf.php";
 $db = new Database();
 $conn = $db->connect();
 $admin = new Admin($conn);
+$adminId = (int)$_SESSION['user_id'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
@@ -25,7 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
     $desc   = trim($_POST['category_description'] ?? '');
     $deptId = (int) ($_POST['auto_assign_department_id'] ?? 0);
     if ($name !== '') {
-        $admin->addCategory($name, $desc, $_SESSION['user_id'], $deptId ?: null);
+        $admin->addCategory($name, $desc, $adminId, $deptId ?: null);
+        $admin->logActivity($adminId, 'category_added', 'category', 0, $name, "Category '{$name}' added");
         $_SESSION['message'] = "Category '{$name}' added successfully.";
     } else {
         $_SESSION['message_error'] = "Category name is required.";
@@ -43,6 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_category'])) {
     $deptId = (int) ($_POST['auto_assign_department_id'] ?? 0);
     if ($id && $name !== '') {
         $admin->updateCategory($id, $name, $desc, $status, $deptId ?: null);
+        $admin->logActivity($adminId, 'category_updated', 'category', $id, $name, "Category updated to '{$name}' (status: {$status})");
         $_SESSION['message'] = "Category updated successfully.";
     } else {
         $_SESSION['message_error'] = "Category name is required.";
@@ -56,6 +59,7 @@ if (isset($_GET['delete_category']) && is_numeric($_GET['delete_category'])) {
     $id = (int) $_GET['delete_category'];
     try {
         $admin->deleteCategory($id);
+        $admin->logActivity($adminId, 'category_deleted', 'category', $id, "Category #$id", "Category #$id deleted");
         $_SESSION['message'] = "Category deleted successfully.";
     } catch (Exception $e) {
         $_SESSION['message_error'] = $e->getMessage();
@@ -71,7 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subcategory'])) {
     $desc = trim($_POST['subcategory_description'] ?? '');
     if ($catId && $name !== '') {
         try {
-            $admin->addSubcategory($catId, $name, $desc, $_SESSION['user_id']);
+            $admin->addSubcategory($catId, $name, $desc, $adminId);
+            $admin->logActivity($adminId, 'subcategory_added', 'category', $catId, $name, "Subcategory '{$name}' added to category #$catId");
             $_SESSION['message'] = "Subcategory '{$name}' added successfully.";
         } catch (Exception $e) {
             $_SESSION['message_error'] = $e->getMessage();
@@ -92,6 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_subcategory'])) 
     if ($id && $name !== '') {
         try {
             $admin->updateSubcategory($id, $name, $desc, $status);
+            $admin->logActivity($adminId, 'subcategory_updated', 'category', $id, $name, "Subcategory updated to '{$name}' (status: {$status})");
             $_SESSION['message'] = "Subcategory updated successfully.";
         } catch (Exception $e) {
             $_SESSION['message_error'] = $e->getMessage();
@@ -108,6 +114,7 @@ if (isset($_GET['delete_subcategory']) && is_numeric($_GET['delete_subcategory']
     $id = (int) $_GET['delete_subcategory'];
     try {
         $admin->deleteSubcategory($id);
+        $admin->logActivity($adminId, 'subcategory_deleted', 'category', $id, "Subcategory #$id", "Subcategory #$id deleted");
         $_SESSION['message'] = "Subcategory deleted successfully.";
     } catch (Exception $e) {
         $_SESSION['message_error'] = $e->getMessage();

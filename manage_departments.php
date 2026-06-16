@@ -1,5 +1,5 @@
 ﻿<?php
-session_start();
+require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
     header("Location: login.php");
@@ -14,6 +14,7 @@ require_once "includes/csrf.php";
 $db = new Database();
 $conn = $db->connect();
 $admin = new Admin($conn);
+$adminId = (int)$_SESSION['user_id'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
@@ -24,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_department'])) {
     $name = trim($_POST['department_name'] ?? '');
     if ($name !== '') {
         $admin->addDepartment($name);
+        $admin->logActivity($adminId, 'department_added', 'department', 0, $name, "Department '{$name}' added");
         $_SESSION['message'] = "Department '{$name}' added successfully.";
     } else {
         $_SESSION['message_error'] = "Department name is required.";
@@ -38,6 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_department'])) {
     $name = trim($_POST['department_name'] ?? '');
     if ($id && $name !== '') {
         $admin->updateDepartment($id, $name);
+        $admin->logActivity($adminId, 'department_updated', 'department', $id, $name, "Department updated to '{$name}'");
         $_SESSION['message'] = "Department updated successfully.";
     } else {
         $_SESSION['message_error'] = "Department name is required.";
@@ -51,6 +54,7 @@ if (isset($_GET['delete_department']) && is_numeric($_GET['delete_department']))
     $id = (int)$_GET['delete_department'];
     try {
         $admin->deleteDepartment($id);
+        $admin->logActivity($adminId, 'department_deleted', 'department', $id, "Department #$id", "Department #$id deleted");
         $_SESSION['message'] = "Department deleted successfully.";
     } catch (Exception $e) {
         $_SESSION['message_error'] = $e->getMessage();

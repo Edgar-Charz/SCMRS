@@ -1,5 +1,5 @@
-﻿<?php
-session_start();
+<?php
+require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
     header("Location: login.php");
@@ -81,12 +81,12 @@ $anonymousBadge = $complaint['is_anonymous']
 function statusBadge($status)
 {
     $map = [
-        'pending'                   => ['bg-warning text-dark',  'Pending'],
-        'in_progress'               => ['bg-info text-white',    'In Progress'],
-        'awaiting_student_response' => ['bg-primary text-white', 'Awaiting Response'],
-        'resolved'                  => ['bg-success text-white', 'Resolved'],
-        'rejected'                  => ['bg-danger text-white',  'Rejected'],
-        'reopened'                  => ['bg-orange text-white',  'Reopened'],
+        STATUS_PENDING => ['bg-warning text-dark',  'Pending'],
+        STATUS_IN_PROGRESS => ['bg-info text-white',    'In Progress'],
+        STATUS_AWAITING_RESPONSE => ['bg-primary text-white', 'Awaiting Response'],
+        STATUS_RESOLVED => ['bg-success text-white', 'Resolved'],
+        STATUS_REJECTED => ['bg-danger text-white',  'Rejected'],
+        STATUS_REOPENED => ['bg-orange text-white',  'Reopened'],
     ];
     [$class, $label] = $map[$status] ?? ['bg-secondary text-white', ucfirst(str_replace('_', ' ', $status))];
     return "<span class=\"badge $class\">$label</span>";
@@ -100,7 +100,7 @@ function priorityBadge($priority)
 }
 
 $irStatusMap = [
-    'pending'   => ['bg-warning text-dark', 'Pending'],
+    STATUS_PENDING => ['bg-warning text-dark', 'Pending'],
     'responded' => ['bg-success text-white', 'Responded'],
     'closed'    => ['bg-secondary text-white', 'Closed'],
 ];
@@ -461,7 +461,7 @@ $irStatusMap = [
                 </div>
 
                 <!-- ── Student Feedback ───────────────────────────────── -->
-                <?php if ($complaint['complaint_status'] === 'resolved'): ?>
+                <?php if ($complaint['complaint_status'] === STATUS_RESOLVED): ?>
                     <div class="container-card shadow-sm">
                         <h4 class="mb-3 fw-bold">
                             <i class="fas fa-star me-2 text-warning"></i>Student Feedback
