@@ -1,7 +1,29 @@
 <?php
+require_once __DIR__ . '/EmailQueue.php';
+require_once __DIR__ . '/Mailer.php';
+
 class Notification
 {
     private $conn;
+
+    // Maps notification type → email subject prefix
+    private static array $subjects = [
+        'new_complaint'              => 'New Complaint Submitted',
+        'new_assignment'             => 'Complaint Assigned to You',
+        'status_change'              => 'Complaint Status Updated',
+        'complaint_resolved'         => 'Your Complaint Has Been Resolved',
+        'complaint_rejected'         => 'Your Complaint Has Been Rejected',
+        'complaint_reopened'         => 'Complaint Reopened',
+        'complaint_deleted'          => 'Complaint Deleted',
+        'request_info'               => 'Information Requested on Your Complaint',
+        'info_responded'             => 'Student Responded to Information Request',
+        'staff_approved'             => 'Your Staff Account Has Been Approved',
+        'staff_rejected'             => 'Your Staff Account Was Not Approved',
+        'new_registration'           => 'New Staff Registration Pending Approval',
+        'complaint_delegated'          => 'Complaint Delegated to You',
+        'complaint_delegated_resolved' => 'Delegated Complaint Resolved',
+        'complaint_overdue'            => 'Complaint Past Resolution Deadline',
+    ];
 
     public function __construct($db)
     {
@@ -10,6 +32,7 @@ class Notification
 
     public function create($userId, $message, $type, $link = null, $complaintId = null)
     {
+        // In-app notification (unchanged)
         $stmt = $this->conn->prepare(
             "INSERT INTO notifications (user_id, complaint_id, message, type, link)
              VALUES (?, ?, ?, ?, ?)"
@@ -17,6 +40,34 @@ class Notification
         $stmt->bind_param("iisss", $userId, $complaintId, $message, $type, $link);
         $stmt->execute();
         $stmt->close();
+
+        // Queue email to same user
+        $this->queueEmailForUser((int) $userId, $message, $type, $link);
+    }
+
+    private function queueEmailForUser(int $userId, string $message, string $type, ?string $link): void
+    {
+        try {
+            $uStmt = $this->conn->prepare(
+                "SELECT username, user_email FROM users WHERE user_id = ? LIMIT 1"
+            );
+            $uStmt->bind_param('i', $userId);
+            $uStmt->execute();
+            $user = $uStmt->get_result()->fetch_assoc();
+            $uStmt->close();
+
+            if (!$user || empty($user['user_email'])) {
+                return;
+            }
+
+            $subject = self::$subjects[$type] ?? 'SCMRS Notification';
+            $body    = Mailer::buildBody($user['username'], $message, $link);
+
+            EmailQueue::enqueue($this->conn, $user['user_email'], $user['username'], $subject, $body);
+        } catch (Throwable $e) {
+            // Never let email queuing break the main request
+            error_log('[Notification] queueEmailForUser error: ' . $e->getMessage());
+        }
     }
 
     // Notify every admin
@@ -147,6 +198,7 @@ class Notification
             'complaint_reopened'           => 'fa-redo text-warning',
             'complaint_delegated_resolved' => 'fa-check-double text-success',
             'complaint_delegated'          => 'fa-level-down-alt text-info',
+            'complaint_overdue'            => 'fa-exclamation-triangle text-danger',
         ];
         return $map[$type] ?? 'fa-bell text-secondary';
     }

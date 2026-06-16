@@ -256,7 +256,7 @@ class User
                 $lockTime = !empty($user['lock_time']) ? strtotime($user['lock_time']) : 0;
                 $currentTime = time();
 
-                if (($currentTime - $lockTime) < 900) { // 15 mins
+                if ($currentTime - $lockTime < 900) { // 15 mins
                     $remaining = 900 - ($currentTime - $lockTime);
                     $minutes = ceil($remaining / 60);
 
@@ -544,6 +544,46 @@ class User
         return false;
     }
 
+    public function isIpRateLimited(string $ip): bool
+    {
+        $this->conn->query(
+            "CREATE TABLE IF NOT EXISTS login_rate_limits (
+                id           INT AUTO_INCREMENT PRIMARY KEY,
+                ip_address   VARCHAR(45)  NOT NULL,
+                attempted_at TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_ip_time (ip_address, attempted_at)
+            )"
+        );
+
+        // Remove attempts older than 15 minutes
+        $clean = $this->conn->prepare(
+            "DELETE FROM login_rate_limits WHERE attempted_at < NOW() - INTERVAL 15 MINUTE"
+        );
+        $clean->execute();
+        $clean->close();
+
+        $stmt = $this->conn->prepare(
+            "SELECT COUNT(*) AS cnt FROM login_rate_limits
+             WHERE ip_address = ? AND attempted_at >= NOW() - INTERVAL 15 MINUTE"
+        );
+        $stmt->bind_param('s', $ip);
+        $stmt->execute();
+        $count = (int) $stmt->get_result()->fetch_assoc()['cnt'];
+        $stmt->close();
+
+        return $count >= 10;
+    }
+
+    public function recordFailedIpAttempt(string $ip): void
+    {
+        $stmt = $this->conn->prepare(
+            "INSERT INTO login_rate_limits (ip_address) VALUES (?)"
+        );
+        $stmt->bind_param('s', $ip);
+        $stmt->execute();
+        $stmt->close();
+    }
+
     public function createPasswordResetToken($email)
     {
         $stmt = $this->conn->prepare("SELECT user_id FROM users WHERE user_email = ?");
@@ -554,6 +594,10 @@ class User
         }
         $stmt->close();
 
+        // Purge globally expired / already-used tokens to prevent table bloat
+        $this->conn->query("DELETE FROM password_resets WHERE expires_at < NOW() OR used = 1");
+
+        // Invalidate any still-valid token for this email before issuing a new one
         $del = $this->conn->prepare("DELETE FROM password_resets WHERE email = ?");
         $del->bind_param('s', $email);
         $del->execute();

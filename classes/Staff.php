@@ -75,10 +75,10 @@ class Staff
         if (!$stmt) {
             return [
                 'total' => 0,
-                'pending' => 0,
-                'in_progress' => 0,
-                'resolved' => 0,
-                'rejected' => 0,
+                STATUS_PENDING => 0,
+                STATUS_IN_PROGRESS => 0,
+                STATUS_RESOLVED => 0,
+                STATUS_REJECTED => 0,
             ];
         }
 
@@ -89,10 +89,10 @@ class Staff
 
         return [
             'total' => (int) ($row['total'] ?? 0),
-            'pending' => (int) ($row['pending'] ?? 0),
-            'in_progress' => (int) ($row['in_progress'] ?? 0),
-            'resolved' => (int) ($row['resolved'] ?? 0),
-            'rejected' => (int) ($row['rejected'] ?? 0),
+            STATUS_PENDING => (int) ($row['pending'] ?? 0),
+            STATUS_IN_PROGRESS => (int) ($row['in_progress'] ?? 0),
+            STATUS_RESOLVED => (int) ($row['resolved'] ?? 0),
+            STATUS_REJECTED => (int) ($row['rejected'] ?? 0),
         ];
     }
 
@@ -195,7 +195,7 @@ class Staff
             $statusStmt->execute();
             $currentStatus = $statusStmt->get_result()->fetch_assoc()['complaint_status'] ?? '';
             $statusStmt->close();
-            if (in_array($currentStatus, ['resolved', 'rejected'])) {
+            if (in_array($currentStatus, [STATUS_RESOLVED, STATUS_REJECTED])) {
                 throw new Exception("Cannot escalate a complaint that is already $currentStatus.");
             }
 
@@ -443,7 +443,7 @@ class Staff
             $oldStmt->execute();
             $old = $oldStmt->get_result()->fetch_assoc();
             $oldStmt->close();
-            $oldStatus = $old['complaint_status'] ?? 'in_progress';
+            $oldStatus = $old['complaint_status'] ?? STATUS_IN_PROGRESS;
 
             $insStmt = $this->conn->prepare(
                 "INSERT INTO information_requests (complaint_id, requested_by, request_message) VALUES (?, ?, ?)"
@@ -502,7 +502,7 @@ class Staff
         $statusMap = [
             'resolve' => 'resolved',
             'reject' => 'rejected',
-            'in_progress' => 'in_progress',
+            STATUS_IN_PROGRESS => 'in_progress',
         ];
         if (!array_key_exists($action, $statusMap)) {
             throw new Exception("Invalid action.");
@@ -519,9 +519,9 @@ class Staff
             $oldStmt->execute();
             $old = $oldStmt->get_result()->fetch_assoc();
             $oldStmt->close();
-            $oldStatus = $old['complaint_status'] ?? 'pending';
+            $oldStatus = $old['complaint_status'] ?? STATUS_PENDING;
 
-            if ($newStatus === 'resolved') {
+            if ($newStatus === STATUS_RESOLVED) {
                 $updStmt = $this->conn->prepare(
                     "UPDATE complaints SET complaint_status = ?, complaint_response = ?,
                      resolved_at = NOW(), updated_at = NOW() WHERE complaint_id = ?"
@@ -565,10 +565,10 @@ class Staff
             $studRow = $studStmt->get_result()->fetch_assoc();
             $studStmt->close();
             if ($studRow) {
-                if ($newStatus === 'resolved') {
+                if ($newStatus === STATUS_RESOLVED) {
                     $msg = "Your complaint #$complaintId has been resolved.";
                     $type = 'complaint_resolved';
-                } elseif ($newStatus === 'rejected') {
+                } elseif ($newStatus === STATUS_REJECTED) {
                     $msg = "Your complaint #$complaintId has been rejected.";
                     $type = 'complaint_rejected';
                 } else {
@@ -585,7 +585,7 @@ class Staff
             }
 
             // Notify all staff who delegated this complaint downward
-            if ($newStatus === 'resolved') {
+            if ($newStatus === STATUS_RESOLVED) {
                 $delStmt = $this->conn->prepare(
                     "SELECT DISTINCT s.staff_user_id
                      FROM complaint_escalations ce
@@ -672,7 +672,7 @@ class Staff
             $statusStmt->execute();
             $currentStatus = $statusStmt->get_result()->fetch_assoc()['complaint_status'] ?? '';
             $statusStmt->close();
-            if (in_array($currentStatus, ['resolved', 'rejected'])) {
+            if (in_array($currentStatus, [STATUS_RESOLVED, STATUS_REJECTED])) {
                 throw new Exception("Cannot delegate a complaint that is already $currentStatus.");
             }
 
@@ -771,7 +771,7 @@ class Staff
         return $data;
     }
 
-    // ── Feature 1: On Hold / Resume ─────────────────────────────────────────
+    // On Hold / Resume
 
     public function putComplaintOnHold($complaintId, $staffUserId, $reason)
     {
@@ -787,7 +787,7 @@ class Staff
             $oldStmt->close();
             $oldStatus = $old['complaint_status'] ?? '';
 
-            if (in_array($oldStatus, ['resolved', 'rejected'])) {
+            if (in_array($oldStatus, [STATUS_RESOLVED, STATUS_REJECTED])) {
                 throw new Exception("Cannot put a $oldStatus complaint on hold.");
             }
 
@@ -901,7 +901,7 @@ class Staff
         }
     }
 
-    // ── Feature 2: Progress Updates ─────────────────────────────────────────
+    // Progress Updates 
 
     public function sendProgressUpdate($complaintId, $staffUserId, $message)
     {
@@ -952,7 +952,7 @@ class Staff
         return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     }
 
-    // ── Feature 3: Reject Assignment ────────────────────────────────────────
+    // Reject Assignment 
 
     public function rejectAssignment($complaintId, $staffId, $staffUserId, $reason)
     {
@@ -967,7 +967,7 @@ class Staff
             $currentStatus = $statusStmt->get_result()->fetch_assoc()['complaint_status'] ?? '';
             $statusStmt->close();
 
-            if (in_array($currentStatus, ['resolved', 'rejected'])) {
+            if (in_array($currentStatus, [STATUS_RESOLVED, STATUS_REJECTED])) {
                 throw new Exception("Cannot reject an assignment for a complaint that is already $currentStatus.");
             }
 
@@ -1011,7 +1011,7 @@ class Staff
         }
     }
 
-    // ── Feature 4: Performance Stats ────────────────────────────────────────
+    // Performance Stats
 
     public function getPerformanceStats($staffId)
     {
@@ -1072,7 +1072,7 @@ class Staff
         ];
     }
 
-    // ── Feature 5: Target Resolution Date ───────────────────────────────────
+    // Target Resolution Date 
 
     public function setTargetDate($complaintId, $staffId, $targetDate)
     {
@@ -1092,7 +1092,7 @@ class Staff
         return true;
     }
 
-    // ── Feature 6: Department-Level View ────────────────────────────────────
+    // Department-Level View 
 
     public function getDepartmentComplaints($departmentId)
     {

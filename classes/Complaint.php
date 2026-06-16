@@ -20,6 +20,20 @@ class Complaint
                 throw new Exception("Fill all the required fields");
             }
 
+            // Length validation (cannot be bypassed via direct POST)
+            if (mb_strlen($title) < 10) {
+                throw new Exception("Complaint title must be at least 10 characters.");
+            }
+            if (mb_strlen($title) > 200) {
+                throw new Exception("Complaint title must not exceed 200 characters.");
+            }
+            if (mb_strlen($description) < 30) {
+                throw new Exception("Description must be at least 30 characters.");
+            }
+            if (mb_strlen($description) > 5000) {
+                throw new Exception("Description must not exceed 5,000 characters.");
+            }
+
             // Insert a new complaint
             $insertComplaintStmt = $this->conn->prepare("INSERT INTO complaints (student_id, category_id, subcategory_id, department_id, complaint_title, complaint_description, is_anonymous)
                                                         VALUES(?, ?, ?, ?, ?, ?, ?)");
@@ -42,36 +56,45 @@ class Complaint
             $max_size = 5 * 1024 * 1024;
 
             if (!empty($_FILES['attachments']['name'][0])) {
+                // Validate every file before moving any of them
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $rejected = [];
+                foreach ($_FILES['attachments']['tmp_name'] as $key => $tmp_name) {
+                    if ($_FILES['attachments']['error'][$key] !== UPLOAD_ERR_OK) {
+                        $rejected[] = basename($_FILES['attachments']['name'][$key]) . ' (upload error)';
+                        continue;
+                    }
+                    $file_type = $finfo->file($tmp_name);
+                    $file_size = $_FILES['attachments']['size'][$key];
+                    $file_name = basename($_FILES['attachments']['name'][$key]);
+                    if (!in_array($file_type, $allowed_types)) {
+                        $rejected[] = $file_name . ' (unsupported type — only JPEG, PNG, PDF allowed)';
+                    } elseif ($file_size > $max_size) {
+                        $rejected[] = $file_name . ' (exceeds 5 MB limit)';
+                    }
+                }
+                if (!empty($rejected)) {
+                    throw new Exception("The following file(s) were rejected: " . implode('; ', $rejected));
+                }
+
                 $upload_dir = 'uploads/complaints/' . $complaintId . '/';
                 if (!file_exists($upload_dir)) {
                     mkdir($upload_dir, 0755, true);
                 }
 
                 foreach ($_FILES['attachments']['tmp_name'] as $key => $tmp_name) {
-                    if ($_FILES['attachments']['error'][$key] !== UPLOAD_ERR_OK) {
-                        continue;
-                    }
-
-                    // Detect MIME type from actual file contents, not browser-supplied header
-                    $finfo = new finfo(FILEINFO_MIME_TYPE);
                     $file_type = $finfo->file($tmp_name);
-
                     $file_size = $_FILES['attachments']['size'][$key];
-                    if (!in_array($file_type, $allowed_types) || $file_size > $max_size) {
-                        continue;
-                    }
-
-                    // Strip any path components from the original name
                     $file_name = basename($_FILES['attachments']['name'][$key]);
                     $unique_name = uniqid() . '_' . time() . '_' . $file_name;
                     $target_path = $upload_dir . $unique_name;
 
                     if (move_uploaded_file($tmp_name, $target_path)) {
                         $attach_stmt = $this->conn->prepare(
-                            "INSERT INTO complaint_attachments (complaint_id, uploaded_by, file_name, file_path, file_type, file_size) 
+                            "INSERT INTO complaint_attachments (complaint_id, uploaded_by, file_name, file_path, file_type, file_size)
                                 VALUES (?, ?, ?, ?, ?, ?)"
                         );
-                        $attach_stmt->bind_param("issssi", $complaintId, $user_id, $file_name, $target_path, $file_type, $file_size);
+                        $attach_stmt->bind_param("iisssi", $complaintId, $user_id, $file_name, $target_path, $file_type, $file_size);
                         $attach_stmt->execute();
                         $attach_stmt->close();
                     }
@@ -98,7 +121,7 @@ class Complaint
             return $complaintId;
         } catch (Exception $e) {
             // Rollback transaction
-            $this->conn->rollBack();
+            $this->conn->rollback();
 
             throw new Exception($e->getMessage());
         }

@@ -11,16 +11,16 @@ class Category
     // Get Categories
     public function getCategories()
     {
-        $categories_query_result = $this->conn->query("SELECT category_id, category_name FROM complaint_categories ORDER BY category_name");
-
-        return $categories_query_result;
+        $stmt = $this->conn->prepare("SELECT category_id, category_name FROM complaint_categories ORDER BY category_name");
+        $stmt->execute();
+        return $stmt->get_result();
     }
 
     // Get Subcategories
     public function getSubcategories()
     {
-        $subcategories_query_result = $this->conn->query("SELECT subcategory_id, subcategory_name FROM complaint_subcategories ORDER BY subcategory_name");
-
-        return $subcategories_query_result;
+        $stmt = $this->conn->prepare("SELECT subcategory_id, subcategory_name FROM complaint_subcategories ORDER BY subcategory_name");
+        $stmt->execute();
+        return $stmt->get_result();
     }
 }

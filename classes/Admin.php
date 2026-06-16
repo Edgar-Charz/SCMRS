@@ -108,7 +108,8 @@ class Admin extends User
                        u.username AS student_name,
                        s.student_registration_number,
                        d.department_name,
-                       su.username AS assigned_staff_name
+                       su.username AS assigned_staff_name,
+                       ca_lead.target_resolution_date
                 FROM complaints c
                 JOIN complaint_categories cc ON c.category_id = cc.category_id
                 JOIN students s ON c.student_id = s.student_id
@@ -521,6 +522,16 @@ class Admin extends User
             $assignStmt->execute();
             $assignStmt->close();
 
+            // Auto-set SLA deadline: high=2 days, medium=5, low=10
+            $slaDays = ['high' => 2, 'medium' => 5, 'low' => 10][$priority] ?? 5;
+            $slaStmt = $this->conn->prepare(
+                "UPDATE complaint_assignments SET target_resolution_date = DATE_ADD(NOW(), INTERVAL ? DAY)
+                 WHERE complaint_id = ? AND status = 'active' AND is_lead = 1"
+            );
+            $slaStmt->bind_param('ii', $slaDays, $complaintId);
+            $slaStmt->execute();
+            $slaStmt->close();
+
             $remarks = !empty($note) ? $note : 'Complaint assigned to staff';
             $logStmt = $this->conn->prepare(
                 "INSERT INTO complaint_status_logs
@@ -644,8 +655,8 @@ class Admin extends User
             $studRow = $studStmt->get_result()->fetch_assoc();
             $studStmt->close();
             if ($studRow) {
-                $type = $newStatus === 'resolved' ? 'complaint_resolved' : 'complaint_rejected';
-                $msg = $newStatus === 'resolved'
+                $type = $newStatus === STATUS_RESOLVED ? 'complaint_resolved' : 'complaint_rejected';
+                $msg = $newStatus === STATUS_RESOLVED
                     ? "Your complaint #$complaintId has been resolved."
                     : "Your complaint #$complaintId has been rejected.";
                 (new Notification($this->conn))->create($studRow['user_id'], $msg, $type, "student_complaint_details.php?id=$complaintId", $complaintId);
@@ -676,7 +687,7 @@ class Admin extends User
         if (!$row) {
             throw new Exception("Complaint not found.");
         }
-        if ($row['complaint_status'] !== 'pending') {
+        if ($row['complaint_status'] !== STATUS_PENDING) {
             throw new Exception("Only pending complaints can be deleted.");
         }
 
@@ -690,7 +701,8 @@ class Admin extends User
         $filePaths = array_column($pathStmt->get_result()->fetch_all(MYSQLI_ASSOC), 'file_path');
         $pathStmt->close();
 
-        $stmt = $this->conn->prepare("DELETE FROM complaints WHERE complaint_id = ?");
+        // Soft delete: Update status to 'deleted' instead of hard delete
+        $stmt = $this->conn->prepare("UPDATE complaints SET complaint_status = 'deleted', updated_at = NOW() WHERE complaint_id = ?");
         $stmt->bind_param("i", $complaintId);
         $ok = $stmt->execute();
         $stmt->close();
@@ -772,10 +784,10 @@ class Admin extends User
 
         return [
             'total' => (int) ($row['total'] ?? 0),
-            'pending' => (int) ($row['pending'] ?? 0),
-            'in_progress' => (int) ($row['in_progress'] ?? 0),
-            'resolved' => (int) ($row['resolved'] ?? 0),
-            'rejected' => (int) ($row['rejected'] ?? 0),
+            STATUS_PENDING => (int) ($row['pending'] ?? 0),
+            STATUS_IN_PROGRESS => (int) ($row['in_progress'] ?? 0),
+            STATUS_RESOLVED => (int) ($row['resolved'] ?? 0),
+            STATUS_REJECTED => (int) ($row['rejected'] ?? 0),
             'avg_resolution_hours' => $row['avg_resolution_hours'] ?? null,
         ];
     }
@@ -1332,9 +1344,29 @@ class Admin extends User
         return $ok;
     }
 
-    // Write a row to activity_logs
+    // Write a row to activity_logs (creates table on first call if missing)
     public function logActivity($adminId, $action, $targetType, $targetId, $targetName, $details = null)
     {
+        static $tableReady = false;
+        if (!$tableReady) {
+            $this->conn->query(
+                "CREATE TABLE IF NOT EXISTS activity_logs (
+                    log_id       INT AUTO_INCREMENT PRIMARY KEY,
+                    admin_id     INT NOT NULL,
+                    action       VARCHAR(100) NOT NULL,
+                    target_type  VARCHAR(50)  NOT NULL,
+                    target_id    INT          DEFAULT NULL,
+                    target_name  VARCHAR(255) DEFAULT NULL,
+                    details      TEXT         DEFAULT NULL,
+                    ip_address   VARCHAR(45)  DEFAULT NULL,
+                    created_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_admin   (admin_id),
+                    INDEX idx_created (created_at)
+                )"
+            );
+            $tableReady = true;
+        }
+
         $ip = $_SERVER['REMOTE_ADDR'] ?? null;
         $stmt = $this->conn->prepare(
             "INSERT INTO activity_logs (admin_id, action, target_type, target_id, target_name, details, ip_address)
@@ -1486,5 +1518,55 @@ class Admin extends User
             $this->conn->rollback();
             throw new Exception("Info request error: " . $e->getMessage());
         }
+    }
+
+    // Detect newly-overdue complaints and notify all admins once per complaint.
+    public function notifyOverdueComplaints(): int
+    {
+        // Add the tracking column idempotently (MariaDB supports IF NOT EXISTS)
+        $this->conn->query(
+            "ALTER TABLE complaint_assignments
+             ADD COLUMN IF NOT EXISTS overdue_notified TINYINT(1) NOT NULL DEFAULT 0"
+        );
+
+        $stmt = $this->conn->prepare(
+            "SELECT ca.complaint_id, c.complaint_title
+             FROM complaint_assignments ca
+             JOIN complaints c ON ca.complaint_id = c.complaint_id
+             WHERE ca.status = 'active'
+               AND ca.target_resolution_date IS NOT NULL
+               AND ca.target_resolution_date < NOW()
+               AND ca.overdue_notified = 0
+               AND c.complaint_status NOT IN ('resolved','rejected','deleted')"
+        );
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+        if (empty($rows)) return 0;
+
+        $notif = new Notification($this->conn);
+
+        foreach ($rows as $row) {
+            $cid   = (int) $row['complaint_id'];
+            $title = $row['complaint_title'];
+
+            $notif->notifyAllAdmins(
+                "Complaint #$cid \"{$title}\" has passed its resolution deadline.",
+                'complaint_overdue',
+                "complaint_details.php?id=$cid",
+                $cid
+            );
+
+            $upStmt = $this->conn->prepare(
+                "UPDATE complaint_assignments SET overdue_notified = 1
+                 WHERE complaint_id = ? AND status = 'active'"
+            );
+            $upStmt->bind_param('i', $cid);
+            $upStmt->execute();
+            $upStmt->close();
+        }
+
+        return count($rows);
     }
 }

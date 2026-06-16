@@ -61,7 +61,7 @@ class Student extends User
             "SELECT c.*, cc.category_name
              FROM complaints c
              JOIN complaint_categories cc ON c.category_id = cc.category_id
-             WHERE c.student_id = ?
+             WHERE c.student_id = ? AND c.complaint_status != 'deleted'
              ORDER BY c.created_at DESC"
         );
         $stmt->bind_param("i", $studentId);
@@ -253,7 +253,7 @@ class Student extends User
         $stmt->close();
 
         if (!$row) throw new Exception("Complaint not found.");
-        if ($row['complaint_status'] !== 'resolved')
+        if ($row['complaint_status'] !== STATUS_RESOLVED)
             throw new Exception("Only resolved complaints can be reopened.");
 
         $daysSince = (new DateTime())->diff(new DateTime($row['updated_at']))->days;
@@ -297,7 +297,7 @@ class Student extends User
     // Get filtered complaints with status tabs support
     public function getFilteredComplaints($studentId, $filter = 'all')
     {
-        $where  = "WHERE c.student_id = ?";
+        $where  = "WHERE c.student_id = ? AND c.complaint_status != 'deleted'";
         $types  = "i";
         $params = [$studentId];
 
@@ -334,10 +334,10 @@ class Student extends User
 
         foreach ($statuses as $status) {
             if ($status === 'all') {
-                $stmt = $this->conn->prepare("SELECT COUNT(*) AS cnt FROM complaints WHERE student_id = ?");
+                $stmt = $this->conn->prepare("SELECT COUNT(*) AS cnt FROM complaints WHERE student_id = ? AND complaint_status != 'deleted'");
                 $stmt->bind_param("i", $studentId);
             } else {
-                $stmt = $this->conn->prepare("SELECT COUNT(*) AS cnt FROM complaints WHERE student_id = ? AND complaint_status = ?");
+                $stmt = $this->conn->prepare("SELECT COUNT(*) AS cnt FROM complaints WHERE student_id = ? AND complaint_status = ? AND complaint_status != 'deleted'");
                 $stmt->bind_param("is", $studentId, $status);
             }
             $stmt->execute();
@@ -355,7 +355,7 @@ class Student extends User
             "SELECT COUNT(DISTINCT c.complaint_id) AS cnt
              FROM complaints c
              JOIN information_requests ir ON ir.complaint_id = c.complaint_id
-             WHERE c.student_id = ? AND ir.status = 'pending'"
+             WHERE c.student_id = ? AND ir.status = 'pending' AND c.complaint_status != 'deleted'"
         );
         $stmt->bind_param("i", $studentId);
         $stmt->execute();
@@ -433,14 +433,32 @@ class Student extends User
     // Delete a pending complaint (only allowed while status is pending)
     public function deleteComplaint($complaintId, $studentId, $reason = '')
     {
-        $stmt = $this->conn->prepare(
-            "DELETE FROM complaints WHERE complaint_id = ? AND student_id = ? AND complaint_status = 'pending'"
+        // Verify complaint exists, belongs to this student and is pending
+        $checkStmt = $this->conn->prepare(
+            "SELECT complaint_status FROM complaints WHERE complaint_id = ? AND student_id = ? LIMIT 1"
         );
-        $stmt->bind_param("ii", $complaintId, $studentId);
+        $checkStmt->bind_param("ii", $complaintId, $studentId);
+        $checkStmt->execute();
+        $row = $checkStmt->get_result()->fetch_assoc();
+        $checkStmt->close();
+
+        if (!$row) {
+            return false;
+        }
+        if ($row['complaint_status'] !== STATUS_PENDING) {
+            return false;
+        }
+
+        // Soft delete: Update status to 'deleted' instead of hard delete
+        $stmt = $this->conn->prepare(
+            "UPDATE complaints SET complaint_status = 'deleted', updated_at = NOW() WHERE complaint_id = ?"
+        );
+        $stmt->bind_param("i", $complaintId);
         $ok = $stmt->execute();
         $stmt->close();
 
-        if ($ok && $this->conn->affected_rows > 0) {
+        if ($ok) {
+            // Notify admins about deletion
             require_once __DIR__ . '/Notification.php';
             $reasonText = $reason ? " Reason: $reason" : '';
             (new Notification($this->conn))->notifyAllAdmins(
@@ -449,9 +467,8 @@ class Student extends User
                 'manage_complaints.php',
                 null
             );
-            return true;
         }
 
-        return false;
+        return $ok;
     }
 }
