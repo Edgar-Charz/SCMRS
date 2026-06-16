@@ -9,6 +9,8 @@ class Database
 
     public function connect()
     {
+        mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
         $this->conn = new mysqli(
             $this->servername,
             $this->username,
