@@ -23,7 +23,7 @@ if (!$file) {
 $file_path = $file['file_path'];
 $file_name = $file['file_name'];
 
-// Bug 2 fix: confirm the resolved path is inside uploads/ before serving
+// Confirm the resolved path is inside uploads/ before serving
 $upload_base = realpath(__DIR__ . '/uploads/complaints');
 $real_file   = realpath($file_path);
 
@@ -32,7 +32,7 @@ if ($real_file === false || $upload_base === false || strpos($real_file, $upload
 }
 
 if (file_exists($real_file)) {
-    // Bug 3 fix: strip characters that could inject extra headers via Content-Disposition
+    // Strip characters that could inject extra headers via Content-Disposition
     $safe_name = preg_replace('/[^\w.\-]/', '_', $file_name);
 
     Header('Content-Description: File Transfer');

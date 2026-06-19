@@ -53,6 +53,19 @@ if (isset($_POST["submitComplaintBTN"])) {
                 "complaint_details.php?id=$newComplaintId",
                 $newComplaintId
             );
+            if ($department_id) {
+                require_once 'classes/StudentLeader.php';
+                $leaderMsg = $is_anonymous
+                    ? "A new anonymous complaint has been submitted in your department."
+                    : "New complaint in your department: \"$title\"";
+                (new StudentLeader($conn))->notifyLeadersInDepartment(
+                    $department_id,
+                    $leaderMsg,
+                    'new_complaint_in_rep_scope',
+                    "leader_complaint_details.php?id=$newComplaintId",
+                    $newComplaintId
+                );
+            }
             $_SESSION['message'] = "Complaint submitted successfully.";
             header("Location: track_complaints.php");
         }
