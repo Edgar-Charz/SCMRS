@@ -105,104 +105,133 @@ class Admin extends User
 
     public function getComplaints()
     {
-        $sql = "SELECT c.*, cc.category_name, cc.auto_assign_department_id AS category_dept_id,
-                       u.username AS student_name,
-                       s.student_registration_number,
-                       d.department_name,
-                       su.username AS assigned_staff_name,
-                       ca_lead.target_resolution_date
-                FROM complaints c
-                JOIN complaint_categories cc ON c.category_id = cc.category_id
-                JOIN students s ON c.student_id = s.student_id
-                JOIN users u ON s.student_user_id = u.user_id
-                LEFT JOIN departments d ON c.department_id = d.department_id
-                LEFT JOIN complaint_assignments ca_lead ON c.complaint_id = ca_lead.complaint_id AND ca_lead.status = 'active' AND ca_lead.is_lead = 1
-                LEFT JOIN staffs sf ON ca_lead.staff_id = sf.staff_id
-                LEFT JOIN users su ON sf.staff_user_id = su.user_id
-                ORDER BY c.created_at DESC";
-        $result = $this->conn->query($sql);
-        return $result->fetch_all(MYSQLI_ASSOC);
+        $stmt = $this->conn->prepare(
+            "SELECT c.*,
+                    (SELECT COUNT(*)
+                         FROM
+                             complaint_endorsements ce
+                         WHERE
+                             ce.complaint_id = c.complaint_id) AS endorsement_count,
+                             cc.category_name, cc.auto_assign_department_id AS category_dept_id,
+                             u.username AS student_name,
+                             s.student_registration_number,
+                             d.department_name,
+                             su.username AS assigned_staff_name,
+                             ca_lead.target_resolution_date
+                 FROM complaints c
+                 JOIN complaint_categories cc ON c.category_id = cc.category_id
+                 JOIN students s ON c.student_id = s.student_id
+                 JOIN users u ON s.student_user_id = u.user_id
+                 LEFT JOIN departments d ON c.department_id = d.department_id
+                 LEFT JOIN complaint_assignments ca_lead ON c.complaint_id = ca_lead.complaint_id AND ca_lead.status = 'active' AND ca_lead.is_lead = 1
+                 LEFT JOIN staffs sf ON ca_lead.staff_id = sf.staff_id
+                 LEFT JOIN users su ON sf.staff_user_id = su.user_id
+                 ORDER BY c.created_at DESC"
+        );
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        
+        return $data;
     }
 
     // Get all registered students
     public function getAllStudents()
     {
-        $sql = "SELECT users.user_id, users.username, users.user_email, users.user_phone_number, users.user_status,
-                           students.student_registration_number, students.student_program, colleges.college_name
-                    FROM users
-                    JOIN students ON users.user_id = students.student_user_id
-                    LEFT JOIN colleges ON students.student_college_id = colleges.college_id
-                    WHERE users.user_role = 'student'
-                    ORDER BY students.student_registration_number ASC";
-        $result = $this->conn->query($sql);
-
-        return $result->fetch_all(MYSQLI_ASSOC);
+        $stmt = $this->conn->prepare(
+            "SELECT users.user_id, users.username, users.user_email, users.user_phone_number, users.user_status,
+                    students.student_registration_number, students.student_program, colleges.college_name
+                 FROM users
+                 JOIN students ON users.user_id = students.student_user_id
+                 LEFT JOIN colleges ON students.student_college_id = colleges.college_id
+                 WHERE users.user_role IN ('student', 'student_leader')
+                 ORDER BY students.student_registration_number ASC"
+        );
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $data;
     }
 
     // Get all registered staff
     public function getAllStaff()
     {
-        $sql = "SELECT users.user_id, users.username, users.user_email, users.user_phone_number, users.user_status,
-                       staffs.staff_id, staffs.staff_role_id, staffs.staff_approved_at,
-                       departments.department_name, departments.department_id,
-                       staff_roles.role_name, staff_roles.role_rank,
-                       approver.username AS approved_by_name
-                FROM users
-                JOIN staffs ON users.user_id = staffs.staff_user_id
-                LEFT JOIN departments  ON staffs.staff_department_id = departments.department_id
-                LEFT JOIN staff_roles  ON staffs.staff_role_id = staff_roles.role_id
-                LEFT JOIN users approver ON staffs.staff_approved_by = approver.user_id
-                WHERE users.user_role = 'staff'
-                ORDER BY users.username ASC";
-        return $this->conn->query($sql)->fetch_all(MYSQLI_ASSOC);
+        $stmt = $this->conn->prepare(
+            "SELECT users.user_id, users.username, users.user_email, users.user_phone_number, users.user_status,
+                    staffs.staff_id, staffs.staff_role_id, staffs.staff_approved_at,
+                    departments.department_name, departments.department_id,
+                    staff_roles.role_name, staff_roles.role_rank,
+                    approver.username AS approved_by_name
+                 FROM users
+                 JOIN staffs ON users.user_id = staffs.staff_user_id
+                 LEFT JOIN departments ON staffs.staff_department_id = departments.department_id
+                 LEFT JOIN staff_roles ON staffs.staff_role_id = staff_roles.role_id
+                 LEFT JOIN users approver ON staffs.staff_approved_by = approver.user_id
+                 WHERE users.user_role = 'staff'
+                 ORDER BY users.username ASC"
+        );
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+        return $data;
     }
 
     // Get pending staff approvals
     public function getPendingStaffApprovals()
     {
-        $sql = "SELECT users.user_id, users.username, users.user_email,
-                       users.user_phone_number, users.created_at,
-                       staffs.staff_id, staffs.staff_approval_status,
-                       staffs.staff_department_id,
-                       departments.department_name
-                FROM users
-                JOIN staffs ON users.user_id = staffs.staff_user_id
-                LEFT JOIN departments ON staffs.staff_department_id = departments.department_id
-                WHERE staffs.staff_approval_status = '0'
-                ORDER BY users.created_at ASC";
-        $result = $this->conn->query($sql);
-
-        return $result->fetch_all(MYSQLI_ASSOC);
+        $stmt = $this->conn->prepare(
+            "SELECT users.user_id, users.username, users.user_email,
+                    users.user_phone_number, users.created_at,
+                    staffs.staff_id, staffs.staff_approval_status,
+                    staffs.staff_department_id,
+                    departments.department_name
+                 FROM users
+                 JOIN staffs ON users.user_id = staffs.staff_user_id
+                 LEFT JOIN departments ON staffs.staff_department_id = departments.department_id
+                 WHERE staffs.staff_approval_status = '0'
+                 ORDER BY users.created_at ASC"
+        );
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        
+        return $data;
     }
 
     // Get approved staff (includes role info for escalation dropdowns)
     public function getApprovedStaff()
     {
-        $sql = "SELECT users.user_id, users.username, users.user_email, users.user_phone_number, users.user_status,
-                       staffs.staff_id, staffs.staff_department_id, staffs.staff_approval_status,
-                       staffs.staff_approved_at, departments.department_name,
-                       staff_roles.role_name, staff_roles.role_rank,
-                       approver.username AS approved_by_name
-                    FROM users
-                    JOIN staffs ON users.user_id = staffs.staff_user_id
-                    LEFT JOIN departments ON staffs.staff_department_id = departments.department_id
-                    LEFT JOIN staff_roles ON staffs.staff_role_id = staff_roles.role_id
-                    LEFT JOIN users approver ON staffs.staff_approved_by = approver.user_id
-                    WHERE staffs.staff_approval_status = '1'
-                    ORDER BY staff_roles.role_rank ASC, users.username ASC";
-        $result = $this->conn->query($sql);
+        $stmt = $this->conn->prepare(
+            "SELECT users.user_id, users.username, users.user_email, users.user_phone_number, users.user_status,
+                    staffs.staff_id, staffs.staff_department_id, staffs.staff_approval_status,
+                    staffs.staff_approved_at, departments.department_name,
+                    staff_roles.role_name, staff_roles.role_rank,
+                    approver.username AS approved_by_name
+                 FROM users
+                 JOIN staffs ON users.user_id = staffs.staff_user_id
+                 LEFT JOIN departments ON staffs.staff_department_id = departments.department_id
+                 LEFT JOIN staff_roles ON staffs.staff_role_id = staff_roles.role_id
+                 LEFT JOIN users approver ON staffs.staff_approved_by = approver.user_id
+                 WHERE staffs.staff_approval_status = '1'
+                 ORDER BY staff_roles.role_rank ASC, users.username ASC"
+        );
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
 
-        return $result->fetch_all(MYSQLI_ASSOC);
+        return $data;
     }
 
     // Get pending approvals count
     public function getPendingApprovalsCount()
     {
-        $sql = "SELECT COUNT(*) as count FROM staffs WHERE staff_approval_status = '0'";
-        $result = $this->conn->query($sql);
-        $data = $result->fetch_assoc();
-
-        return $data['count'];
+        $stmt = $this->conn->prepare("SELECT COUNT(*) AS count FROM staffs WHERE staff_approval_status = '0'");
+        $stmt->execute();
+        $count = $stmt->get_result()->fetch_assoc()['count'];
+        $stmt->close();
+        
+        return $count;
     }
 
     // Approve staff
@@ -387,27 +416,31 @@ class Admin extends User
     // Get all departments for dropdown
     public function getAllDepartments()
     {
-        $sql = "SELECT department_id, department_name FROM departments ORDER BY department_name ASC";
-        $result = $this->conn->query($sql);
-
-        return $result->fetch_all(MYSQLI_ASSOC);
+        $stmt = $this->conn->prepare("SELECT department_id, department_name FROM departments ORDER BY department_name ASC");
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $data;
     }
 
     // Get all categories for dropdown
     public function getAllCategories()
     {
-        $sql = "SELECT category_id, category_name FROM complaint_categories WHERE status = 'active' ORDER BY category_name ASC";
-        $result = $this->conn->query($sql);
-        return $result->fetch_all(MYSQLI_ASSOC);
+        $stmt = $this->conn->prepare("SELECT category_id, category_name FROM complaint_categories WHERE status = 'active' ORDER BY category_name ASC");
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $data;
     }
 
     // Get all colleges for dropdown
     public function getAllColleges()
     {
-        $sql = "SELECT college_id, college_name FROM colleges ORDER BY college_name ASC";
-        $result = $this->conn->query($sql);
-
-        return $result->fetch_all(MYSQLI_ASSOC);
+        $stmt = $this->conn->prepare("SELECT college_id, college_name FROM colleges ORDER BY college_name ASC");
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $data;
     }
 
     // Get single complaint with full details
@@ -513,7 +546,7 @@ class Admin extends User
             $oldStatus = $oldStmt->get_result()->fetch_assoc()['complaint_status'];
             $oldStmt->close();
 
-            // Look up the staff member's department so we can route the complaint there
+            // Look up the staff member's department for routing route the complaint 
             $deptStmt = $this->conn->prepare("SELECT staff_department_id FROM staffs WHERE staff_id = ? LIMIT 1");
             $deptStmt->bind_param("s", $staffId);
             $deptStmt->execute();
@@ -1015,13 +1048,18 @@ class Admin extends User
 
     public function getAllStaffRolesWithCount()
     {
-        $sql = "SELECT sr.role_id, sr.role_name, sr.role_rank,
-                       COUNT(s.staff_id) AS staff_count
-                FROM staff_roles sr
-                LEFT JOIN staffs s ON sr.role_id = s.staff_role_id
-                GROUP BY sr.role_id, sr.role_name, sr.role_rank
-                ORDER BY sr.role_rank ASC";
-        return $this->conn->query($sql)->fetch_all(MYSQLI_ASSOC);
+        $stmt = $this->conn->prepare(
+            "SELECT sr.role_id, sr.role_name, sr.role_rank,
+                    COUNT(s.staff_id) AS staff_count
+                 FROM staff_roles sr
+                 LEFT JOIN staffs s ON sr.role_id = s.staff_role_id
+                 GROUP BY sr.role_id, sr.role_name, sr.role_rank
+                 ORDER BY sr.role_rank ASC"
+        );
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $data;
     }
 
     public function addStaffRole($name, $rank)
@@ -1089,16 +1127,21 @@ class Admin extends User
 
     public function getAllDepartmentsWithStats()
     {
-        $sql = "SELECT d.department_id, d.department_name,
-                       COUNT(DISTINCT c.complaint_id)  AS complaint_count,
-                       COUNT(DISTINCT s.staff_id)             AS staff_count
-                FROM departments d
-                LEFT JOIN complaints c ON d.department_id = c.department_id
-                LEFT JOIN staffs s    ON d.department_id = s.staff_department_id
-                                     AND s.staff_approval_status = 1
-                GROUP BY d.department_id, d.department_name
-                ORDER BY d.department_name ASC";
-        return $this->conn->query($sql)->fetch_all(MYSQLI_ASSOC);
+        $stmt = $this->conn->prepare(
+            "SELECT d.department_id, d.department_name,
+                    COUNT(DISTINCT c.complaint_id) AS complaint_count,
+                    COUNT(DISTINCT s.staff_id) AS staff_count
+                 FROM departments d
+                 LEFT JOIN complaints c ON d.department_id = c.department_id
+                 LEFT JOIN staffs s ON d.department_id = s.staff_department_id
+                                    AND s.staff_approval_status = 1
+                 GROUP BY d.department_id, d.department_name
+                 ORDER BY d.department_name ASC"
+        );
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $data;
     }
 
     public function addDepartment($name)
@@ -1140,16 +1183,21 @@ class Admin extends User
 
     public function getAllCategoriesWithStats()
     {
-        $sql = "SELECT cc.category_id, cc.category_name, cc.category_description, cc.status,
-                       cc.auto_assign_department_id,
-                       d.department_name AS default_dept_name,
-                       COUNT(c.complaint_id) AS complaint_count
-                FROM complaint_categories cc
-                LEFT JOIN complaints c ON cc.category_id = c.category_id
-                LEFT JOIN departments d ON cc.auto_assign_department_id = d.department_id
-                GROUP BY cc.category_id, d.department_name
-                ORDER BY cc.category_name ASC";
-        return $this->conn->query($sql)->fetch_all(MYSQLI_ASSOC);
+        $stmt = $this->conn->prepare(
+            "SELECT cc.category_id, cc.category_name, cc.category_description, cc.status,
+                    cc.auto_assign_department_id,
+                    d.department_name AS default_dept_name,
+                    COUNT(c.complaint_id) AS complaint_count
+                 FROM complaint_categories cc
+                 LEFT JOIN complaints c ON cc.category_id = c.category_id
+                 LEFT JOIN departments d ON cc.auto_assign_department_id = d.department_id
+                 GROUP BY cc.category_id, d.department_name
+                 ORDER BY cc.category_name ASC"
+        );
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $data;
     }
 
     public function addCategory($name, $description, $createdBy, $departmentId = null)
@@ -1211,15 +1259,19 @@ class Admin extends User
 
     public function getAllSubcategoriesGrouped()
     {
-        $sql = "SELECT cs.subcategory_id, cs.category_id, cs.subcategory_name,
-                       cs.subcategory_description, cs.status,
-                       COUNT(c.complaint_id) AS complaint_count
-                FROM complaint_subcategories cs
-                LEFT JOIN complaints c ON cs.subcategory_id = c.subcategory_id
-                GROUP BY cs.subcategory_id, cs.category_id, cs.subcategory_name,
-                         cs.subcategory_description, cs.status
-                ORDER BY cs.category_id ASC, cs.subcategory_name ASC";
-        $rows = $this->conn->query($sql)->fetch_all(MYSQLI_ASSOC);
+        $stmt = $this->conn->prepare(
+            "SELECT cs.subcategory_id, cs.category_id, cs.subcategory_name,
+                    cs.subcategory_description, cs.status,
+                    COUNT(c.complaint_id) AS complaint_count
+                 FROM complaint_subcategories cs
+                 LEFT JOIN complaints c ON cs.subcategory_id = c.subcategory_id
+                 GROUP BY cs.subcategory_id, cs.category_id, cs.subcategory_name,
+                          cs.subcategory_description, cs.status
+                 ORDER BY cs.category_id ASC, cs.subcategory_name ASC"
+        );
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
         $grouped = [];
         foreach ($rows as $row) {
             $grouped[(int) $row['category_id']][] = $row;
@@ -1373,29 +1425,9 @@ class Admin extends User
         return $ok;
     }
 
-    // Write a row to activity_logs (creates table on first call if missing)
+    // Write a row to activity_logs 
     public function logActivity($adminId, $action, $targetType, $targetId, $targetName, $details = null)
     {
-        static $tableReady = false;
-        if (!$tableReady) {
-            $this->conn->query(
-                "CREATE TABLE IF NOT EXISTS activity_logs (
-                    log_id       INT AUTO_INCREMENT PRIMARY KEY,
-                    admin_id     INT NOT NULL,
-                    action       VARCHAR(100) NOT NULL,
-                    target_type  VARCHAR(50)  NOT NULL,
-                    target_id    INT          DEFAULT NULL,
-                    target_name  VARCHAR(255) DEFAULT NULL,
-                    details      TEXT         DEFAULT NULL,
-                    ip_address   VARCHAR(45)  DEFAULT NULL,
-                    created_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_admin   (admin_id),
-                    INDEX idx_created (created_at)
-                )"
-            );
-            $tableReady = true;
-        }
-
         $ip = $_SERVER['REMOTE_ADDR'] ?? null;
         $stmt = $this->conn->prepare(
             "INSERT INTO activity_logs (admin_id, action, target_type, target_id, target_name, details, ip_address)
@@ -1552,12 +1584,6 @@ class Admin extends User
     // Detect newly-overdue complaints and notify all admins once per complaint.
     public function notifyOverdueComplaints(): int
     {
-        // Add the tracking column idempotently (MariaDB supports IF NOT EXISTS)
-        $this->conn->query(
-            "ALTER TABLE complaint_assignments
-             ADD COLUMN IF NOT EXISTS overdue_notified TINYINT(1) NOT NULL DEFAULT 0"
-        );
-
         $stmt = $this->conn->prepare(
             "SELECT ca.complaint_id, c.complaint_title, s.staff_user_id
              FROM complaint_assignments ca
@@ -1573,13 +1599,14 @@ class Admin extends User
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
 
-        if (empty($rows)) return 0;
+        if (empty($rows))
+            return 0;
 
         $notif = new Notification($this->conn);
 
         foreach ($rows as $row) {
-            $cid         = (int) $row['complaint_id'];
-            $title       = $row['complaint_title'];
+            $cid = (int) $row['complaint_id'];
+            $title = $row['complaint_title'];
             $staffUserId = (int) $row['staff_user_id'];
 
             $notif->notifyAllAdmins(

@@ -7,6 +7,12 @@ class Database
     private $dbname     = "scmrs";
     public $conn;
 
+    // private $servername = "sql101.infinityfree.com";
+    // private $username   = "if0_42219014";
+    // private $password   = "CharlesEddy004";
+    // private $dbname     = "if0_42219014_scmrs";
+    // public $conn;
+
     public function connect()
     {
         mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);

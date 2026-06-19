@@ -9,9 +9,7 @@ use PHPMailer\PHPMailer\Exception as MailException;
 
 class Mailer
 {
-    /**
-     * Send a single HTML email. Returns true on success, throws on failure.
-     */
+    // Send a single HTML email. Returns true on success, throws on failure.
     public static function send(string $toEmail, string $toName, string $subject, string $htmlBody): bool
     {
         $cfg = require __DIR__ . '/../config/email.php';
@@ -20,14 +18,14 @@ class Mailer
 
         // Server settings
         $mail->isSMTP();
-        $mail->Host       = $cfg['host'];
-        $mail->Port       = $cfg['port'];
-        $mail->SMTPDebug  = SMTP::DEBUG_OFF;
+        $mail->Host = $cfg['host'];
+        $mail->Port = $cfg['port'];
+        $mail->SMTPDebug = SMTP::DEBUG_OFF;
 
         if (!empty($cfg['username'])) {
-            $mail->SMTPAuth   = true;
-            $mail->Username   = $cfg['username'];
-            $mail->Password   = $cfg['password'];
+            $mail->SMTPAuth = true;
+            $mail->Username = $cfg['username'];
+            $mail->Password = $cfg['password'];
         }
 
         if (!empty($cfg['encryption'])) {
@@ -45,25 +43,23 @@ class Mailer
         $mail->isHTML(true);
         $mail->CharSet = 'UTF-8';
         $mail->Subject = $subject;
-        $mail->Body    = $htmlBody;
+        $mail->Body = $htmlBody;
         $mail->AltBody = strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $htmlBody));
 
         $mail->send();
         return true;
     }
 
-    /**
-     * Build the standard HTML email body used for all notification emails.
-     */
+    // Build the standard HTML email body used for all notification emails.
     public static function buildBody(
         string $recipientName,
         string $message,
         ?string $link = null,
         string $linkText = 'View Details'
     ): string {
-        $cfg     = require __DIR__ . '/../config/email.php';
+        $cfg = require __DIR__ . '/../config/email.php';
         $fullUrl = $link ? rtrim($cfg['app_url'], '/') . '/' . ltrim($link, '/') : null;
-        $year    = date('Y');
+        $year = date('Y');
 
         $buttonHtml = $fullUrl
             ? '<a href="' . htmlspecialchars($fullUrl) . '"

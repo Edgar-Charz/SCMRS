@@ -23,6 +23,8 @@ class Notification
         'complaint_delegated'          => 'Complaint Delegated to You',
         'complaint_delegated_resolved' => 'Delegated Complaint Resolved',
         'complaint_overdue'            => 'Complaint Past Resolution Deadline',
+        'new_complaint_in_rep_scope'   => 'New Complaint in Your Department',
+        'endorsed_complaint_updated'   => 'An Endorsed Complaint Has Been Updated',
     ];
 
     public function __construct($db)
@@ -30,6 +32,7 @@ class Notification
         $this->conn = $db;
     }
 
+    //  Create a new notification
     public function create($userId, $message, $type, $link = null, $complaintId = null)
     {
         if ($complaintId !== null) {
@@ -206,6 +209,8 @@ class Notification
             'complaint_delegated_resolved' => 'fa-check-double text-success',
             'complaint_delegated'          => 'fa-level-down-alt text-info',
             'complaint_overdue'            => 'fa-exclamation-triangle text-danger',
+            'new_complaint_in_rep_scope'   => 'fa-building text-primary',
+            'endorsed_complaint_updated'   => 'fa-thumbs-up text-success',
         ];
         return $map[$type] ?? 'fa-bell text-secondary';
     }

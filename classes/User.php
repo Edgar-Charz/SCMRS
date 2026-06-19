@@ -466,27 +466,37 @@ class User
     // Fetch all students with account and college details
     public function getAllRegisteredStudents()
     {
-        $sql = "SELECT u.user_id, u.username, u.user_email, u.user_status, 
-                       s.student_registration_number, s.student_program, c.college_name
-                FROM users u
-                JOIN students s ON u.user_id = s.student_user_id
-                LEFT JOIN colleges c ON s.student_college_id = c.college_id
-                WHERE u.user_role = 'student'
-                ORDER BY s.student_registration_number ASC";
-        return $this->conn->query($sql);
+        $stmt = $this->conn->prepare(
+            "SELECT u.user_id, u.username, u.user_email, u.user_status,
+                    s.student_registration_number, s.student_program, c.college_name
+                 FROM users u
+                 JOIN students s ON u.user_id = s.student_user_id
+                 LEFT JOIN colleges c ON s.student_college_id = c.college_id
+                 WHERE u.user_role = 'student'
+                 ORDER BY s.student_registration_number ASC"
+        );
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $data;
     }
 
     // Fetch all staff with account and department details
     public function getAllRegisteredStaff()
     {
-        $sql = "SELECT u.user_id, u.username, u.user_email, u.user_status, 
-                       d.department_name
-                FROM users u
-                JOIN staffs st ON u.user_id = st.staff_user_id
-                LEFT JOIN departments d ON st.staff_department_id = d.department_id
-                WHERE u.user_role = 'staff'
-                ORDER BY u.username ASC";
-        return $this->conn->query($sql);
+        $stmt = $this->conn->prepare(
+            "SELECT u.user_id, u.username, u.user_email, u.user_status,
+                    d.department_name
+                 FROM users u
+                 JOIN staffs st ON u.user_id = st.staff_user_id
+                 LEFT JOIN departments d ON st.staff_department_id = d.department_id
+                 WHERE u.user_role = 'staff'
+                 ORDER BY u.username ASC"
+        );
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $data;
     }
 
     // Utility to toggle user status (Active/Inactive)
@@ -546,15 +556,6 @@ class User
 
     public function isIpRateLimited(string $ip): bool
     {
-        $this->conn->query(
-            "CREATE TABLE IF NOT EXISTS login_rate_limits (
-                id           INT AUTO_INCREMENT PRIMARY KEY,
-                ip_address   VARCHAR(45)  NOT NULL,
-                attempted_at TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-                INDEX idx_ip_time (ip_address, attempted_at)
-            )"
-        );
-
         // Remove attempts older than 15 minutes
         $clean = $this->conn->prepare(
             "DELETE FROM login_rate_limits WHERE attempted_at < NOW() - INTERVAL 15 MINUTE"
@@ -595,7 +596,9 @@ class User
         $stmt->close();
 
         // Purge globally expired / already-used tokens to prevent table bloat
-        $this->conn->query("DELETE FROM password_resets WHERE expires_at < NOW() OR used = 1");
+        $purge = $this->conn->prepare("DELETE FROM password_resets WHERE expires_at < NOW() OR used = 1");
+        $purge->execute();
+        $purge->close();
 
         // Invalidate any still-valid token for this email before issuing a new one
         $del = $this->conn->prepare("DELETE FROM password_resets WHERE email = ?");
