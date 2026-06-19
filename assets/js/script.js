@@ -172,7 +172,7 @@ $(document).ready(function () {
   // DataTable column widths are adjusted after tables have been initialised.
   if (typeof window.switchTab === "function") {
     const hash = location.hash.slice(1);
-    const VALID_TABS = ["students", "staff", "approval", "roles"];
+    const VALID_TABS = ["students", "staff", "approval", "roles", "reps"];
     window.switchTab(VALID_TABS.includes(hash) ? hash : "students");
   }
 });

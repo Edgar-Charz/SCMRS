@@ -16,7 +16,15 @@
     <div class="user-info d-flex align-items-center">
         <div class="flex-shrink-0"><i class="fas fa-user me-2"></i></div>
         <div class="flex-grow-1 ms-3">
-            <p class="mb-0 small fw-bold"><?= strtoupper($sidebarRole) ?></p>
+            <?php
+            $_roleLabels = [
+                'admin'          => 'ADMINISTRATOR',
+                'staff'          => 'STAFF',
+                'student'        => 'STUDENT',
+                'student_leader' => 'STUDENT REP',
+            ];
+            ?>
+            <p class="mb-0 small fw-bold"><?= $_roleLabels[$sidebarRole] ?? strtoupper($sidebarRole) ?></p>
         </div>
     </div>
 
@@ -69,6 +77,20 @@
                 <a href="email_queue.php">
                     <i class="fas fa-envelope-open-text me-2"></i>
                     <span class="link-text">Email Queue</span>
+                </a>
+            </li>
+
+        <?php elseif ($sidebarRole === 'student_leader'): ?>
+            <li>
+                <a href="leader_dashboard.php">
+                    <i class="fas fa-chart-pie me-2"></i>
+                    <span class="link-text">Dashboard</span>
+                </a>
+            </li>
+            <li>
+                <a href="leader_complaints.php">
+                    <i class="fas fa-file-invoice me-2"></i>
+                    <span class="link-text">Department Complaints</span>
                 </a>
             </li>
 

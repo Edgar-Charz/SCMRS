@@ -6,9 +6,10 @@ $_topbarName = htmlspecialchars($_SESSION['username'] ?? 'User');
 $_topbarAvatar = strtoupper(substr($_SESSION['username'] ?? 'U', 0, 1));
 
 $_roleConfig = [
-    'admin' => ['label' => 'Administrator', 'icon' => 'fa-user-shield'],
-    'staff' => ['label' => 'Staff Member', 'icon' => 'fa-user-tie'],
-    'student' => ['label' => 'Student', 'icon' => 'fa-user-graduate'],
+    'admin'          => ['label' => 'Administrator', 'icon' => 'fa-user-shield'],
+    'staff'          => ['label' => 'Staff Member',  'icon' => 'fa-user-tie'],
+    'student'        => ['label' => 'Student',        'icon' => 'fa-user-graduate'],
+    'student_leader' => ['label' => 'Student Rep',    'icon' => 'fa-user-friends'],
 ];
 $_rc = $_roleConfig[$_topbarRole] ?? $_roleConfig['student'];
 
