@@ -609,6 +609,8 @@ $staffPost   = isset($_POST['registerStaffBTN']);
             <ul class="split-features">
                 <li><i class="fas fa-check-circle"></i> Submit complaints quickly and easily</li>
                 <li><i class="fas fa-check-circle"></i> Track resolution progress in real time</li>
+                <li><i class="fas fa-check-circle"></i> Receive updates on your complaint status</li>
+                <li><i class="fas fa-check-circle"></i> Access reports and analytics for informed decisions</li>
             </ul>
             <div class="split-footer-line"></div>
             <p class="split-uni">University of Dar es Salaam</p>

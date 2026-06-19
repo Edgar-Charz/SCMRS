@@ -62,6 +62,9 @@ if (isset($_POST["loginBTN"])) {
                 case 'admin':
                     header("Location: admin_dashboard.php");
                     break;
+                case 'student_leader':
+                    header("Location: leader_dashboard.php");
+                    break;
                 default:
                     header("Location: default_dashboard.php");
                     break;
