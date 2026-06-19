@@ -398,6 +398,7 @@ $pendingStaffCount = $admin->getPendingStaffCount();
 
     <?php if (!empty($_SESSION['login_success'])):
         unset($_SESSION['login_success']); ?>
+        <!-- <style>.swal2-toast-shown .swal2-container.swal2-top-end { top: 100px; }</style> -->
         <script>
             document.addEventListener('DOMContentLoaded', function () {
                 Swal.fire({

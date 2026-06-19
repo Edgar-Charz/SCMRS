@@ -11,6 +11,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/Admin.php";
+require_once "classes/StudentLeader.php";
 require_once "includes/csrf.php";
 
 $message = $error = "";
@@ -18,6 +19,7 @@ $message = $error = "";
 $db = new Database();
 $conn = $db->connect();
 $admin = new Admin($conn);
+$studentLeader = new StudentLeader($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
@@ -105,7 +107,7 @@ if (isset($_GET['reject_staff']) && is_numeric($_GET['reject_staff'])) {
     }
 }
 
-// Handle Demote Staff (set back to pending)
+// Handle Revoke Staff Approval (set back to pending)
 if (isset($_GET['demote_staff']) && is_numeric($_GET['demote_staff'])) {
     $staff_id = (int) $_GET['demote_staff'];
     try {
@@ -114,15 +116,15 @@ if (isset($_GET['demote_staff']) && is_numeric($_GET['demote_staff'])) {
         $uStmt->execute();
         $uRow = $uStmt->get_result()->fetch_assoc();
         $uStmt->close();
-        $demote_stmt = $conn->prepare("UPDATE staffs SET staff_approval_status = '0' WHERE staff_user_id = ?");
-        $demote_stmt->bind_param("i", $staff_id);
-        if ($demote_stmt->execute()) {
+        $revoke_stmt = $conn->prepare("UPDATE staffs SET staff_approval_status = '0' WHERE staff_user_id = ?");
+        $revoke_stmt->bind_param("i", $staff_id);
+        if ($revoke_stmt->execute()) {
             $admin->logActivity($adminId, 'staff_demoted', 'user', $staff_id, $uRow['username'] ?? "User #$staff_id", 'Staff approval revoked (moved back to pending)');
-            $_SESSION['message'] = "Staff demoted successfully.";
+            $_SESSION['message'] = "Staff approval revoked successfully.";
             header("Location: user_management.php#approval");
             exit;
         }
-        $demote_stmt->close();
+        $revoke_stmt->close();
     } catch (Exception $e) {
         $error = $e->getMessage();
     }
@@ -130,7 +132,7 @@ if (isset($_GET['demote_staff']) && is_numeric($_GET['demote_staff'])) {
 
 // Handle Toggle Student Status (suspend / activate)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_student_status'])) {
-    $userId        = (int) ($_POST['toggle_user_id'] ?? 0);
+    $userId = (int) ($_POST['toggle_user_id'] ?? 0);
     $currentStatus = $_POST['current_status'] ?? '';
     try {
         if ($userId && in_array($currentStatus, ['active', 'inactive'], true)) {
@@ -154,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_student_status
 
 // Handle Toggle Staff Status (suspend / activate)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_staff_status'])) {
-    $userId        = (int) ($_POST['toggle_user_id'] ?? 0);
+    $userId = (int) ($_POST['toggle_user_id'] ?? 0);
     $currentStatus = $_POST['current_status'] ?? '';
     try {
         if ($userId && in_array($currentStatus, ['active', 'inactive'], true)) {
@@ -178,14 +180,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_staff_status']
 
 // Handle Admin Password Reset
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_reset_password'])) {
-    $userId          = (int) ($_POST['reset_user_id'] ?? 0);
-    $newPassword     = $_POST['new_password'] ?? '';
+    $userId = (int) ($_POST['reset_user_id'] ?? 0);
+    $newPassword = $_POST['new_password'] ?? '';
     $confirmPassword = $_POST['confirm_new_password'] ?? '';
-    $redirectTab     = in_array($_POST['redirect_tab'] ?? '', ['students', 'staff'], true) ? $_POST['redirect_tab'] : 'students';
+    $redirectTab = in_array($_POST['redirect_tab'] ?? '', ['students', 'staff'], true) ? $_POST['redirect_tab'] : 'students';
     try {
-        if (!$userId) throw new Exception("Invalid user.");
-        if (empty($newPassword)) throw new Exception("Password is required.");
-        if ($newPassword !== $confirmPassword) throw new Exception("Passwords do not match.");
+        if (!$userId)
+            throw new Exception("Invalid user.");
+        if (empty($newPassword))
+            throw new Exception("Password is required.");
+        if ($newPassword !== $confirmPassword)
+            throw new Exception("Passwords do not match.");
         $admin->adminResetPassword($userId, $newPassword);
         $uStmt = $conn->prepare("SELECT username FROM users WHERE user_id = ?");
         $uStmt->bind_param("i", $userId);
@@ -320,6 +325,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_role'])) {
     exit;
 }
 
+// Handle Assign Student Rep
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_rep'])) {
+    $repUserId = (int) ($_POST['rep_user_id'] ?? 0);
+    $repDeptId = (int) ($_POST['rep_department_id'] ?? 0);
+    if ($repUserId > 0 && $repDeptId > 0) {
+        try {
+            $studentLeader->setUserId($repUserId);
+            $username = $studentLeader->getUsername();
+            $studentLeader->assign($repDeptId, $adminId);
+            $admin->logActivity($adminId, 'role_changed', 'user', $repUserId, $username, 'Assigned as Student Rep');
+            $_SESSION['message'] = "Student assigned as department representative.";
+        } catch (Exception $e) {
+            $_SESSION['message_error'] = $e->getMessage();
+        }
+    }
+    header("Location: user_management.php#reps");
+    exit;
+}
+
+// Handle Revoke Student Rep
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['revoke_rep'])) {
+    $repUserId = (int) ($_POST['rep_user_id'] ?? 0);
+    $repDeptId = (int) ($_POST['rep_department_id'] ?? 0);
+    if ($repUserId > 0 && $repDeptId > 0) {
+        try {
+            $studentLeader->setUserId($repUserId);
+            $username = $studentLeader->getUsername();
+            $studentLeader->revoke($repDeptId);
+            $admin->logActivity($adminId, 'role_changed', 'user', $repUserId, $username, "Revoked Student Rep scope for department #$repDeptId");
+            $_SESSION['message'] = "Representative scope revoked.";
+        } catch (Exception $e) {
+            $_SESSION['message_error'] = $e->getMessage();
+        }
+    }
+    header("Location: user_management.php#reps");
+    exit;
+}
+
 // Get data
 $registered_students = $admin->getAllStudents();
 $registered_staffs = $admin->getAllStaff();
@@ -330,6 +373,7 @@ $approved_count = count($approved_staffs);
 $departments = $admin->getAllDepartments();
 $colleges = $admin->getAllColleges();
 $staff_roles = $admin->getAllStaffRolesWithCount();
+$student_reps  = $studentLeader->getAllReps();
 
 // Get message from session
 if (isset($_SESSION['message'])) {
@@ -420,6 +464,16 @@ if (isset($_SESSION['message'])) {
                             Staff Roles
                         </button>
                     </li>
+                    <li class="nav-item me-2" role="presentation">
+                        <button class="nav-link fw-bold" onclick="switchTab('reps')" id="tab-reps">
+                            <i class="fas fa-user-friends me-2"></i>
+                            Student Reps
+                            <?php if (!empty($student_reps)): ?>
+                                <span class="badge bg-purple ms-1"
+                                    style="background-color:#6f42c1;"><?= count($student_reps) ?></span>
+                            <?php endif; ?>
+                        </button>
+                    </li>
                 </ul>
 
                 <!-- Manage students -->
@@ -468,6 +522,9 @@ if (isset($_SESSION['message'])) {
                                                     <?php else: ?>
                                                         <span class="badge bg-danger">Suspended</span>
                                                     <?php endif; ?>
+                                                    <?php if (($student['user_role'] ?? '') === 'student_leader'): ?>
+                                                        <span class="badge ms-1" style="background-color:#6f42c1;">Rep</span>
+                                                    <?php endif; ?>
                                                 </td>
                                                 <td class="text-center">
                                                     <div class="d-flex justify-content-center">
@@ -483,7 +540,8 @@ if (isset($_SESSION['message'])) {
                                                         <button type="button" class="btn btn-status btn-outline-secondary me-2"
                                                             onclick="confirmToggleStatus(<?= $student['user_id'] ?>, '<?= $student['user_status'] ?>', 'student')"
                                                             title="<?= $student['user_status'] === 'active' ? 'Suspend account' : 'Activate account' ?>">
-                                                            <i class="fas fa-<?= $student['user_status'] === 'active' ? 'user-slash' : 'user-check' ?> text-dark"></i>
+                                                            <i
+                                                                class="fas fa-<?= $student['user_status'] === 'active' ? 'user-slash' : 'user-check' ?> text-dark"></i>
                                                         </button>
 
                                                         <!-- Reset Password Button -->
@@ -499,6 +557,15 @@ if (isset($_SESSION['message'])) {
                                                             onclick="confirmDeleteStudent(<?php echo $student['user_id']; ?>)"
                                                             title="delete">
                                                             <i class="fas fa-trash text-dark"></i>
+                                                        </button>
+
+                                                        <!-- Assign as Rep Button -->
+                                                        <button type="button" class="btn btn-status btn-outline-secondary me-2"
+                                                            data-bs-toggle="modal" data-bs-target="#assignRepModal"
+                                                            onclick="openAssignRep(<?= $student['user_id'] ?>, '<?= htmlspecialchars($student['username'], ENT_QUOTES) ?>')"
+                                                            title="Assign as department rep"
+                                                            style="color:#6f42c1;border-color:#6f42c1;">
+                                                            <i class="fas fa-user-friends" style="color:#6f42c1;"></i>
                                                         </button>
                                                     </div>
                                                 </td>
@@ -517,7 +584,8 @@ if (isset($_SESSION['message'])) {
                                             <div class="modal-content shadow-lg rounded-3">
                                                 <div class="modal-header text-white"
                                                     style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                                                    <h5 class="modal-title fw-bold text-white" id="viewStudentModalLabel">
+                                                    <h5 class="modal-title fw-bold text-white"
+                                                        id="viewStudentModalLabel">
                                                         <i class="fas fa-user-graduate me-2"></i>
                                                         STUDENT INFORMATION
                                                     </h5>
@@ -533,7 +601,8 @@ if (isset($_SESSION['message'])) {
                                                                 <p class="form-control" id="modal_student_name">-</p>
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
-                                                                <label class="form-label fw-bold">Registration Number</label>
+                                                                <label class="form-label fw-bold">Registration
+                                                                    Number</label>
                                                                 <p class="form-control" id="modal_student_regnum">-</p>
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
@@ -578,7 +647,8 @@ if (isset($_SESSION['message'])) {
                                             <div class="modal-content shadow-lg rounded-3">
                                                 <div class="modal-header text-white"
                                                     style="background: linear-gradient(135deg, #007bff, #0056b3);">
-                                                    <h5 class="modal-title fw-bold text-white" id="editStudentModalLabel">
+                                                    <h5 class="modal-title fw-bold text-white"
+                                                        id="editStudentModalLabel">
                                                         <i class="fas fa-user-edit me-2"></i>
                                                         EDIT STUDENT INFORMATION
                                                     </h5>
@@ -710,7 +780,8 @@ if (isset($_SESSION['message'])) {
                                                 <div class="pwd-wrap">
                                                     <input type="password" name="student_password" id="addStudentPwd"
                                                         class="form-control" placeholder="Min 8 characters" required>
-                                                    <button type="button" class="pwd-eye" onclick="togglePwd('addStudentPwd',this)" tabindex="-1">
+                                                    <button type="button" class="pwd-eye"
+                                                        onclick="togglePwd('addStudentPwd',this)" tabindex="-1">
                                                         <i class="fas fa-eye-slash"></i>
                                                     </button>
                                                 </div>
@@ -722,7 +793,8 @@ if (isset($_SESSION['message'])) {
                                                     <input type="password" name="student_confirm_password"
                                                         id="addStudentPwdConfirm" class="form-control"
                                                         placeholder="Re-enter password" required>
-                                                    <button type="button" class="pwd-eye" onclick="togglePwd('addStudentPwdConfirm',this)" tabindex="-1">
+                                                    <button type="button" class="pwd-eye"
+                                                        onclick="togglePwd('addStudentPwdConfirm',this)" tabindex="-1">
                                                         <i class="fas fa-eye-slash"></i>
                                                     </button>
                                                 </div>
@@ -742,6 +814,96 @@ if (isset($_SESSION['message'])) {
                         </div>
                     </div>
                     <!-- / Add Student modal -->
+
+                </div>
+
+                <!-- Student Representatives -->
+                <div id="reps-section" class="management-content d-none">
+                    <div class="container-card border-0 shadow-sm p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4 class="mb-1 fw-bold" style="color:var(--udsm-blue);">
+                                <i class="fas fa-user-friends me-2"></i>Student Representatives
+                            </h4>
+                        </div>
+
+                        <?php if (empty($student_reps)): ?>
+                            <div class="text-center text-muted py-5">
+                                <i class="fas fa-users fa-2x mb-2"></i>
+                                <p class="mb-0">No student representatives assigned yet.<br>
+                                    Go to the <strong>Students List</strong> tab and click the <i
+                                        class="fas fa-user-friends"></i> button on a student.</p>
+                            </div>
+                        <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-stripped" id="repsTable">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>#</th>
+                                            <th>NAME</th>
+                                            <th>EMAIL</th>
+                                            <th>DEPARTMENTS</th>
+                                            <th class="text-center">ACTION</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php $n = 1;
+                                        foreach ($student_reps as $rep): ?>
+                                            <?php
+                                            $deptNames = explode(', ', $rep['departments']);
+                                            $deptIds = explode(',', $rep['department_ids']);
+                                            ?>
+                                            <tr>
+                                                <td><?= $n++ ?></td>
+                                                <td><?= htmlspecialchars($rep['username']) ?></td>
+                                                <td><?= htmlspecialchars($rep['user_email']) ?></td>
+                                                <td>
+                                                    <?php foreach ($deptNames as $idx => $dName): ?>
+                                                        <span class="badge me-1 mb-1" style="background-color:#6f42c1;">
+                                                            <?= htmlspecialchars($dName) ?>
+                                                            <form method="POST" style="display:inline;"
+                                                                onsubmit="return confirm('Remove this rep scope?');">
+                                                                <input type="hidden" name="revoke_rep" value="1">
+                                                                <input type="hidden" name="rep_user_id"
+                                                                    value="<?= $rep['user_id'] ?>">
+                                                                <input type="hidden" name="rep_department_id"
+                                                                    value="<?= (int) ($deptIds[$idx] ?? 0) ?>">
+                                                                <?= csrf_field() ?>
+                                                                <button type="submit" class="btn p-0 ms-1"
+                                                                    style="color:rgba(255,255,255,0.8);line-height:1;"
+                                                                    title="Remove scope">
+                                                                    <i class="fas fa-times" style="font-size:0.7rem;"></i>
+                                                                </button>
+                                                            </form>
+                                                        </span>
+                                                    <?php endforeach; ?>
+                                                </td>
+                                                <td class="text-center">
+                                                    <div class="d-flex justify-content-center gap-1">
+                                                        <!-- View Rep -->
+                                                        <button type="button"
+                                                            class="btn btn-status btn-outline-secondary"
+                                                            data-bs-toggle="modal" data-bs-target="#viewRepModal"
+                                                            onclick="viewRep(<?= htmlspecialchars(json_encode($rep), ENT_QUOTES) ?>)"
+                                                            title="View rep details">
+                                                            <i class="fas fa-eye text-dark"></i>
+                                                        </button>
+                                                        <!-- Add another department -->
+                                                        <button type="button"
+                                                            class="btn btn-status btn-outline-secondary"
+                                                            data-bs-toggle="modal" data-bs-target="#assignRepModal"
+                                                            onclick="openAssignRep(<?= $rep['user_id'] ?>, '<?= htmlspecialchars($rep['username'], ENT_QUOTES) ?>')"
+                                                            title="Add another department">
+                                                            <i class="fas fa-plus text-dark"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
 
                 <!-- Manage staffs -->
@@ -819,7 +981,8 @@ if (isset($_SESSION['message'])) {
                                                         <button type="button" class="btn btn-status btn-outline-secondary me-2"
                                                             onclick="confirmToggleStatus(<?= $staff['user_id'] ?>, '<?= $staff['user_status'] ?>', 'staff')"
                                                             title="<?= $staff['user_status'] === 'active' ? 'Suspend account' : 'Activate account' ?>">
-                                                            <i class="fas fa-<?= $staff['user_status'] === 'active' ? 'user-slash' : 'user-check' ?> text-dark"></i>
+                                                            <i
+                                                                class="fas fa-<?= $staff['user_status'] === 'active' ? 'user-slash' : 'user-check' ?> text-dark"></i>
                                                         </button>
 
                                                         <!-- Reset Password Button -->
@@ -883,7 +1046,8 @@ if (isset($_SESSION['message'])) {
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
                                                                 <label class="form-label fw-bold">Department</label>
-                                                                <p class="form-control" id="modal_staff_department">-</p>
+                                                                <p class="form-control" id="modal_staff_department">-
+                                                                </p>
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
                                                                 <label class="form-label fw-bold">Role</label>
@@ -895,11 +1059,13 @@ if (isset($_SESSION['message'])) {
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
                                                                 <label class="form-label fw-bold">Approved By</label>
-                                                                <p class="form-control" id="modal_staff_approved_by">-</p>
+                                                                <p class="form-control" id="modal_staff_approved_by">-
+                                                                </p>
                                                             </div>
                                                             <div class="col-lg-6 col-sm-12 col-12">
                                                                 <label class="form-label fw-bold">Approved At</label>
-                                                                <p class="form-control" id="modal_staff_approved_at">-</p>
+                                                                <p class="form-control" id="modal_staff_approved_at">-
+                                                                </p>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1054,7 +1220,8 @@ if (isset($_SESSION['message'])) {
                                                 <div class="pwd-wrap">
                                                     <input type="password" name="staff_password" id="addStaffPwd"
                                                         class="form-control" placeholder="Min 8 characters" required>
-                                                    <button type="button" class="pwd-eye" onclick="togglePwd('addStaffPwd',this)" tabindex="-1">
+                                                    <button type="button" class="pwd-eye"
+                                                        onclick="togglePwd('addStaffPwd',this)" tabindex="-1">
                                                         <i class="fas fa-eye-slash"></i>
                                                     </button>
                                                 </div>
@@ -1066,7 +1233,8 @@ if (isset($_SESSION['message'])) {
                                                     <input type="password" name="staff_confirm_password"
                                                         id="addStaffPwdConfirm" class="form-control"
                                                         placeholder="Re-enter password" required>
-                                                    <button type="button" class="pwd-eye" onclick="togglePwd('addStaffPwdConfirm',this)" tabindex="-1">
+                                                    <button type="button" class="pwd-eye"
+                                                        onclick="togglePwd('addStaffPwdConfirm',this)" tabindex="-1">
                                                         <i class="fas fa-eye-slash"></i>
                                                     </button>
                                                 </div>
@@ -1285,10 +1453,10 @@ if (isset($_SESSION['message'])) {
                                                             <i class="fas fa-eye text-dark"></i>
                                                         </button>
 
-                                                        <!-- Demote Button -->
+                                                        <!-- Revoke Approval Button -->
                                                         <button type="button" class="btn btn-status btn-outline-secondary me-2"
                                                             onclick="confirmDemoteStaff(<?php echo $staff['user_id']; ?>)"
-                                                            title="demote">
+                                                            title="Revoke approval">
                                                             <i class="fas fa-user-minus text-dark"></i>
                                                         </button>
                                                     </div>
@@ -1309,7 +1477,8 @@ if (isset($_SESSION['message'])) {
                                             <div class="modal-content shadow-lg rounded-3">
                                                 <div class="modal-header text-white"
                                                     style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                                                    <h5 class="modal-title fw-bold text-white" id="viewApprovedStaffModalLabel">
+                                                    <h5 class="modal-title fw-bold text-white"
+                                                        id="viewApprovedStaffModalLabel">
                                                         <i class="fas fa-user-tie me-2"></i>
                                                         STAFF INFORMATION
                                                     </h5>
@@ -1584,27 +1753,31 @@ if (isset($_SESSION['message'])) {
                                 <h5 class="modal-title fw-bold text-white">
                                     <i class="fas fa-key me-2"></i>RESET PASSWORD
                                 </h5>
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                <button type="button" class="btn-close btn-close-white"
+                                    data-bs-dismiss="modal"></button>
                             </div>
                             <form action="user_management.php" method="POST">
                                 <?= csrf_field() ?>
                                 <input type="hidden" name="reset_user_id" id="reset_user_id">
                                 <input type="hidden" name="redirect_tab" id="reset_redirect_tab">
                                 <div class="modal-body px-4 py-3">
-                                    <p class="mb-3 small">Setting new password for: <strong id="reset_user_name"></strong></p>
+                                    <p class="mb-3 small">Setting new password for: <strong
+                                            id="reset_user_name"></strong></p>
                                     <div class="mb-3">
-                                        <label class="form-label fw-bold small">New Password <span class="text-danger">*</span></label>
+                                        <label class="form-label fw-bold small">New Password <span
+                                                class="text-danger">*</span></label>
                                         <div class="pwd-wrap">
                                             <input type="password" name="new_password" id="resetPwd"
                                                 class="form-control" placeholder="Min 8 characters" required>
-                                            <button type="button" class="pwd-eye"
-                                                onclick="togglePwd('resetPwd',this)" tabindex="-1">
+                                            <button type="button" class="pwd-eye" onclick="togglePwd('resetPwd',this)"
+                                                tabindex="-1">
                                                 <i class="fas fa-eye-slash"></i>
                                             </button>
                                         </div>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label fw-bold small">Confirm Password <span class="text-danger">*</span></label>
+                                        <label class="form-label fw-bold small">Confirm Password <span
+                                                class="text-danger">*</span></label>
                                         <div class="pwd-wrap">
                                             <input type="password" name="confirm_new_password" id="resetPwdConfirm"
                                                 class="form-control" placeholder="Re-enter password" required>
@@ -1624,7 +1797,8 @@ if (isset($_SESSION['message'])) {
                                         onclick="return checkPasswords('resetPwd','resetPwdConfirm')">
                                         <i class="fas fa-key me-1"></i>Reset Password
                                     </button>
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="button" class="btn btn-secondary"
+                                        data-bs-dismiss="modal">Cancel</button>
                                 </div>
                             </form>
                         </div>
@@ -1679,9 +1853,102 @@ if (isset($_SESSION['message'])) {
         </div>
     </div>
 
+    <!-- Assign Rep Modal (body-level so it works from any tab) -->
+    <div class="modal fade" id="assignRepModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content shadow-lg rounded-3">
+                <div class="modal-header text-white" style="background:linear-gradient(135deg,#6f42c1,#8a5cf7);">
+                    <h5 class="modal-title fw-bold text-white">
+                        <i class="fas fa-user-friends me-2"></i>Assign as Department Rep
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST">
+                    <div class="modal-body">
+                        <input type="hidden" name="assign_rep" value="1">
+                        <input type="hidden" name="rep_user_id" id="assignRepUserId">
+                        <?= csrf_field() ?>
+                        <p class="mb-3">Assigning <strong id="assignRepName"></strong> as a department representative.
+                        </p>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Department</label>
+                            <select name="rep_department_id" class="form-select" required>
+                                <option value="">-- Select Department --</option>
+                                <?php foreach ($departments as $dept): ?>
+                                    <option value="<?= $dept['department_id'] ?>">
+                                        <?= htmlspecialchars($dept['department_name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn text-white" style="background-color:#6f42c1;">
+                            <i class="fas fa-check me-1"></i>Assign
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- /Assign Rep Modal -->
+
+    <!-- View Rep Modal -->
+    <div class="modal fade" id="viewRepModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content shadow-lg rounded-3">
+                <div class="modal-header text-white"
+                     style="background:linear-gradient(135deg,#6f42c1,#8a5cf7);">
+                    <h5 class="modal-title fw-bold text-white">
+                        <i class="fas fa-user-friends me-2"></i>
+                        STUDENT REP INFORMATION
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="container-fluid">
+                        <div class="row g-3">
+                            <div class="col-sm-6">
+                                <label class="form-label fw-bold small text-muted">FULL NAME</label>
+                                <p class="form-control mb-0" id="viewRep_name">-</p>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label fw-bold small text-muted">REGISTRATION NUMBER</label>
+                                <p class="form-control mb-0" id="viewRep_regnum">-</p>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label fw-bold small text-muted">EMAIL ADDRESS</label>
+                                <p class="form-control mb-0" id="viewRep_email">-</p>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label fw-bold small text-muted">ACCOUNT STATUS</label>
+                                <p class="form-control mb-0" id="viewRep_status">-</p>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold small text-muted">DEPARTMENTS REPRESENTING</label>
+                                <p class="form-control mb-0" id="viewRep_departments">-</p>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label fw-bold small text-muted">TOTAL ENDORSEMENTS MADE</label>
+                                <p class="form-control mb-0" id="viewRep_endorsements">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- /View Rep Modal -->
+
     <script>
         (function () {
-            var VALID_TABS = ['students', 'staff', 'approval', 'roles'];
+            var VALID_TABS = ['students', 'staff', 'approval', 'roles', 'reps'];
+            var LS_KEY = 'um_active_tab';
 
             window.switchTab = function (tabName) {
                 if (VALID_TABS.indexOf(tabName) === -1) tabName = 'students';
@@ -1696,6 +1963,7 @@ if (isset($_SESSION['message'])) {
                 if (section) section.classList.remove('d-none');
                 if (tab) tab.classList.add('active');
                 history.replaceState(null, '', '#' + tabName);
+                try { localStorage.setItem(LS_KEY, tabName); } catch (e) {}
                 if (window.$ && $.fn.DataTable) {
                     $($.fn.dataTable.tables(true)).DataTable().columns.adjust();
                 }
@@ -1706,8 +1974,14 @@ if (isset($_SESSION['message'])) {
                 switchTab(VALID_TABS.indexOf(hash) !== -1 ? hash : 'students');
             });
 
-            var initHash = location.hash.slice(1);
-            switchTab(VALID_TABS.indexOf(initHash) !== -1 ? initHash : 'students');
+            // Priority: URL hash (PHP redirects set this) → localStorage → default
+            var hash = location.hash.slice(1);
+            var saved = '';
+            try { saved = localStorage.getItem(LS_KEY) || ''; } catch (e) {}
+            var initTab = VALID_TABS.indexOf(hash) !== -1 ? hash
+                        : VALID_TABS.indexOf(saved) !== -1 ? saved
+                        : 'students';
+            switchTab(initTab);
         }());
 
         function checkPasswords(pwdId, confirmId) {
@@ -1725,23 +1999,23 @@ if (isset($_SESSION['message'])) {
         }
 
         function viewStudent(student) {
-            document.getElementById('modal_student_name').textContent    = student.username || '-';
-            document.getElementById('modal_student_regnum').textContent  = student.student_registration_number || '-';
-            document.getElementById('modal_student_email').textContent   = student.user_email || '-';
-            document.getElementById('modal_student_phone').textContent   = student.user_phone_number || 'Not provided';
+            document.getElementById('modal_student_name').textContent = student.username || '-';
+            document.getElementById('modal_student_regnum').textContent = student.student_registration_number || '-';
+            document.getElementById('modal_student_email').textContent = student.user_email || '-';
+            document.getElementById('modal_student_phone').textContent = student.user_phone_number || 'Not provided';
             document.getElementById('modal_student_college').textContent = student.college_name || 'Not specified';
             document.getElementById('modal_student_program').textContent = student.student_program || 'Not specified';
-            document.getElementById('modal_student_status').textContent  = student.user_status === 'active' ? 'Active' : 'Suspended';
+            document.getElementById('modal_student_status').textContent = student.user_status === 'active' ? 'Active' : 'Suspended';
         }
 
         function viewStaff(staff) {
-            document.getElementById('modal_staff_name').textContent        = staff.username || '-';
-            document.getElementById('modal_staff_id').textContent          = staff.staff_id || '-';
-            document.getElementById('modal_staff_email').textContent       = staff.user_email || '-';
-            document.getElementById('modal_staff_phone').textContent       = staff.user_phone_number || 'Not provided';
-            document.getElementById('modal_staff_department').textContent  = staff.department_name || 'Unassigned';
-            document.getElementById('modal_staff_role').textContent        = staff.role_name || 'Unassigned';
-            document.getElementById('modal_staff_status').textContent      = staff.user_status === 'active' ? 'Active' : 'Suspended';
+            document.getElementById('modal_staff_name').textContent = staff.username || '-';
+            document.getElementById('modal_staff_id').textContent = staff.staff_id || '-';
+            document.getElementById('modal_staff_email').textContent = staff.user_email || '-';
+            document.getElementById('modal_staff_phone').textContent = staff.user_phone_number || 'Not provided';
+            document.getElementById('modal_staff_department').textContent = staff.department_name || 'Unassigned';
+            document.getElementById('modal_staff_role').textContent = staff.role_name || 'Unassigned';
+            document.getElementById('modal_staff_status').textContent = staff.user_status === 'active' ? 'Active' : 'Suspended';
             document.getElementById('modal_staff_approved_by').textContent = staff.approved_by_name || 'N/A';
             document.getElementById('modal_staff_approved_at').textContent = staff.staff_approved_at
                 ? new Date(staff.staff_approved_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -1749,17 +2023,37 @@ if (isset($_SESSION['message'])) {
         }
 
         function viewApprovedStaff(staff) {
-            document.getElementById('astaff_name').textContent         = staff.username || '-';
-            document.getElementById('astaff_id').textContent           = staff.staff_id || '-';
-            document.getElementById('astaff_email').textContent        = staff.user_email || '-';
-            document.getElementById('astaff_phone').textContent        = staff.user_phone_number || 'Not provided';
-            document.getElementById('astaff_dept').textContent         = staff.department_name || 'Unassigned';
-            document.getElementById('astaff_role').textContent         = staff.role_name || 'Unassigned';
-            document.getElementById('astaff_approved_by').textContent  = staff.approved_by_name || 'N/A';
-            document.getElementById('astaff_approved_at').textContent  = staff.staff_approved_at
+            document.getElementById('astaff_name').textContent = staff.username || '-';
+            document.getElementById('astaff_id').textContent = staff.staff_id || '-';
+            document.getElementById('astaff_email').textContent = staff.user_email || '-';
+            document.getElementById('astaff_phone').textContent = staff.user_phone_number || 'Not provided';
+            document.getElementById('astaff_dept').textContent = staff.department_name || 'Unassigned';
+            document.getElementById('astaff_role').textContent = staff.role_name || 'Unassigned';
+            document.getElementById('astaff_approved_by').textContent = staff.approved_by_name || 'N/A';
+            document.getElementById('astaff_approved_at').textContent = staff.staff_approved_at
                 ? new Date(staff.staff_approved_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                 : 'N/A';
             document.getElementById('astaff_status').textContent = staff.user_status === 'active' ? 'Active' : 'Suspended';
+        }
+
+        function openAssignRep(userId, username) {
+            document.getElementById('assignRepUserId').value = userId;
+            document.getElementById('assignRepName').textContent = username;
+        }
+
+        function viewRep(rep) {
+            document.getElementById('viewRep_name').textContent       = rep.username || '-';
+            document.getElementById('viewRep_regnum').textContent     = rep.student_registration_number || 'N/A';
+            document.getElementById('viewRep_email').textContent      = rep.user_email || '-';
+            document.getElementById('viewRep_departments').textContent = rep.departments || '-';
+            document.getElementById('viewRep_endorsements').textContent = rep.endorsement_count || '0';
+
+            var statusEl = document.getElementById('viewRep_status');
+            if (rep.user_status === 'active') {
+                statusEl.innerHTML = '<span class="badge bg-success">Active</span>';
+            } else {
+                statusEl.innerHTML = '<span class="badge bg-danger">' + (rep.user_status || 'Unknown') + '</span>';
+            }
         }
 
         function confirmDeleteStudent(studentId) {
@@ -1822,12 +2116,12 @@ if (isset($_SESSION['message'])) {
         function confirmDemoteStaff(staffId) {
             Swal.fire({
                 icon: 'warning',
-                title: 'Demote Staff?',
+                title: 'Revoke Staff Approval?',
                 text: 'This will move the staff back to pending approval status.',
                 showCancelButton: true,
                 confirmButtonColor: '#d33',
                 cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Yes, demote',
+                confirmButtonText: 'Yes, revoke approval',
                 cancelButtonText: 'Cancel'
             }).then((result) => {
                 if (result.isConfirmed) {
@@ -1867,7 +2161,7 @@ if (isset($_SESSION['message'])) {
                         'current_status': currentStatus
                     };
                     fields['toggle_' + type + '_status'] = '1';
-                    Object.entries(fields).forEach(function([k, v]) {
+                    Object.entries(fields).forEach(function ([k, v]) {
                         var input = document.createElement('input');
                         input.type = 'hidden';
                         input.name = k;

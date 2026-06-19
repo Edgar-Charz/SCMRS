@@ -299,6 +299,11 @@ function statusBadge($status)
                                                         <i class="fas fa-clock me-1"></i>Overdue
                                                     </span>
                                                 <?php endif; ?>
+                                                <?php if (!empty($c['endorsement_count']) && $c['endorsement_count'] > 0): ?>
+                                                    <br><span class="badge mt-1" style="background-color:#6f42c1;">
+                                                        <i class="fas fa-thumbs-up me-1"></i><?= (int)$c['endorsement_count'] ?> Rep
+                                                    </span>
+                                                <?php endif; ?>
                                             </td>
                                             <td class="text-center">
                                                 <?php if (!empty($c['assigned_staff_name'])): ?>

@@ -12,24 +12,6 @@ require_once "classes/Admin.php";
 
 $db = new Database();
 $conn = $db->connect();
-
-// Ensure the activity_logs table exists
-$conn->query(
-    "CREATE TABLE IF NOT EXISTS activity_logs (
-        log_id       INT AUTO_INCREMENT PRIMARY KEY,
-        admin_id     INT NOT NULL,
-        action       VARCHAR(100) NOT NULL,
-        target_type  VARCHAR(50)  NOT NULL,
-        target_id    INT          DEFAULT NULL,
-        target_name  VARCHAR(255) DEFAULT NULL,
-        details      TEXT         DEFAULT NULL,
-        ip_address   VARCHAR(45)  DEFAULT NULL,
-        created_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_admin   (admin_id),
-        INDEX idx_created (created_at)
-    )"
-);
-
 $admin = new Admin($conn);
 
 // Filters
@@ -52,7 +34,7 @@ $actionMeta = [
     'password_reset' => ['label' => 'Password Reset', 'class' => 'bg-secondary'],
     'staff_approved' => ['label' => 'Staff Approved', 'class' => 'bg-success'],
     'staff_rejected' => ['label' => 'Staff Rejected', 'class' => 'bg-danger'],
-    'staff_demoted'        => ['label' => 'Staff Demoted',          'class' => 'bg-warning text-dark'],
+    'staff_demoted'        => ['label' => 'Staff Approval Revoked', 'class' => 'bg-warning text-dark'],
     'complaint_assigned'   => ['label' => 'Complaint Assigned',     'class' => 'bg-info text-dark'],
     'complaint_deleted'    => ['label' => 'Complaint Deleted',      'class' => 'bg-danger'],
     'department_added'     => ['label' => 'Department Added',       'class' => 'bg-success'],
