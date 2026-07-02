@@ -66,6 +66,7 @@ class Staff
                     COUNT(*) as total,
                     SUM(CASE WHEN complaint_status = 'pending' THEN 1 ELSE 0 END) as pending,
                     SUM(CASE WHEN complaint_status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
+                    SUM(CASE WHEN complaint_status = 'awaiting_student_response' THEN 1 ELSE 0 END) as awaiting_response,
                     SUM(CASE WHEN complaint_status = 'resolved' THEN 1 ELSE 0 END) as resolved,
                     SUM(CASE WHEN complaint_status = 'rejected' THEN 1 ELSE 0 END) as rejected
                 FROM complaints
@@ -77,6 +78,7 @@ class Staff
                 'total' => 0,
                 STATUS_PENDING => 0,
                 STATUS_IN_PROGRESS => 0,
+                STATUS_AWAITING_RESPONSE => 0,
                 STATUS_RESOLVED => 0,
                 STATUS_REJECTED => 0,
             ];
@@ -91,6 +93,7 @@ class Staff
             'total' => (int) ($row['total'] ?? 0),
             STATUS_PENDING => (int) ($row['pending'] ?? 0),
             STATUS_IN_PROGRESS => (int) ($row['in_progress'] ?? 0),
+            STATUS_AWAITING_RESPONSE => (int) ($row['awaiting_response'] ?? 0),
             STATUS_RESOLVED => (int) ($row['resolved'] ?? 0),
             STATUS_REJECTED => (int) ($row['rejected'] ?? 0),
         ];
@@ -151,6 +154,30 @@ class Staff
         }
 
         return $complaints;
+    }
+
+    // Count active assigned complaints whose target_resolution_date has passed without resolution
+    public function getOverdueCount(string $staffId): int
+    {
+        $stmt = $this->conn->prepare(
+            "SELECT COUNT(*) AS cnt
+             FROM complaints c
+             JOIN complaint_assignments ca ON ca.complaint_id = c.complaint_id
+                                          AND ca.staff_id = ?
+                                          AND ca.status = 'active'
+             WHERE c.complaint_status NOT IN ('resolved', 'rejected', 'deleted')
+               AND (
+                   (ca.target_resolution_date IS NOT NULL AND ca.target_resolution_date < CURDATE())
+                   OR
+                   (ca.target_resolution_date IS NULL AND c.created_at < NOW() - INTERVAL 7 DAY)
+               )"
+        );
+        if (!$stmt) return 0;
+        $stmt->bind_param('s', $staffId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return (int)($row['cnt'] ?? 0);
     }
 
     // Get staff members eligible to receive an escalation (higher rank than the forwarding staff)
@@ -341,17 +368,19 @@ class Staff
                        d.department_name,
                        su.username AS assigned_staff_name,
                        sr.role_name AS staff_role_name,
-                       ca.target_resolution_date
+                       ca.target_resolution_date,
+                       ca.status AS assignment_status
                 FROM complaints c
                 JOIN students s ON c.student_id = s.student_id
                 JOIN users u ON s.student_user_id = u.user_id
                 LEFT JOIN complaint_categories cc ON c.category_id = cc.category_id
                 LEFT JOIN departments d ON c.department_id = d.department_id
-                JOIN complaint_assignments ca ON c.complaint_id = ca.complaint_id AND ca.staff_id = ? AND ca.status = 'active'
+                JOIN complaint_assignments ca ON c.complaint_id = ca.complaint_id AND ca.staff_id = ? AND ca.status IN ('active', 'forwarded')
                 LEFT JOIN staffs st ON ca.staff_id = st.staff_id
                 LEFT JOIN users su ON st.staff_user_id = su.user_id
                 LEFT JOIN staff_roles sr ON st.staff_role_id = sr.role_id
                 WHERE c.complaint_id = ?
+                ORDER BY FIELD(ca.status, 'active', 'forwarded')
                 LIMIT 1";
 
         $stmt = $this->conn->prepare($sql);

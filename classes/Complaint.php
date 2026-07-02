@@ -147,4 +147,17 @@ class Complaint
         $stmt->execute();
         return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     }
+
+    // Routing info needed to validate/resolve a complaint's department at submission time
+    public function getCategoryRoutingMeta($categoryId)
+    {
+        $stmt = $this->conn->prepare(
+            "SELECT requires_department_selection, auto_assign_department_id, default_role_id
+             FROM complaint_categories
+             WHERE category_id = ?"
+        );
+        $stmt->bind_param("i", $categoryId);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_assoc();
+    }
 }

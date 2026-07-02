@@ -336,4 +336,127 @@ class StudentLeader
         $stmt->close();
         return $row !== null;
     }
+
+    // Get the student_id for this leader (leaders are also students)
+    public function getStudentId(): ?int
+    {
+        $stmt = $this->conn->prepare("SELECT student_id FROM students WHERE student_user_id = ? LIMIT 1");
+        if (!$stmt) return null;
+        $stmt->bind_param('i', $this->userId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return $row ? (int)$row['student_id'] : null;
+    }
+
+    // Get approved, active staff members for a given department
+    public function getApprovedStaffByDepartment(int $deptId): array
+    {
+        $stmt = $this->conn->prepare(
+            "SELECT s.staff_id, u.username, sr.role_name
+             FROM staffs s
+             JOIN users u ON u.user_id = s.staff_user_id
+             LEFT JOIN staff_roles sr ON sr.role_id = s.staff_role_id
+             WHERE s.staff_department_id = ?
+               AND s.staff_approval_status = 1
+               AND u.user_status = 'active'
+             ORDER BY u.username"
+        );
+        if (!$stmt) return [];
+        $stmt->bind_param('i', $deptId);
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
+    }
+
+    // Get complaints submitted by this leader (as a student)
+    public function getMyComplaints(int $limit = 0): array
+    {
+        $studentId = $this->getStudentId();
+        if (!$studentId) return [];
+        $limitClause = $limit > 0 ? "LIMIT $limit" : '';
+        $stmt = $this->conn->prepare(
+            "SELECT c.complaint_id, c.complaint_title, c.complaint_description,
+                    c.complaint_status, c.priority, c.is_anonymous, c.created_at, c.updated_at,
+                    c.preferred_staff_id,
+                    cat.category_name, d.department_name,
+                    su.username AS preferred_staff_name
+             FROM complaints c
+             JOIN complaint_categories cat ON cat.category_id = c.category_id
+             LEFT JOIN departments d       ON d.department_id = c.department_id
+             LEFT JOIN staffs sf           ON sf.staff_id = c.preferred_staff_id
+             LEFT JOIN users su            ON su.user_id = sf.staff_user_id
+             WHERE c.student_id = ?
+               AND c.complaint_status != 'deleted'
+             ORDER BY c.created_at DESC
+             $limitClause"
+        );
+        if (!$stmt) return [];
+        $stmt->bind_param('i', $studentId);
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
+    }
+
+    // Count this leader's own submitted complaints by status
+    public function getMyComplaintCounts(): array
+    {
+        $studentId = $this->getStudentId();
+        if (!$studentId) {
+            return ['total' => 0, 'pending' => 0, 'in_progress' => 0, 'resolved' => 0, 'rejected' => 0];
+        }
+        $row = $this->conn->query(
+            "SELECT COUNT(*) AS total,
+                    SUM(complaint_status = 'pending')     AS pending,
+                    SUM(complaint_status = 'in_progress') AS in_progress,
+                    SUM(complaint_status = 'resolved')    AS resolved,
+                    SUM(complaint_status = 'rejected')    AS rejected
+             FROM complaints
+             WHERE student_id = $studentId
+               AND complaint_status != 'deleted'"
+        )->fetch_assoc();
+        return [
+            'total'       => (int)($row['total'] ?? 0),
+            'pending'     => (int)($row['pending'] ?? 0),
+            'in_progress' => (int)($row['in_progress'] ?? 0),
+            'resolved'    => (int)($row['resolved'] ?? 0),
+            'rejected'    => (int)($row['rejected'] ?? 0),
+        ];
+    }
+
+    // Count pending complaints in the leader's departments that the leader has NOT yet endorsed
+    public function getUnendorsedPendingCount(): int
+    {
+        $depts = $this->getDepartments();
+        if (empty($depts)) return 0;
+        $deptIds = implode(',', array_column($depts, 'department_id'));
+        $uid = (int)$this->userId;
+        $row = $this->conn->query(
+            "SELECT COUNT(*) AS cnt
+             FROM complaints c
+             WHERE c.department_id IN ($deptIds)
+               AND c.complaint_status = 'pending'
+               AND NOT EXISTS (
+                   SELECT 1 FROM complaint_endorsements ce
+                   WHERE ce.complaint_id = c.complaint_id
+                     AND ce.leader_id = $uid
+               )"
+        )->fetch_assoc();
+        return (int)($row['cnt'] ?? 0);
+    }
+
+    // Set preferred staff on a newly created complaint
+    public function setPreferredStaff(int $complaintId, string $staffId): bool
+    {
+        $stmt = $this->conn->prepare(
+            "UPDATE complaints SET preferred_staff_id = ? WHERE complaint_id = ?"
+        );
+        if (!$stmt) return false;
+        $stmt->bind_param('si', $staffId, $complaintId);
+        $ok = $stmt->execute();
+        $stmt->close();
+        return $ok;
+    }
 }

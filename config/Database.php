@@ -27,6 +27,13 @@ class Database
             error_log("DB connection failed: " . $this->conn->connect_error);
             die("A database error occurred. Please try again later.");
         }
+
+        // Set MySQL session timezone to East Africa Time (UTC+3)
+        $this->conn->query("SET time_zone = '+03:00'");
+
+        // Align PHP date functions to the same timezone
+        date_default_timezone_set('Africa/Dar_es_Salaam');
+
         return $this->conn;
     }
 }

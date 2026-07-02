@@ -89,11 +89,33 @@ class Admin extends User
         $stmt = $this->conn->prepare("SELECT user_role, COUNT(*) AS total FROM users GROUP BY user_role");
         $stmt->execute();
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $counts = ['student' => 0, 'staff' => 0, 'admin' => 0];
+        $counts = ['student' => 0, 'student_leader' => 0, 'staff' => 0, 'admin' => 0];
         foreach ($rows as $row) {
             $counts[$row['user_role']] = (int) $row['total'];
         }
         return $counts;
+    }
+
+    public function getTotalAwaiting(): int
+    {
+        $stmt = $this->conn->prepare("SELECT COUNT(*) AS cnt FROM complaints WHERE complaint_status = 'awaiting_student_response'");
+        $stmt->execute();
+        return (int) $stmt->get_result()->fetch_assoc()['cnt'];
+    }
+
+    public function getUnassignedCount(): int
+    {
+        $stmt = $this->conn->prepare(
+            "SELECT COUNT(*) AS cnt
+             FROM complaints c
+             WHERE c.complaint_status = 'pending'
+               AND NOT EXISTS (
+                   SELECT 1 FROM complaint_assignments ca
+                   WHERE ca.complaint_id = c.complaint_id AND ca.status = 'active'
+               )"
+        );
+        $stmt->execute();
+        return (int) $stmt->get_result()->fetch_assoc()['cnt'];
     }
 
     public function getPendingStaffCount()
@@ -103,35 +125,35 @@ class Admin extends User
         return (int) $stmt->get_result()->fetch_assoc()['cnt'];
     }
 
-    public function getComplaints()
+    public function getComplaints(int $limit = 0)
     {
-        $stmt = $this->conn->prepare(
-            "SELECT c.*,
-                    (SELECT COUNT(*)
-                         FROM
-                             complaint_endorsements ce
-                         WHERE
-                             ce.complaint_id = c.complaint_id) AS endorsement_count,
-                             cc.category_name, cc.auto_assign_department_id AS category_dept_id,
-                             u.username AS student_name,
-                             s.student_registration_number,
-                             d.department_name,
-                             su.username AS assigned_staff_name,
-                             ca_lead.target_resolution_date
-                 FROM complaints c
-                 JOIN complaint_categories cc ON c.category_id = cc.category_id
-                 JOIN students s ON c.student_id = s.student_id
-                 JOIN users u ON s.student_user_id = u.user_id
-                 LEFT JOIN departments d ON c.department_id = d.department_id
-                 LEFT JOIN complaint_assignments ca_lead ON c.complaint_id = ca_lead.complaint_id AND ca_lead.status = 'active' AND ca_lead.is_lead = 1
-                 LEFT JOIN staffs sf ON ca_lead.staff_id = sf.staff_id
-                 LEFT JOIN users su ON sf.staff_user_id = su.user_id
-                 ORDER BY c.created_at DESC"
-        );
+        $sql = "SELECT c.*,
+                    (SELECT COUNT(*) FROM complaint_endorsements ce WHERE ce.complaint_id = c.complaint_id) AS endorsement_count,
+                    cc.category_name, cc.auto_assign_department_id AS category_dept_id,
+                    u.username AS student_name,
+                    s.student_registration_number,
+                    d.department_name,
+                    su.username AS assigned_staff_name,
+                    ca_lead.target_resolution_date
+                FROM complaints c
+                JOIN complaint_categories cc ON c.category_id = cc.category_id
+                JOIN students s ON c.student_id = s.student_id
+                JOIN users u ON s.student_user_id = u.user_id
+                LEFT JOIN departments d ON c.department_id = d.department_id
+                LEFT JOIN complaint_assignments ca_lead ON c.complaint_id = ca_lead.complaint_id AND ca_lead.status = 'active' AND ca_lead.is_lead = 1
+                LEFT JOIN staffs sf ON ca_lead.staff_id = sf.staff_id
+                LEFT JOIN users su ON sf.staff_user_id = su.user_id
+                ORDER BY c.created_at DESC";
+        if ($limit > 0) {
+            $sql .= " LIMIT ?";
+        }
+        $stmt = $this->conn->prepare($sql);
+        if ($limit > 0) {
+            $stmt->bind_param('i', $limit);
+        }
         $stmt->execute();
         $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
-        
         return $data;
     }
 
@@ -535,7 +557,7 @@ class Admin extends User
     }
 
     // Assign complaint to a staff member
-    public function assignComplaint($complaintId, $staffId, $priority, $note = '')
+    public function assignComplaint($complaintId, $staffId, $priority, $note = '', $assignedByUserId = null)
     {
         try {
             $this->conn->begin_transaction();
@@ -574,7 +596,7 @@ class Admin extends User
             $stmt->close();
 
             // Record in complaint_assignments table
-            $adminId = $_SESSION['user_id'];
+            $adminId = $assignedByUserId ?? $_SESSION['user_id'];
             $assignStmt = $this->conn->prepare(
                 "INSERT INTO complaint_assignments (complaint_id, staff_id, assigned_by, is_lead, status, notes)
                  VALUES (?, ?, ?, 1, 'active', ?)"
@@ -1046,6 +1068,15 @@ class Admin extends User
 
     // Staff Roles CRUD 
 
+    public function getAllStaffRoles()
+    {
+        $stmt = $this->conn->prepare("SELECT role_id, role_name FROM staff_roles ORDER BY role_rank DESC, role_name ASC");
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $data;
+    }
+
     public function getAllStaffRolesWithCount()
     {
         $stmt = $this->conn->prepare(
@@ -1179,19 +1210,67 @@ class Admin extends User
         return $ok;
     }
 
+    public function getDepartmentById($id)
+    {
+        $stmt = $this->conn->prepare("SELECT department_id, department_name FROM departments WHERE department_id = ?");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return $row ?: null;
+    }
+
+    // Approved staff of a department, ordered highest rank first, for a hierarchy/escalation-chain view
+    public function getDepartmentStaffHierarchy($departmentId)
+    {
+        $stmt = $this->conn->prepare(
+            "SELECT users.user_id, users.username, users.user_email,
+                    staffs.staff_id, staffs.staff_role_id,
+                    staff_roles.role_name, staff_roles.role_rank
+                 FROM staffs
+                 JOIN users ON staffs.staff_user_id = users.user_id
+                 LEFT JOIN staff_roles ON staffs.staff_role_id = staff_roles.role_id
+                 WHERE staffs.staff_department_id = ?
+                   AND staffs.staff_approval_status = 1
+                 ORDER BY COALESCE(staff_roles.role_rank, -1) DESC, users.username ASC"
+        );
+        $stmt->bind_param("i", $departmentId);
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+        // Group into tiers by rank so equal-rank staff render side by side
+        $tiers = [];
+        foreach ($data as $row) {
+            $key = $row['staff_role_id'] ?? 'unassigned';
+            if (!isset($tiers[$key])) {
+                $tiers[$key] = [
+                    'role_name' => $row['role_name'] ?? 'No Role Assigned',
+                    'role_rank' => $row['role_rank'] ?? null,
+                    'staff' => [],
+                ];
+            }
+            $tiers[$key]['staff'][] = $row;
+        }
+
+        return array_values($tiers);
+    }
+
     // Categories CRUD
 
     public function getAllCategoriesWithStats()
     {
         $stmt = $this->conn->prepare(
             "SELECT cc.category_id, cc.category_name, cc.category_description, cc.status,
-                    cc.auto_assign_department_id,
+                    cc.requires_department_selection, cc.auto_assign_department_id, cc.default_role_id,
                     d.department_name AS default_dept_name,
+                    sr.role_name AS default_role_name,
                     COUNT(c.complaint_id) AS complaint_count
                  FROM complaint_categories cc
                  LEFT JOIN complaints c ON cc.category_id = c.category_id
                  LEFT JOIN departments d ON cc.auto_assign_department_id = d.department_id
-                 GROUP BY cc.category_id, d.department_name
+                 LEFT JOIN staff_roles sr ON cc.default_role_id = sr.role_id
+                 GROUP BY cc.category_id, d.department_name, sr.role_name
                  ORDER BY cc.category_name ASC"
         );
         $stmt->execute();
@@ -1200,39 +1279,34 @@ class Admin extends User
         return $data;
     }
 
-    public function addCategory($name, $description, $createdBy, $departmentId = null)
+    public function addCategory($name, $description, $createdBy, $departmentId = null, $requiresDeptSelection = 0, $defaultRoleId = null)
     {
         $deptId = ($departmentId > 0) ? (int) $departmentId : null;
-        if ($deptId) {
-            $stmt = $this->conn->prepare(
-                "INSERT INTO complaint_categories (category_name, category_description, auto_assign_department_id, created_by) VALUES (?, ?, ?, ?)"
-            );
-            $stmt->bind_param("ssii", $name, $description, $deptId, $createdBy);
-        } else {
-            $stmt = $this->conn->prepare(
-                "INSERT INTO complaint_categories (category_name, category_description, created_by) VALUES (?, ?, ?)"
-            );
-            $stmt->bind_param("ssi", $name, $description, $createdBy);
-        }
+        $roleId = ($defaultRoleId > 0) ? (int) $defaultRoleId : null;
+        $reqDept = $requiresDeptSelection ? 1 : 0;
+        $stmt = $this->conn->prepare(
+            "INSERT INTO complaint_categories
+                (category_name, category_description, requires_department_selection, auto_assign_department_id, default_role_id, created_by)
+             VALUES (?, ?, ?, ?, ?, ?)"
+        );
+        $stmt->bind_param("ssiiii", $name, $description, $reqDept, $deptId, $roleId, $createdBy);
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;
     }
 
-    public function updateCategory($id, $name, $description, $status, $departmentId = null)
+    public function updateCategory($id, $name, $description, $status, $departmentId = null, $requiresDeptSelection = 0, $defaultRoleId = null)
     {
         $deptId = ($departmentId > 0) ? (int) $departmentId : null;
-        if ($deptId) {
-            $stmt = $this->conn->prepare(
-                "UPDATE complaint_categories SET category_name = ?, category_description = ?, status = ?, auto_assign_department_id = ? WHERE category_id = ?"
-            );
-            $stmt->bind_param("sssii", $name, $description, $status, $deptId, $id);
-        } else {
-            $stmt = $this->conn->prepare(
-                "UPDATE complaint_categories SET category_name = ?, category_description = ?, status = ?, auto_assign_department_id = NULL WHERE category_id = ?"
-            );
-            $stmt->bind_param("sssi", $name, $description, $status, $id);
-        }
+        $roleId = ($defaultRoleId > 0) ? (int) $defaultRoleId : null;
+        $reqDept = $requiresDeptSelection ? 1 : 0;
+        $stmt = $this->conn->prepare(
+            "UPDATE complaint_categories
+             SET category_name = ?, category_description = ?, status = ?,
+                 requires_department_selection = ?, auto_assign_department_id = ?, default_role_id = ?
+             WHERE category_id = ?"
+        );
+        $stmt->bind_param("sssiiii", $name, $description, $status, $reqDept, $deptId, $roleId, $id);
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;
@@ -1261,12 +1335,14 @@ class Admin extends User
     {
         $stmt = $this->conn->prepare(
             "SELECT cs.subcategory_id, cs.category_id, cs.subcategory_name,
-                    cs.subcategory_description, cs.status,
+                    cs.subcategory_description, cs.status, cs.default_role_id,
+                    sr.role_name AS default_role_name,
                     COUNT(c.complaint_id) AS complaint_count
                  FROM complaint_subcategories cs
                  LEFT JOIN complaints c ON cs.subcategory_id = c.subcategory_id
+                 LEFT JOIN staff_roles sr ON cs.default_role_id = sr.role_id
                  GROUP BY cs.subcategory_id, cs.category_id, cs.subcategory_name,
-                          cs.subcategory_description, cs.status
+                          cs.subcategory_description, cs.status, cs.default_role_id, sr.role_name
                  ORDER BY cs.category_id ASC, cs.subcategory_name ASC"
         );
         $stmt->execute();
@@ -1279,28 +1355,30 @@ class Admin extends User
         return $grouped;
     }
 
-    public function addSubcategory($categoryId, $name, $description, $createdBy)
+    public function addSubcategory($categoryId, $name, $description, $createdBy, $defaultRoleId = null)
     {
+        $roleId = ($defaultRoleId > 0) ? (int) $defaultRoleId : null;
         $stmt = $this->conn->prepare(
-            "INSERT INTO complaint_subcategories (category_id, subcategory_name, subcategory_description, created_by)
-             VALUES (?, ?, ?, ?)"
+            "INSERT INTO complaint_subcategories (category_id, subcategory_name, subcategory_description, default_role_id, created_by)
+             VALUES (?, ?, ?, ?, ?)"
         );
         $desc = $description ?: null;
-        $stmt->bind_param("issi", $categoryId, $name, $desc, $createdBy);
+        $stmt->bind_param("issii", $categoryId, $name, $desc, $roleId, $createdBy);
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;
     }
 
-    public function updateSubcategory($id, $name, $description, $status)
+    public function updateSubcategory($id, $name, $description, $status, $defaultRoleId = null)
     {
+        $roleId = ($defaultRoleId > 0) ? (int) $defaultRoleId : null;
         $stmt = $this->conn->prepare(
             "UPDATE complaint_subcategories
-             SET subcategory_name = ?, subcategory_description = ?, status = ?
+             SET subcategory_name = ?, subcategory_description = ?, status = ?, default_role_id = ?
              WHERE subcategory_id = ?"
         );
         $desc = $description ?: null;
-        $stmt->bind_param("sssi", $name, $desc, $status, $id);
+        $stmt->bind_param("sssii", $name, $desc, $status, $roleId, $id);
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;
