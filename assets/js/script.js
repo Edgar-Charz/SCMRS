@@ -152,12 +152,20 @@ $(document).ready(function () {
 });
 
 // Loader
-window.onload = function () {
-  document.getElementById("loader").style.display = "none";
-};
+function hideLoader() {
+  var el = document.getElementById("loader");
+  if (el) el.style.display = "none";
+}
+
+// Hides loader on normal load AND on back/forward cache restore
+window.onload = hideLoader;
+window.addEventListener("pageshow", function (e) {
+  if (e.persisted) hideLoader();
+});
 
 window.onbeforeunload = function () {
-  document.getElementById("loader").style.display = "flex";
+  var el = document.getElementById("loader");
+  if (el) el.style.display = "flex";
 };
 
 // Submit button loader
