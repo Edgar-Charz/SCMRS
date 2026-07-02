@@ -122,13 +122,40 @@ if (isset($_SESSION['message'])) {
 }
 
 // Fire overdue notifications for any newly-past-deadline complaints
-$admin->notifyOverdueComplaints();
+try {
+    $admin->notifyOverdueComplaints();
+} catch (Throwable $e) {
+    error_log('[SCMRS] notifyOverdueComplaints: ' . $e->getMessage());
+}
 
-$complaints  = $admin->getComplaints();
-$staffList   = $admin->getApprovedStaff();
-$departments = $admin->getAllDepartments();
+try {
+    $complaints = $admin->getComplaints();
+} catch (Throwable $e) {
+    error_log('[SCMRS] getComplaints: ' . $e->getMessage());
+    $complaints = [];
+}
+
+try {
+    $staffList = $admin->getApprovedStaff();
+} catch (Throwable $e) {
+    error_log('[SCMRS] getApprovedStaff: ' . $e->getMessage());
+    $staffList = [];
+}
+
+try {
+    $departments = $admin->getAllDepartments();
+} catch (Throwable $e) {
+    error_log('[SCMRS] getAllDepartments: ' . $e->getMessage());
+    $departments = [];
+}
 
 $now = new DateTime();
+
+// Build unique filter lists from complaint data
+$filterCategories = array_values(array_filter(array_unique(array_column($complaints, 'category_name'))));
+sort($filterCategories);
+$filterDepartments = array_values(array_filter(array_unique(array_column($complaints, 'department_name'))));
+sort($filterDepartments);
 
 function statusBadge($status)
 {
@@ -138,7 +165,7 @@ function statusBadge($status)
         STATUS_AWAITING_RESPONSE => ['bg-primary text-white', 'Awaiting Response'],
         STATUS_RESOLVED => ['bg-success text-white', 'Resolved'],
         STATUS_REJECTED => ['bg-danger text-white',  'Rejected'],
-        STATUS_REOPENED => ['bg-orange text-white',  'Reopened'],
+        STATUS_REOPENED => ['bg-warning text-white',  'Reopened'],
     ];
     [$class, $label] = $map[$status] ?? ['bg-secondary text-white', ucfirst(str_replace('_', ' ', $status))];
     return "<span class=\"badge $class\">$label</span>";
@@ -152,12 +179,17 @@ function statusBadge($status)
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Complaints | Admin</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
         #bulkToolbar {
@@ -187,14 +219,14 @@ function statusBadge($status)
 
             <!-- Toast Notifications -->
             <div aria-live="polite" aria-atomic="true" class="position-fixed top-0 start-50 translate-middle-x p-3"
-                style="z-index: 1100;">
+                style="z-index: 1100; pointer-events: none;">
                 <?php if (!empty($message) || !empty($error)):
                     $type = !empty($message) ? 'success' : 'danger';
                     $text = !empty($message) ? $message : $error;
                     $icon = ($type === 'success') ? 'fa-check-circle' : 'fa-exclamation-circle';
                     ?>
                     <div class="toast show align-items-center text-white bg-<?= $type ?> border-0" role="alert"
-                        aria-live="assertive" aria-atomic="true">
+                        aria-live="assertive" aria-atomic="true" style="pointer-events: auto;">
                         <div class="d-flex">
                             <div class="toast-body">
                                 <i class="fas <?= $icon ?> me-2"></i>
@@ -214,6 +246,7 @@ function statusBadge($status)
                         <li class="breadcrumb-item">
                             <a href="admin_dashboard.php"><i class="fas fa-home" style="color: black;"></i></a>
                         </li>
+                        <li class="breadcrumb-item"><a href="admin_dashboard.php" style="color:black;">Admin</a></li>
                         <li class="breadcrumb-item active">Manage Complaints</li>
                     </ol>
                 </nav>
@@ -234,8 +267,71 @@ function statusBadge($status)
                     </button>
                 </div>
 
+                <!-- ── Filter Card ──────────────────────────────────────── -->
                 <div class="container-card shadow-sm">
-                    <h4 class="mb-3 fw-bold"><i class="fas fa-file-invoice me-2"></i>Student Complaints</h4>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-2">
+                            <label class="form-label small fw-semibold mb-1">Status</label>
+                            <select id="filterStatus" class="form-select form-select-sm">
+                                <option value="">All Statuses</option>
+                                <option value="pending">Pending</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="awaiting_response">Awaiting Response</option>
+                                <option value="resolved">Resolved</option>
+                                <option value="rejected">Rejected</option>
+                                <option value="reopened">Reopened</option>
+                                <option value="overdue">Overdue</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-2">
+                            <label class="form-label small fw-semibold mb-1">Priority</label>
+                            <select id="filterPriority" class="form-select form-select-sm">
+                                <option value="">All Priorities</option>
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-2">
+                            <label class="form-label small fw-semibold mb-1">Category</label>
+                            <select id="filterCategory" class="form-select form-select-sm">
+                                <option value="">All Categories</option>
+                                <?php foreach ($filterCategories as $cat): ?>
+                                    <option value="<?= htmlspecialchars($cat) ?>"><?= htmlspecialchars($cat) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-2">
+                            <label class="form-label small fw-semibold mb-1">Department</label>
+                            <select id="filterDept" class="form-select form-select-sm">
+                                <option value="">All Departments</option>
+                                <?php foreach ($filterDepartments as $dept): ?>
+                                    <option value="<?= htmlspecialchars($dept) ?>"><?= htmlspecialchars($dept) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-2">
+                            <label class="form-label small fw-semibold mb-1">Date From</label>
+                            <input type="date" id="filterDateFrom" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-2">
+                            <label class="form-label small fw-semibold mb-1">Date To</label>
+                            <input type="date" id="filterDateTo" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-auto d-flex align-items-end">
+                            <button type="button" id="clearFilters" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-times me-1"></i>Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Table Card ───────────────────────────────────────── -->
+                <div class="container-card shadow-sm">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0 fw-bold"><i class="fas fa-file-invoice me-2"></i>Student Complaints</h4>
+                        <div class="search-input"></div>
+                    </div>
 
                     <div class="table-responsive">
                         <table class="table table-striped" id="complaintsTable">
@@ -278,8 +374,15 @@ function statusBadge($status)
                                             && !empty($c['target_resolution_date'])
                                             && new DateTime($c['target_resolution_date']) < $now;
                                         ?>
-                                        <tr>
-                                            <td>
+                                        <tr data-status="<?= htmlspecialchars($c['complaint_status']) ?>"
+                                            data-priority="<?= htmlspecialchars($c['priority']) ?>"
+                                            data-category="<?= htmlspecialchars($c['category_name']) ?>"
+                                            data-dept="<?= htmlspecialchars($c['department_name'] ?? '') ?>"
+                                            data-overdue="<?= $isOverdue ? '1' : '0' ?>"
+                                            data-date="<?= date('Y-m-d', strtotime($c['created_at'])) ?>"
+                                            style="cursor:pointer;"
+                                            onclick="window.location.href='complaint_details.php?id=<?= $c['complaint_id'] ?>'">
+                                            <td onclick="event.stopPropagation()">
                                                 <input type="checkbox" class="row-check"
                                                        value="<?= $c['complaint_id'] ?>">
                                             </td>
@@ -315,7 +418,7 @@ function statusBadge($status)
                                             <td class="text-center">
                                                 <?= date('d M Y', strtotime($c['created_at'])) ?>
                                             </td>
-                                            <td class="text-center">
+                                            <td class="text-center" onclick="event.stopPropagation()">
                                                 <?php $isAssigned = !empty($c['assigned_staff_name']); ?>
                                                 <div class="d-flex justify-content-center gap-1">
                                                     <a href="complaint_details.php?id=<?= $c['complaint_id'] ?>"
@@ -323,8 +426,8 @@ function statusBadge($status)
                                                         <i class="fas fa-eye text-dark"></i>
                                                     </a>
 
-                                                    <?php if (!$isClosed): ?>
-                                                        <a href="respond_complaint.php?id=<?= $c['complaint_id'] ?>"
+                                                    <?php if (!$isClosed && !$isAssigned): ?>
+                                                        <a href="complaint_details.php?id=<?= $c['complaint_id'] ?>#respond"
                                                             class="btn btn-status btn-outline-secondary" title="Respond">
                                                             <i class="fas fa-reply text-dark"></i>
                                                         </a>
@@ -333,12 +436,12 @@ function statusBadge($status)
                                                             class="btn btn-status btn-outline-secondary btn-assign"
                                                             data-bs-toggle="modal" data-bs-target="#assignModal"
                                                             data-complaint-id="<?= $c['complaint_id'] ?>"
-                                                            data-staff-name="<?= htmlspecialchars($c['assigned_staff_name'] ?? '', ENT_QUOTES) ?>"
+                                                            data-staff-name=""
                                                             data-priority="<?= htmlspecialchars($c['priority']) ?>"
-                                                            data-is-assigned="<?= $isAssigned ? '1' : '0' ?>"
+                                                            data-is-assigned="0"
                                                             data-category-dept-id="<?= (int)($c['category_dept_id'] ?? 0) ?>"
-                                                            title="<?= $isAssigned ? 'Reassign to Staff' : 'Assign to Staff' ?>">
-                                                            <i class="fas fa-<?= $isAssigned ? 'user-edit' : 'user-tag' ?> text-dark"></i>
+                                                            title="Assign to Staff">
+                                                            <i class="fas fa-user-tag text-dark"></i>
                                                         </button>
 
                                                         <?php if ($c['complaint_status'] === STATUS_PENDING): ?>
@@ -347,6 +450,18 @@ function statusBadge($status)
                                                                 <i class="fas fa-trash text-dark"></i>
                                                             </button>
                                                         <?php endif; ?>
+                                                    <?php elseif (!$isClosed && $isAssigned): ?>
+                                                        <button type="button"
+                                                            class="btn btn-status btn-outline-warning btn-assign"
+                                                            data-bs-toggle="modal" data-bs-target="#assignModal"
+                                                            data-complaint-id="<?= $c['complaint_id'] ?>"
+                                                            data-staff-name="<?= htmlspecialchars($c['assigned_staff_name'] ?? '', ENT_QUOTES) ?>"
+                                                            data-priority="<?= htmlspecialchars($c['priority']) ?>"
+                                                            data-is-assigned="1"
+                                                            data-category-dept-id="<?= (int)($c['category_dept_id'] ?? 0) ?>"
+                                                            title="Reassign to a different staff member">
+                                                            <i class="fas fa-user-edit"></i>
+                                                        </button>
                                                     <?php endif; ?>
                                                 </div>
                                             </td>
@@ -595,10 +710,14 @@ function statusBadge($status)
         </div>
     </div>
 
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/jquery.dataTables.min.js"></script>
-    <script src="assets/js/dataTables.bootstrap4.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery.dataTables.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <!-- <script src="assets/js/dataTables.bootstrap4.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
@@ -804,10 +923,41 @@ function statusBadge($status)
             document.getElementById('deleteForm').submit();
         });
 
+        // ── Custom row filter (runs before DataTables draws) ─────────────────
+        $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+            if (settings.nTable.id !== 'complaintsTable') return true;
+            var rowNode  = settings.aoData[dataIndex] ? settings.aoData[dataIndex].nTr : null;
+            if (!rowNode) return true;
+            var row      = $(rowNode);
+            var rStatus  = row.data('status')   || '';
+            var rPri     = row.data('priority') || '';
+            var rCat     = row.data('category') || '';
+            var rDept    = row.data('dept')     || '';
+            var rOverdue = row.data('overdue')  === '1';
+            var rDate    = row.data('date')     || '';
+
+            var fStatus   = $('#filterStatus').val()   || '';
+            var fPriority = $('#filterPriority').val() || '';
+            var fCategory = $('#filterCategory').val() || '';
+            var fDept     = $('#filterDept').val()     || '';
+            var fFrom     = $('#filterDateFrom').val() || '';
+            var fTo       = $('#filterDateTo').val()   || '';
+
+            if (fStatus === 'overdue'  && !rOverdue)          return false;
+            if (fStatus && fStatus !== 'overdue' && rStatus !== fStatus) return false;
+            if (fPriority && rPri  !== fPriority)             return false;
+            if (fCategory && rCat  !== fCategory)             return false;
+            if (fDept     && rDept !== fDept)                 return false;
+            if (fFrom     && rDate < fFrom)                   return false;
+            if (fTo       && rDate > fTo)                     return false;
+            return true;
+        });
+
         // ── DataTable ─────────────────────────────────────────────────────────
+        var complaintsTable;
         $(document).ready(function() {
             if ($("#complaintsTable").length > 0 && !$.fn.DataTable.isDataTable("#complaintsTable")) {
-                var dt = $("#complaintsTable").DataTable({
+                complaintsTable = $("#complaintsTable").DataTable({
                     destroy:     true,
                     bFilter:     true,
                     sDom:        "fBtlpi",
@@ -825,7 +975,20 @@ function statusBadge($status)
                     }
                 });
 
-                reapplyChecks(dt);
+                reapplyChecks(complaintsTable);
+
+                // Bind filter controls
+                $('#filterStatus, #filterPriority, #filterCategory, #filterDept').on('change', function() {
+                    complaintsTable.draw();
+                });
+                $('#filterDateFrom, #filterDateTo').on('change', function() {
+                    complaintsTable.draw();
+                });
+                $('#clearFilters').on('click', function() {
+                    $('#filterStatus, #filterPriority, #filterCategory, #filterDept').val('');
+                    $('#filterDateFrom, #filterDateTo').val('');
+                    complaintsTable.search('').draw();
+                });
             }
         });
     </script>

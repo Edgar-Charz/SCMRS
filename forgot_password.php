@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once 'config/session.php';
 
 require_once "config/Database.php";
@@ -59,10 +59,13 @@ if (isset($_POST['submitBtn'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Forgot Password | SCMRS</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/auth-style.css">
     <style>
         body {
@@ -173,7 +176,7 @@ if (isset($_POST['submitBtn'])) {
 
 <body>
 
-    <div id="loader">
+    <div id="loader" class="loader-branded">
         <div class="loader-content">
             <img src="assets/img/logo.png" alt="UDSM" class="loader-logo">
             <div class="spinner"></div>
@@ -239,7 +242,8 @@ if (isset($_POST['submitBtn'])) {
     </div><!-- /.auth-wrap -->
 
     <script src="assets/js/auth-script.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>

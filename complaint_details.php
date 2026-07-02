@@ -11,6 +11,7 @@ $adminId = $_SESSION['user_id'];
 require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/Admin.php";
+require_once "includes/csrf.php";
  
 $db    = new Database();
 $conn  = $db->connect();  
@@ -34,7 +35,28 @@ if (!$complaint) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    if ($action === 'add_note') {
+    if ($action === 'respond') {
+        csrf_verify();
+        $responseAction = $_POST['response_action'] ?? '';
+        $responseText   = trim($_POST['response'] ?? '');
+        if (empty($responseText)) {
+            $error = "A response is required before submitting.";
+        } elseif (!in_array($responseAction, ['resolve', 'reject'], true)) {
+            $error = "Invalid action.";
+        } else {
+            $newStatus = ($responseAction === 'resolve') ? 'resolved' : 'rejected';
+            try {
+                $admin->respondComplaint($complaintId, $responseText, $newStatus);
+                $label = ($responseAction === 'resolve') ? 'resolved' : 'rejected';
+                $admin->logActivity($adminId, 'complaint_' . $label, 'complaint', $complaintId, "Complaint #$complaintId", "Admin $label the complaint.");
+                $_SESSION['message'] = "Complaint #$complaintId has been $label.";
+                header("Location: complaint_details.php?id=$complaintId");
+                exit;
+            } catch (Exception $e) {
+                $error = $e->getMessage();
+            }
+        }
+    } elseif ($action === 'add_note') {
         $noteText = trim($_POST['note_text'] ?? '');
         if (empty($noteText)) {
             $error = "Note cannot be empty.";
@@ -73,6 +95,8 @@ $infoRequests = $admin->getInformationRequests($complaintId);
 $statusLogs   = $admin->getComplaintStatusLogs($complaintId);
 $feedback     = $admin->getComplaintFeedback($complaintId);
 
+$isClosed    = in_array($complaint['complaint_status'], [STATUS_RESOLVED, STATUS_REJECTED], true);
+$isAssigned  = !empty($complaint['assigned_staff_name']);
 $studentName = htmlspecialchars($complaint['student_name']);
 $anonymousBadge = $complaint['is_anonymous']
     ? ' <span class="badge ms-1" style="background:#111;color:#fff;font-size:.7rem;vertical-align:middle;">Anonymous</span>'
@@ -86,7 +110,7 @@ function statusBadge($status)
         STATUS_AWAITING_RESPONSE => ['bg-primary text-white', 'Awaiting Response'],
         STATUS_RESOLVED => ['bg-success text-white', 'Resolved'],
         STATUS_REJECTED => ['bg-danger text-white',  'Rejected'],
-        STATUS_REOPENED => ['bg-orange text-white',  'Reopened'],
+        STATUS_REOPENED => ['bg-warning text-white',  'Reopened'],
     ];
     [$class, $label] = $map[$status] ?? ['bg-secondary text-white', ucfirst(str_replace('_', ' ', $status))];
     return "<span class=\"badge $class\">$label</span>";
@@ -113,12 +137,17 @@ $irStatusMap = [
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Complaint #<?= $complaintId ?> | Admin</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
@@ -142,14 +171,14 @@ $irStatusMap = [
 
             <!-- Toast Notifications -->
             <div aria-live="polite" aria-atomic="true"
-                class="position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 1100;">
+                class="position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 1100; pointer-events: none;">
                 <?php if (!empty($message) || !empty($error)):
                     $type = !empty($message) ? 'success' : 'danger';
                     $text = !empty($message) ? $message : $error;
                     $icon = ($type === 'success') ? 'fa-check-circle' : 'fa-exclamation-circle';
                 ?>
                     <div class="toast show align-items-center text-white bg-<?= $type ?> border-0"
-                        role="alert" aria-live="assertive" aria-atomic="true">
+                        role="alert" aria-live="assertive" aria-atomic="true" style="pointer-events: auto;">
                         <div class="d-flex">
                             <div class="toast-body">
                                 <i class="fas <?= $icon ?> me-2"></i>
@@ -164,19 +193,19 @@ $irStatusMap = [
 
             <div class="p-4">
 
-                <nav aria-label="breadcrumb" class="d-flex justify-content-between align-items-center mb-3">
+                <nav aria-label="breadcrumb" class="mb-3">
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item">
                             <a href="admin_dashboard.php"><i class="fas fa-home" style="color: black;"></i></a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a href="admin_dashboard.php" style="color:black;">Admin</a>
                         </li>
                         <li class="breadcrumb-item">
                             <a href="manage_complaints.php" style="color: black;">Manage Complaints</a>
                         </li>
                         <li class="breadcrumb-item active">Complaint #<?= $complaintId ?></li>
                     </ol>
-                    <a href="respond_complaint.php?id=<?= $complaintId ?>" class="btn btn-add">
-                        <i class="fas fa-reply me-1"></i> Respond
-                    </a>
                 </nav>
 
                 <!-- ── Complaint Details ───────────────────────────────── -->
@@ -265,9 +294,9 @@ $irStatusMap = [
                         </div>
                     <?php endif; ?>
 
-                    <div class="mb-3">
-                        <div class="detail-label fw-bold mb-1">Description:</div>
-                        <div class="p-3 bg-light rounded border"x>
+                    <div class="mb-3 pb-2" style="border-bottom: 1px solid #dee2e6;">
+                        <div class="fw-bold mb-2">Description:</div>
+                        <div class="p-4 bg-light rounded border">
                             <?= htmlspecialchars($complaint['complaint_description']) ?>
                         </div>
                     </div>
@@ -319,6 +348,52 @@ $irStatusMap = [
                         </div>
                     <?php endif; ?>
                 </div>
+
+                <!-- ── Submit Response ───────────────────────────────────── -->
+                <?php if (!$isClosed && !$isAssigned): ?>
+                <div id="respond" class="container-card shadow-sm">
+                    <h4 class="mb-3 fw-bold"><i class="fas fa-reply me-2"></i>Submit Response</h4>
+                    <form method="POST" action="complaint_details.php?id=<?= $complaintId ?>">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="action" value="respond">
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                Response / Reason <span class="text-danger">*</span>
+                            </label>
+                            <textarea name="response" class="form-control p-3" rows="5"
+                                style="border-radius: 10px; border: 1px solid #e0e6ed;"
+                                placeholder="Write your response, resolution, or reason for denial..."
+                                required><?= isset($_POST['response']) ? htmlspecialchars($_POST['response']) : '' ?></textarea>
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="submit" name="response_action" value="resolve"
+                                class="btn btn-success p-3 fw-bold flex-fill"
+                                style="border-radius: 10px;"
+                                onclick="return confirmAction(this)">
+                                <i class="fas fa-check-circle me-1"></i>Resolve
+                            </button>
+                            <button type="submit" name="response_action" value="reject"
+                                class="btn btn-danger p-3 fw-bold flex-fill"
+                                style="border-radius: 10px;"
+                                onclick="return confirmAction(this)">
+                                <i class="fas fa-times-circle me-1"></i>Deny / Reject
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <?php elseif (!$isClosed && $isAssigned): ?>
+                <div id="respond" class="container-card shadow-sm">
+                    <h4 class="mb-3 fw-bold"><i class="fas fa-reply me-2"></i>Submit Response</h4>
+                    <div class="alert alert-info mb-0 d-flex align-items-start gap-3" style="border-radius: 10px;">
+                        <i class="fas fa-info-circle fa-lg mt-1 flex-shrink-0"></i>
+                        <div>
+                            This complaint is assigned to <strong><?= htmlspecialchars($complaint['assigned_staff_name']) ?></strong>.
+                            The assigned staff member is responsible for responding to it.
+                            <br>To respond directly, first <a href="manage_complaints.php" class="alert-link">reassign or unassign it</a> from the Manage Complaints page.
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
 
                 <!-- ── Collaboration Notes ─────────────────────────────── -->
                 <div class="container-card shadow-sm">
@@ -505,9 +580,42 @@ $irStatusMap = [
 
     </div><!-- /d-flex -->
 
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
     <script src="assets/js/script.js"></script>
+    <script>
+        function confirmAction(btn) {
+            var msg = btn.value === 'resolve'
+                ? 'Are you sure you want to resolve this complaint?'
+                : 'Are you sure you want to deny/reject this complaint?';
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: 'Confirm Action',
+                    text: msg,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonColor: btn.value === 'resolve' ? '#198754' : '#dc3545',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Yes, proceed',
+                    cancelButtonText: 'Cancel'
+                }).then(function (result) {
+                    if (result.isConfirmed) {
+                        var hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = btn.name;
+                        hidden.value = btn.value;
+                        btn.form.appendChild(hidden);
+                        btn.form.submit();
+                    }
+                });
+                return false;
+            }
+            return confirm(msg);
+        }
+    </script>
 
 </body>
 </html>

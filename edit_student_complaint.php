@@ -1,10 +1,14 @@
 <?php
 require_once 'config/session.php';
 
-if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'student') {
+$_allowedRoles = ['student', 'student_leader'];
+if (!isset($_SESSION['user_id']) || !in_array($_SESSION['user_role'], $_allowedRoles)) {
     header("Location: login.php");
     exit;
 }
+$_isLeader    = $_SESSION['user_role'] === 'student_leader';
+$_backListUrl = $_isLeader ? 'leader_my_complaints.php' : 'track_complaints.php';
+$_dashUrl     = $_isLeader ? 'leader_dashboard.php'     : 'student_dashboard.php';
 
 $userId = (int)$_SESSION['user_id'];
 
@@ -19,11 +23,18 @@ $conn     = $db->connect();
 $student  = new Student($conn);
 $category = new Category($conn);
 
+$leaderDepts = [];
+if ($_isLeader) {
+    require_once 'classes/StudentLeader.php';
+    $leader      = new StudentLeader($conn, $userId);
+    $leaderDepts = $leader->getDepartments();
+}
+
 $studentId   = $student->getStudentId($userId);
 $complaintId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 if ($complaintId <= 0) {
-    header("Location: track_complaints.php");
+    header("Location: $_backListUrl");
     exit;
 }
 
@@ -31,7 +42,7 @@ if ($complaintId <= 0) {
 $complaint = $student->readStudentComplaint($complaintId);
 if (!$complaint || (int)$complaint['student_id'] !== (int)$studentId || $complaint['complaint_status'] !== STATUS_PENDING) {
     $_SESSION['message_error'] = "Complaint not found or cannot be edited.";
-    header("Location: track_complaints.php");
+    header("Location: $_backListUrl");
     exit;
 }
 
@@ -61,6 +72,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             // Update core complaint fields
             $student->updateComplaint($complaintId, $studentId, $title, $description, $categoryId, $subcategoryId, $isAnonymous);
+
+            // Leader-only: update department and preferred staff
+            if ($_isLeader) {
+                $newDeptId   = isset($_POST['department_id']) ? (int)$_POST['department_id'] : null;
+                $newPrefStaff = trim($_POST['preferred_staff_id'] ?? '') ?: null;
+                $allowedDeptIds = array_column($leaderDepts, 'department_id');
+                if ($newDeptId && !in_array($newDeptId, $allowedDeptIds)) {
+                    throw new Exception("Invalid department selection.");
+                }
+                $updStmt = $conn->prepare(
+                    "UPDATE complaints SET department_id = ?, preferred_staff_id = ? WHERE complaint_id = ?"
+                );
+                $updStmt->bind_param('isi', $newDeptId, $newPrefStaff, $complaintId);
+                $updStmt->execute();
+                $updStmt->close();
+            }
 
             // Delete selected attachments
             foreach ($deleteIds as $attId) {
@@ -132,11 +159,15 @@ $categories  = $category->getCategories();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edit Complaint #<?= $complaintId ?> | Student</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
@@ -163,10 +194,13 @@ $categories  = $category->getCategories();
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item">
-                            <a href="student_dashboard.php"><i class="fas fa-home" style="color:black;"></i></a>
+                            <a href="<?= $_dashUrl ?>"><i class="fas fa-home" style="color:black;"></i></a>
                         </li>
                         <li class="breadcrumb-item">
-                            <a href="track_complaints.php" style="color:black;">Track Complaints</a>
+                            <a href="<?= $_dashUrl ?>" style="color:black;"><?= $_isLeader ? 'Student Rep' : 'Student' ?></a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a href="<?= $_backListUrl ?>" style="color:black;"><?= $_isLeader ? 'My Complaints' : 'Track Complaints' ?></a>
                         </li>
                         <li class="breadcrumb-item">
                             <a href="student_complaint_details.php?id=<?= $complaintId ?>" style="color:black;">Complaint #<?= $complaintId ?></a>
@@ -232,6 +266,52 @@ $categories  = $category->getCategories();
                                     <i class="fas fa-info-circle"></i> Categorizing helps route your complaint to the right department.
                                 </small>
                             </div>
+
+                            <?php if ($_isLeader): ?>
+                            <div class="col-12 col-md-6 mb-3">
+                                <label class="form-label fw-bold">Department <span class="text-danger">*</span></label>
+                                <?php if (empty($leaderDepts)): ?>
+                                    <div class="alert alert-warning py-2 mb-0">No departments assigned.</div>
+                                    <input type="hidden" name="department_id" value="<?= (int)($complaint['department_id'] ?? 0) ?>">
+                                <?php else: ?>
+                                    <select name="department_id" id="department_id" class="form-select p-3 shadow-sm"
+                                        style="border-radius:10px;border:1px solid #e0e6ed;" required>
+                                        <option value="" disabled>--- Select Department ---</option>
+                                        <?php foreach ($leaderDepts as $dept): ?>
+                                            <option value="<?= $dept['department_id'] ?>"
+                                                <?= (int)$dept['department_id'] === (int)($complaint['department_id'] ?? 0) ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($dept['department_name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <small class="form-hint">
+                                        <i class="fas fa-info-circle"></i> Only your assigned department(s) are shown.
+                                    </small>
+                                <?php endif; ?>
+                            </div>
+
+                            <div class="col-12 col-md-6 mb-3">
+                                <label class="form-label fw-bold">
+                                    Suggest Staff Member
+                                    <span class="text-muted fw-normal">(optional)</span>
+                                </label>
+                                <select name="preferred_staff_id" id="preferred_staff_id" class="form-select p-3 shadow-sm"
+                                    style="border-radius:10px;border:1px solid #e0e6ed;"
+                                    <?= empty($leaderDepts) ? 'disabled' : '' ?>>
+                                    <option value="">--- No preference ---</option>
+                                </select>
+                                <small class="form-hint">
+                                    <i class="fas fa-info-circle"></i> Suggestion only — final assignment is made by an administrator.
+                                </small>
+                                <?php
+                                // Pass current values to JS for pre-selection
+                                $jsCurrentDept  = (int)($complaint['department_id']    ?? 0);
+                                $jsCurrentStaff = htmlspecialchars($complaint['preferred_staff_id'] ?? '', ENT_QUOTES);
+                                ?>
+                                <input type="hidden" id="currentPreferredStaff" value="<?= $jsCurrentStaff ?>">
+                            </div>
+                            <?php endif; ?>
+
                         </div>
                     </div>
 
@@ -340,8 +420,10 @@ $categories  = $category->getCategories();
         </div>
     </div>
 
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
@@ -464,6 +546,51 @@ $categories  = $category->getCategories();
                 }
             });
         }
+
+        <?php if ($_isLeader && !empty($leaderDepts)): ?>
+        // Department → staff AJAX (leader only)
+        (function () {
+            var $dept  = $('#department_id');
+            var $staff = $('#preferred_staff_id');
+            var currentStaff = document.getElementById('currentPreferredStaff')?.value || '';
+
+            function resetStaff(msg) {
+                $staff.prop('disabled', true).html('<option value="">' + msg + '</option>');
+            }
+
+            function loadStaff(deptId, preselectStaffId) {
+                if (!deptId) { resetStaff('--- Select department first ---'); return; }
+                resetStaff('Loading staff...');
+                $.getJSON('ajax/get_staff_by_dept.php', { dept_id: deptId })
+                    .done(function (data) {
+                        if (!data || !data.success || !data.items || !data.items.length) {
+                            resetStaff('--- No staff available ---');
+                            return;
+                        }
+                        var opts = '<option value="">--- No preference (let admin decide) ---</option>';
+                        data.items.forEach(function (s) {
+                            var role = s.role_name ? ' (' + s.role_name + ')' : '';
+                            var sel  = (preselectStaffId && s.staff_id === preselectStaffId) ? ' selected' : '';
+                            opts += '<option value="' + s.staff_id + '"' + sel + '>' + s.username + role + '</option>';
+                        });
+                        $staff.html(opts).prop('disabled', false);
+                    })
+                    .fail(function () { resetStaff('--- Failed to load ---'); });
+            }
+
+            // Load on page ready using current department value
+            var initialDept = parseInt($dept.val()) || 0;
+            if (initialDept) {
+                loadStaff(initialDept, currentStaff);
+            } else {
+                resetStaff('--- Select department first ---');
+            }
+
+            $dept.on('change', function () {
+                loadStaff(parseInt($(this).val()) || 0, '');
+            });
+        })();
+        <?php endif; ?>
 
         // Category → subcategory AJAX
         (function () {

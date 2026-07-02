@@ -31,12 +31,14 @@ $complaintCounts = $isApproved ? $staff->getStaffComplaintCounts($staffDetails['
     'total' => 0,
     STATUS_PENDING => 0,
     STATUS_IN_PROGRESS => 0,
+    STATUS_AWAITING_RESPONSE => 0,
     STATUS_RESOLVED => 0,
     STATUS_REJECTED => 0,
 ];
 $recentComplaints = $isApproved ? $staff->getRecentAssignedComplaints($staffDetails['staff_id']) : [];
 $studentRespondedCount = $isApproved ? $staff->getStudentRespondedCount($staffDetails['staff_id']) : 0;
 $performanceStats = $isApproved ? $staff->getPerformanceStats($staffDetails['staff_id']) : [];
+$overdueCount = $isApproved ? $staff->getOverdueCount($staffDetails['staff_id']) : 0;
 
 function formatStatusBadgeClass($status)
 {
@@ -64,12 +66,17 @@ function formatStatusLabel($status)
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Staff Dashboard</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
@@ -98,9 +105,10 @@ function formatStatusLabel($status)
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item">
-                            <a href="#"><i class="fas fa-user-tie" style="color: black;"></i></a>
+                            <a href="staff_dashboard.php"><i class="fas fa-user-tie" style="color: black;"></i></a>
                         </li>
-                        <li class="breadcrumb-item active">Staff / Dashboard</li>
+                        <li class="breadcrumb-item"><a href="staff_dashboard.php" style="color:black;">Staff</a></li>
+                        <li class="breadcrumb-item active">Dashboard</li>
                     </ol>
                 </nav>
 
@@ -109,7 +117,7 @@ function formatStatusLabel($status)
                     <p class="mb-0 opacity-75">Manage your assigned complaints.</p>
                 </div>
 
-                <!-- <?php if (!$isApproved): ?>
+                <?php if (!$isApproved): ?>
                     <div class="row g-3 mb-4">
                         <div class="col-12">
                             <div class="container-card shadow-sm p-4 text-center">
@@ -131,10 +139,12 @@ function formatStatusLabel($status)
                 <?php else: ?>
 
                     <?php if ($studentRespondedCount > 0): ?>
-                        <div id="respondedAlert" class="alert alert-success alert-dismissible d-flex align-items-center mb-4 shadow-sm" role="alert"
+                        <div id="respondedAlert"
+                            class="alert alert-success alert-dismissible d-flex align-items-center mb-4 shadow-sm" role="alert"
                             style="border-left: 5px solid #16a34a; border-radius: 10px;">
                             <i class="fas fa-reply fa-lg me-3 text-success flex-shrink-0"></i>
-                            <a href="assigned_complaints.php" class="text-decoration-none text-reset flex-grow-1 d-flex align-items-center"
+                            <a href="assigned_complaints.php"
+                                class="text-decoration-none text-reset flex-grow-1 d-flex align-items-center"
                                 style="cursor:pointer;">
                                 <div class="flex-grow-1">
                                     <strong><?= $studentRespondedCount ?>
@@ -147,11 +157,30 @@ function formatStatusLabel($status)
                             </a>
                             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
                         </div>
-                    <?php endif; ?> -->
+                    <?php endif; ?>
 
+                    <?php if ($overdueCount > 0): ?>
+                        <div id="overdueAlert"
+                            class="alert alert-warning alert-dismissible d-flex align-items-center mb-4 shadow-sm" role="alert"
+                            style="border-left: 5px solid #dc2626; border-radius: 10px;">
+                            <i class="fas fa-exclamation-triangle fa-lg me-3 text-danger flex-shrink-0"></i>
+                            <a href="assigned_complaints.php"
+                                class="text-decoration-none text-reset flex-grow-1 d-flex align-items-center"
+                                style="cursor:pointer;">
+                                <div class="flex-grow-1">
+                                    <strong><?= $overdueCount ?> overdue complaint<?= $overdueCount > 1 ? 's' : '' ?>.</strong>
+                                    <span class="ms-2 text-muted small">Past deadline or open &gt;7 days without one &mdash; click to review &rarr;</span>
+                                </div>
+                                <span class="badge bg-danger fs-6 me-2"><?= $overdueCount ?></span>
+                            </a>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
+                        </div>
+                    <?php endif; ?>
+
+                    <!-- Active status counts -->
                     <div class="row g-3 mb-4">
                         <div class="col-12 col-md-6 col-lg-3">
-                            <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                            <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                                 <div
                                     style="width:48px;height:48px;border-radius:12px;background:rgba(79,70,229,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                     <i class="fas fa-folder-open fa-lg" style="color:#4f46e5;"></i>
@@ -164,7 +193,7 @@ function formatStatusLabel($status)
                         </div>
 
                         <div class="col-12 col-md-6 col-lg-3">
-                            <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                            <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                                 <div
                                     style="width:48px;height:48px;border-radius:12px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                     <i class="fas fa-clock fa-lg" style="color:#f59e0b;"></i>
@@ -177,7 +206,7 @@ function formatStatusLabel($status)
                         </div>
 
                         <div class="col-12 col-md-6 col-lg-3">
-                            <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                            <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                                 <div
                                     style="width:48px;height:48px;border-radius:12px;background:rgba(2,132,199,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                     <i class="fas fa-spinner fa-spin fa-lg" style="color:#0284c7;"></i>
@@ -191,7 +220,24 @@ function formatStatusLabel($status)
                         </div>
 
                         <div class="col-12 col-md-6 col-lg-3">
-                            <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                            <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
+                                <div
+                                    style="width:48px;height:48px;border-radius:12px;background:rgba(14,165,233,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <i class="fas fa-user-clock fa-lg" style="color:#0ea5e9;"></i>
+                                </div>
+                                <div class="text-end">
+                                    <h2 class="mb-0 fw-bold" style="color:#0ea5e9;">
+                                        <?= $complaintCounts[STATUS_AWAITING_RESPONSE] ?></h2>
+                                    <p class="mb-0 fw-bold small">Awaiting Response</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Outcome + alert counts -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-12 col-md-6 col-lg-3">
+                            <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                                 <div
                                     style="width:48px;height:48px;border-radius:12px;background:rgba(22,163,74,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                     <i class="fas fa-check-circle fa-lg" style="color:#16a34a;"></i>
@@ -203,27 +249,37 @@ function formatStatusLabel($status)
                             </div>
                         </div>
 
-                    </div>
-
-                    <!-- Performance Stats -->
-                    <div class="row g-3 mb-4">
                         <div class="col-12 col-md-6 col-lg-3">
-                            <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                            <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                                 <div
-                                    style="width:48px;height:48px;border-radius:12px;background:rgba(13,202,240,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                                    <i class="fas fa-clock fa-lg" style="color:#0dcaf0;"></i>
+                                    style="width:48px;height:48px;border-radius:12px;background:rgba(107,114,128,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <i class="fas fa-times-circle fa-lg" style="color:#6b7280;"></i>
                                 </div>
                                 <div class="text-end">
-                                    <h2 class="mb-0 fw-bold" style="color:#0dcaf0;">
-                                        <?= $performanceStats['avg_resolution_days'] ?? '--' ?>
-                                    </h2>
-                                    <p class="mb-0 fw-bold small">Avg Resolution (days)</p>
+                                    <h2 class="mb-0 fw-bold" style="color:#6b7280;"><?= $complaintCounts['rejected'] ?></h2>
+                                    <p class="mb-0 fw-bold small">Rejected</p>
                                 </div>
                             </div>
                         </div>
 
                         <div class="col-12 col-md-6 col-lg-3">
-                            <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                            <a href="assigned_complaints.php" class="text-decoration-none">
+                                <div class="stat-card p-3 d-flex align-items-center justify-content-between shadow-sm"
+                                    style="<?= $overdueCount > 0 ? 'background:linear-gradient(135deg,#fef2f2,#fee2e2);border:2px solid #dc2626;' : '' ?>">
+                                    <div
+                                        style="width:48px;height:48px;border-radius:12px;background:rgba(220,38,38,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                        <i class="fas fa-exclamation-circle fa-lg" style="color:#dc2626;"></i>
+                                    </div>
+                                    <div class="text-end">
+                                        <h2 class="mb-0 fw-bold" style="color:#dc2626;"><?= $overdueCount ?></h2>
+                                        <p class="mb-0 fw-bold small">Overdue (past deadline)</p>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-3">
+                            <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                                 <div
                                     style="width:48px;height:48px;border-radius:12px;background:rgba(22,163,74,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                     <i class="fas fa-calendar-check fa-lg" style="color:#16a34a;"></i>
@@ -237,8 +293,27 @@ function formatStatusLabel($status)
                             </div>
                         </div>
 
-                        <div class="col-12 col-md-6 col-lg-3">
-                            <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                    </div>
+
+                    <!-- Performance Stats -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
+                                <div
+                                    style="width:48px;height:48px;border-radius:12px;background:rgba(13,202,240,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <i class="fas fa-clock fa-lg" style="color:#0dcaf0;"></i>
+                                </div>
+                                <div class="text-end">
+                                    <h2 class="mb-0 fw-bold" style="color:#0dcaf0;">
+                                        <?= $performanceStats['avg_resolution_days'] ?? '--' ?>
+                                    </h2>
+                                    <p class="mb-0 fw-bold small">Avg Resolution (days)</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                                 <div
                                     style="width:48px;height:48px;border-radius:12px;background:rgba(99,102,241,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                     <i class="fas fa-percent fa-lg" style="color:#6366f1;"></i>
@@ -252,8 +327,8 @@ function formatStatusLabel($status)
                             </div>
                         </div>
 
-                        <div class="col-12 col-md-6 col-lg-3">
-                            <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                                 <div
                                     style="width:48px;height:48px;border-radius:12px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                     <i class="fas fa-star fa-lg text-warning"></i>
@@ -269,17 +344,29 @@ function formatStatusLabel($status)
                     </div>
 
                     <div class="row g-3 mb-4">
-                        <div class="col-12 col-md-12 col-lg-12">
+                        <div class="col-12 <?= (int) ($staffDetails['role_rank'] ?? 0) >= 2 ? 'col-md-6' : 'col-md-12' ?>">
                             <a href="assigned_complaints.php" class="action-card action-card--blue">
                                 <i class="fas fa-folder-open action-icon"></i>
                                 <h5>View Assigned Complaints</h5>
                                 <small>View all complaints assigned to you</small>
                             </a>
                         </div>
+                        <?php if ((int) ($staffDetails['role_rank'] ?? 0) >= 2): ?>
+                            <div class="col-12 col-md-6">
+                                <a href="department_complaints.php" class="action-card action-card--teal">
+                                    <i class="fas fa-building action-icon"></i>
+                                    <h5>Department View</h5>
+                                    <small>View all complaints in your department</small>
+                                </a>
+                            </div>
+                        <?php endif; ?>
                     </div>
 
                     <div class="container-card shadow-sm">
-                        <h4 class="mb-1 fw-bold"><i class="fas fa-file-invoice me-2"></i>Recent Assigned Complaints</h4>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h4 class="mb-0 fw-bold"><i class="fas fa-file-invoice me-2"></i>Recent Assigned Complaints</h4>
+                            <div class="search-input"></div>
+                        </div>
                         <p class="text-muted small mb-3">Your latest complaint assignments</p>
 
                         <div class="table-responsive">
@@ -291,12 +378,13 @@ function formatStatusLabel($status)
                                         <th>CATEGORY</th>
                                         <th>DATE</th>
                                         <th>STATUS</th>
+                                        <th>ACTION</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php if (!empty($recentComplaints)): ?>
                                         <?php foreach ($recentComplaints as $complaint): ?>
-                                            <tr>
+                                            <tr data-href="assigned_complaint_details.php?id=<?= (int) $complaint['complaint_id'] ?>">
                                                 <td>#<?= htmlspecialchars($complaint['complaint_id']) ?></td>
                                                 <td><?= htmlspecialchars($complaint['complaint_title']) ?></td>
                                                 <td><?= htmlspecialchars($complaint['category_name'] ?? 'N/A') ?></td>
@@ -307,11 +395,17 @@ function formatStatusLabel($status)
                                                         <?= htmlspecialchars(formatStatusLabel($complaint['complaint_status'])) ?>
                                                     </span>
                                                 </td>
+                                                <td>
+                                                    <a href="assigned_complaint_details.php?id=<?= (int) $complaint['complaint_id'] ?>"
+                                                        class="btn btn-sm btn-primary">
+                                                        <i class="fas fa-eye"></i> View
+                                                    </a>
+                                                </td>
                                             </tr>
                                         <?php endforeach; ?>
                                     <?php else: ?>
                                         <tr>
-                                            <td colspan="5" class="text-center">No recent assigned complaints found.</td>
+                                            <td colspan="6" class="text-center">No recent assigned complaints found.</td>
                                         </tr>
                                     <?php endif; ?>
                                 </tbody>
@@ -327,38 +421,50 @@ function formatStatusLabel($status)
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            var userId = <?= (int)$_SESSION['user_id'] ?>;
-            var count  = <?= (int)$studentRespondedCount ?>;
-            var key    = 'scmrs_dismissed_responded_' + userId + '_' + count;
-            var alertEl = document.getElementById('respondedAlert');
+            var userId = <?= (int) $_SESSION['user_id'] ?>;
 
-            if (!alertEl) return;
-
-            // Hide immediately if already dismissed
-            if (count > 0 && localStorage.getItem(key)) {
-                alertEl.style.display = 'none';
-            }
-
-            // Save to localStorage when Bootstrap closes the alert
-            alertEl.addEventListener('closed.bs.alert', function () {
-                localStorage.setItem(key, '1');
-            });
-
-            // Also dismiss when the link is clicked
-            var link = alertEl.querySelector('a');
-            if (link) {
-                link.addEventListener('click', function () {
-                    localStorage.setItem(key, '1');
+            function bindDismissAlert(alertId, storageKey, count) {
+                var alertEl = document.getElementById(alertId);
+                if (!alertEl || count <= 0) return;
+                if (localStorage.getItem(storageKey)) {
+                    alertEl.style.display = 'none';
+                    return;
+                }
+                alertEl.addEventListener('closed.bs.alert', function () {
+                    localStorage.setItem(storageKey, '1');
                 });
+                var link = alertEl.querySelector('a');
+                if (link) {
+                    link.addEventListener('click', function () {
+                        localStorage.setItem(storageKey, '1');
+                    });
+                }
             }
+
+            bindDismissAlert(
+                'respondedAlert',
+                'scmrs_dismissed_responded_' + userId + '_' + <?= (int) $studentRespondedCount ?>,
+                <?= (int) $studentRespondedCount ?>
+            );
+            bindDismissAlert(
+                'overdueAlert',
+                'scmrs_dismissed_overdue_' + userId + '_' + <?= (int) $overdueCount ?>,
+                <?= (int) $overdueCount ?>
+            );
         });
     </script>
 
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/jquery.dataTables.min.js"></script>
-    <script src="assets/js/dataTables.bootstrap4.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery.dataTables.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <!-- <script src="assets/js/dataTables.bootstrap4.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
+    <!-- CDN fallback (removed - JS local file works on shared hosting): -->
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/10.16.7/sweetalert2.all.min.js"></script> -->
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
@@ -381,6 +487,10 @@ function formatStatusLabel($status)
                             $(".dataTables_filter").appendTo("#tableSearch");
                             $(".dataTables_filter").appendTo(".search-input");
                         }
+                    });
+                    $('#complaintsTable tbody').on('click', 'tr[data-href]', function(e) {
+                        if ($(e.target).closest('a, button, input, label').length) return;
+                        window.location.href = $(this).data('href');
                     });
                 }
             }

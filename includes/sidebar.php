@@ -93,6 +93,18 @@
                     <span class="link-text">Department Complaints</span>
                 </a>
             </li>
+            <li>
+                <a href="leader_create_complaint.php">
+                    <i class="fas fa-plus-circle me-2"></i>
+                    <span class="link-text">Submit Complaint</span>
+                </a>
+            </li>
+            <li>
+                <a href="leader_my_complaints.php">
+                    <i class="fas fa-search me-2"></i>
+                    <span class="link-text">My Complaints</span>
+                </a>
+            </li>
 
         <?php elseif ($sidebarRole === 'staff'): ?>
             <?php $_staffSidebarRank = $_staffSidebarRank ?? 0; ?>
@@ -140,10 +152,4 @@
         <?php endif; ?>
     </ul>
 
-    <div class="sidebar-footer">
-        <a href="logout.php">
-            <i class="fas fa-sign-out-alt me-2"></i>
-            <span class="link-text">Sign Out</span>
-        </a>
-    </div>
 </nav>

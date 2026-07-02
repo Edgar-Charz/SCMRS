@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once 'config/Database.php';
 require_once 'classes/User.php';
 require_once 'config/session.php';

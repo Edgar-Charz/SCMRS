@@ -1,16 +1,18 @@
-<?php
+﻿<?php
 require_once 'config/session.php';
 
-if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'student') {
+$_allowedRoles = ['student', 'student_leader'];
+if (!isset($_SESSION['user_id']) || !in_array($_SESSION['user_role'], $_allowedRoles)) {
     header("Location: login.php");
     exit;
 }
+$_backUrl = $_SESSION['user_role'] === 'student_leader' ? 'leader_my_complaints.php' : 'track_complaints.php';
 
 $userId = (int)$_SESSION['user_id'];
 
 $complaintId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($complaintId <= 0) {
-    header("Location: track_complaints.php");
+    header("Location: $_backUrl");
     exit;
 }
 
@@ -30,7 +32,7 @@ $studentId = $student->getStudentId($userId);
 // Ownership check — load complaint and verify it belongs to this student
 $complaint_details = $student->readStudentComplaint($complaintId);
 if (!$complaint_details || (int)$complaint_details['student_id'] !== (int)$studentId) {
-    header("Location: track_complaints.php");
+    header("Location: $_backUrl");
     exit;
 }
 
@@ -83,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $staffUserId = $student->reopenComplaint($complaintId, $studentId, $userId);
 
         $link = "assigned_complaint_details.php?id=$complaintId";
-        $msg  = "Complaint #$complaintId has been reopened by the student — please review.";
+        $msg  = "Complaint #$complaintId has been reopened by the student, please review.";
 
         if ($staffUserId) {
             $notif->create($staffUserId, $msg, 'complaint_reopened', $link, $complaintId);
@@ -163,12 +165,17 @@ function statusBadge($status): string
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Complaint #<?= $complaintId ?> | Student</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
@@ -192,9 +199,9 @@ function statusBadge($status): string
 
             <!-- Toast -->
             <div aria-live="polite" aria-atomic="true"
-                class="position-fixed top-0 start-50 translate-middle-x p-3" style="z-index:1100;">
+                class="position-fixed top-0 start-50 translate-middle-x p-3" style="z-index:1100; pointer-events:none;">
                 <?php if (!empty($message)): ?>
-                    <div class="toast show align-items-center text-white bg-success border-0" role="alert">
+                    <div class="toast show align-items-center text-white bg-success border-0" role="alert" style="pointer-events:auto;">
                         <div class="d-flex">
                             <div class="toast-body">
                                 <i class="fas fa-check-circle me-2"></i><?= htmlspecialchars($message) ?>
@@ -223,12 +230,15 @@ function statusBadge($status): string
                     class="d-flex justify-content-between align-items-center mb-3">
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item">
-                            <a href="student_dashboard.php">
+                            <a href="<?= $_SESSION['user_role'] === 'student_leader' ? 'leader_dashboard.php' : 'student_dashboard.php' ?>">
                                 <i class="fas fa-home" style="color:black;"></i>
                             </a>
                         </li>
                         <li class="breadcrumb-item">
-                            <a href="track_complaints.php" style="color:black;">Track Complaints</a>
+                            <a href="<?= $_SESSION['user_role'] === 'student_leader' ? 'leader_dashboard.php' : 'student_dashboard.php' ?>" style="color:black;"><?= $_SESSION['user_role'] === 'student_leader' ? 'Student Rep' : 'Student' ?></a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a href="<?= $_backUrl ?>" style="color:black;"><?= $_SESSION['user_role'] === 'student_leader' ? 'My Complaints' : 'Track Complaints' ?></a>
                         </li>
                         <li class="breadcrumb-item active">Complaint #<?= $complaintId ?></li>
                     </ol>
@@ -299,7 +309,7 @@ function statusBadge($status): string
 
                     <div class="mb-3">
                         <div class="detail-label fw-bold mb-1">Description:</div>
-                        <div class="p-3 bg-light rounded border">
+                        <div class="p-4 bg-light rounded border">
                             <?= htmlspecialchars($complaint_details['complaint_description']) ?>
                         </div>
                     </div>
@@ -537,9 +547,12 @@ function statusBadge($status): string
 
     </div><!-- /d-flex -->
 
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/10.16.7/sweetalert2.all.min.js"></script> -->
     <script src="assets/js/script.js"></script>
 
     <script>

@@ -11,20 +11,22 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'student') {
 require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/Student.php";
-require_once "classes/Category.php";
 require_once "classes/Complaint.php";
+require_once "classes/ComplaintRouter.php";
+require_once "classes/Department.php";
 require_once "classes/Notification.php";
 require_once "includes/csrf.php";
 
 $db = new Database();
 $conn = $db->connect();
 
-$category = new Category($conn);
 $student = new Student($conn);
 $complaint = new Complaint($conn);
+$department = new Department($conn);
 
 $studentId = $student->getStudentId($userId);
-$categories = $category->getCategories();
+$categories = $complaint->getComplaintCategories();
+$departments = $department->getDepartments();
 
 $message = $error = "";
 
@@ -42,24 +44,51 @@ if (isset($_POST["submitComplaintBTN"])) {
         $student_id = $studentId;
         $user_id = $_SESSION['user_id'];
 
-        $newComplaintId = $complaint->createComplaint($title, $description, $category_id, $department_id, $is_anonymous, $student_id, $user_id, $subcategory_id);
+        $categoryMeta = $category_id ? $complaint->getCategoryRoutingMeta($category_id) : null;
+        if (!$categoryMeta) {
+            throw new Exception("Please select a valid category.");
+        }
+
+        $requiresDeptSelection = (int) $categoryMeta['requires_department_selection'] === 1;
+        if ($requiresDeptSelection) {
+            if (empty($department_id)) {
+                throw new Exception("Please select your department for this category.");
+            }
+            $effectiveDepartmentId = $department_id;
+        } else {
+            $effectiveDepartmentId = $categoryMeta['auto_assign_department_id'];
+        }
+
+        $newComplaintId = $complaint->createComplaint($title, $description, $category_id, $effectiveDepartmentId, $is_anonymous, $student_id, $user_id, $subcategory_id);
         if ($newComplaintId) {
+            $routeResult = (new ComplaintRouter($conn))->routeComplaint(
+                $newComplaintId,
+                $category_id,
+                $subcategory_id,
+                $effectiveDepartmentId,
+                'medium',
+                $user_id
+            );
+
             $notifMsg = $is_anonymous
                 ? "A new anonymous complaint has been submitted."
                 : "New complaint from " . htmlspecialchars($_SESSION['username']) . ": \"$title\"";
+            $notifMsg .= $routeResult['routed']
+                ? " (auto-assigned to staff)"
+                : " — requires manual assignment.";
             (new Notification($conn))->notifyAllAdmins(
                 $notifMsg,
                 'new_complaint',
                 "complaint_details.php?id=$newComplaintId",
                 $newComplaintId
             );
-            if ($department_id) {
+            if ($requiresDeptSelection && $effectiveDepartmentId) {
                 require_once 'classes/StudentLeader.php';
                 $leaderMsg = $is_anonymous
                     ? "A new anonymous complaint has been submitted in your department."
                     : "New complaint in your department: \"$title\"";
                 (new StudentLeader($conn))->notifyLeadersInDepartment(
-                    $department_id,
+                    $effectiveDepartmentId,
                     $leaderMsg,
                     'new_complaint_in_rep_scope',
                     "leader_complaint_details.php?id=$newComplaintId",
@@ -89,12 +118,17 @@ if (isset($_SESSION['message'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Dashboard</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
@@ -121,16 +155,17 @@ if (isset($_SESSION['message'])) {
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item">
-                            <a href="#"><i class="fas fa-paper-plane" style="color: black;"></i></a>
+                            <a href="student_dashboard.php"><i class="fas fa-paper-plane" style="color: black;"></i></a>
                         </li>
-                        <li class="breadcrumb-item active">Student / Submit Complaint</li>
+                        <li class="breadcrumb-item"><a href="student_dashboard.php" style="color:black;">Student</a></li>
+                        <li class="breadcrumb-item active">Submit Complaint</li>
                     </ol>
                 </nav>
 
                 <!-- Alert -->
                 <div aria-live="polite" aria-atomic="true"
                     class="position-fixed top-0 start-50 translate-middle-x p-3 w-100"
-                    style="z-index: 1100; max-width: 800px;">
+                    style="z-index: 1100; max-width: 800px; pointer-events: none;">
                     <?php if (!empty($message) || !empty($error)):
                         $type = !empty($message) ? 'success' : 'danger';
                         $text = !empty($message) ? $message : $error;
@@ -138,7 +173,8 @@ if (isset($_SESSION['message'])) {
                         ?>
                         <div id="livetoast"
                             class="toast show align-items-center text-white bg-<?php echo $type ?> border-0 w-100"
-                            role="alert" aria-live="assertive" aria-atomic="true">
+                            role="alert" aria-live="assertive" aria-atomic="true"
+                            style="pointer-events: auto;">
                             <div class="d-flex">
                                 <div class="toast-body">
                                     <i class="fas <?php echo $icon; ?> me-2"></i>
@@ -179,7 +215,8 @@ if (isset($_SESSION['message'])) {
                                     <option value="" selected disabled>--- Choose Category ---</option>
                                     <?php if ($categories): ?>
                                         <?php while ($category_row = $categories->fetch_assoc()): ?>
-                                            <option value="<?= $category_row['category_id']; ?>">
+                                            <option value="<?= $category_row['category_id']; ?>"
+                                                data-requires-dept="<?= (int) $category_row['requires_department_selection']; ?>">
                                                 <?= $category_row['category_name']; ?>
                                             </option>
                                         <?php endwhile; ?>
@@ -203,18 +240,25 @@ if (isset($_SESSION['message'])) {
                                 </small>
                             </div>
 
-                            <!-- <div class="col-12 col-md-12 col-lg-12 mb-3">
-                            <label for="" class="form-label fw-bold small">Target Department</label>
-                            <span class="text-danger">*</span>
-                             <select class="form-select p-3 shadow-sm" name="department"
+                            <div class="col-12 col-md-12 col-lg-12 mb-2" id="departmentFieldWrap" style="display:none;">
+                                <label for="department_id" class="form-label fw-bold">Your Department</label>
+                                <span class="text-danger">*</span>
+                                <select class="form-select p-3 shadow-sm" name="department_id" id="department_id"
                                     style="border-radius: 10px; border: 1px solid #e0e6ed;">
-                                    <option value="" selected disabled>All Departments</option>
-                                    <option value="">ABC</option>
+                                    <option value="" selected disabled>--- Choose Department ---</option>
+                                    <?php if ($departments): ?>
+                                        <?php while ($dept_row = $departments->fetch_assoc()): ?>
+                                            <option value="<?= $dept_row['department_id']; ?>">
+                                                <?= htmlspecialchars($dept_row['department_name']); ?>
+                                            </option>
+                                        <?php endwhile; ?>
+                                    <?php endif; ?>
                                 </select>
                                 <small class="form-hint">
-                                    <i class="fas fa-info-circle"></i> Your complaint will be automatically routed to this department for review.
+                                    <i class="fas fa-info-circle"></i> This category requires your department to route
+                                    the complaint to the right staff member.
                                 </small>
-                        </div> -->
+                            </div>
                         </div>
 
                     </div>
@@ -297,11 +341,16 @@ if (isset($_SESSION['message'])) {
         </div>
     </div>
 
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/jquery.dataTables.min.js"></script>
-    <script src="assets/js/dataTables.bootstrap4.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery.dataTables.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <!-- <script src="assets/js/dataTables.bootstrap4.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/10.16.7/sweetalert2.all.min.js"></script> -->
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
@@ -622,16 +671,27 @@ if (isset($_SESSION['message'])) {
         $(function () {
             const $category = $("#category_id");
             const $subcat = $("#subcategory_id");
+            const $deptWrap = $("#departmentFieldWrap");
+            const $deptSelect = $("#department_id");
 
             function resetSubcategories(message) {
                 $subcat.prop("disabled", true);
                 $subcat.html(`<option value="" selected disabled>${message}</option>`);
             }
 
+            function toggleDepartmentField(selectEl) {
+                const selectedOpt = selectEl.options[selectEl.selectedIndex];
+                const requiresDept = !!(selectedOpt && selectedOpt.dataset.requiresDept === "1");
+                $deptWrap.toggle(requiresDept);
+                $deptSelect.prop("required", requiresDept);
+                if (!requiresDept) $deptSelect.val("");
+            }
+
             resetSubcategories("--- Choose category first ---");
 
             $category.on("change", function () {
                 const categoryId = $(this).val();
+                toggleDepartmentField(this);
 
                 if (!categoryId) {
                     resetSubcategories("--- Choose category first ---");

@@ -22,11 +22,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Handle Add
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
-    $name   = trim($_POST['category_name'] ?? '');
-    $desc   = trim($_POST['category_description'] ?? '');
-    $deptId = (int) ($_POST['auto_assign_department_id'] ?? 0);
+    $name     = trim($_POST['category_name'] ?? '');
+    $desc     = trim($_POST['category_description'] ?? '');
+    $deptId   = (int) ($_POST['auto_assign_department_id'] ?? 0);
+    $roleId   = (int) ($_POST['default_role_id'] ?? 0);
+    $reqDept  = isset($_POST['requires_department_selection']) ? 1 : 0;
     if ($name !== '') {
-        $admin->addCategory($name, $desc, $adminId, $deptId ?: null);
+        $admin->addCategory($name, $desc, $adminId, $deptId ?: null, $reqDept, $roleId ?: null);
         $admin->logActivity($adminId, 'category_added', 'category', 0, $name, "Category '{$name}' added");
         $_SESSION['message'] = "Category '{$name}' added successfully.";
     } else {
@@ -38,13 +40,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
 
 // Handle Edit
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_category'])) {
-    $id     = (int) ($_POST['category_id'] ?? 0);
-    $name   = trim($_POST['category_name'] ?? '');
-    $desc   = trim($_POST['category_description'] ?? '');
-    $status = in_array($_POST['status'] ?? '', ['active', 'inactive']) ? $_POST['status'] : 'active';
-    $deptId = (int) ($_POST['auto_assign_department_id'] ?? 0);
+    $id      = (int) ($_POST['category_id'] ?? 0);
+    $name    = trim($_POST['category_name'] ?? '');
+    $desc    = trim($_POST['category_description'] ?? '');
+    $status  = in_array($_POST['status'] ?? '', ['active', 'inactive']) ? $_POST['status'] : 'active';
+    $deptId  = (int) ($_POST['auto_assign_department_id'] ?? 0);
+    $roleId  = (int) ($_POST['default_role_id'] ?? 0);
+    $reqDept = isset($_POST['requires_department_selection']) ? 1 : 0;
     if ($id && $name !== '') {
-        $admin->updateCategory($id, $name, $desc, $status, $deptId ?: null);
+        $admin->updateCategory($id, $name, $desc, $status, $deptId ?: null, $reqDept, $roleId ?: null);
         $admin->logActivity($adminId, 'category_updated', 'category', $id, $name, "Category updated to '{$name}' (status: {$status})");
         $_SESSION['message'] = "Category updated successfully.";
     } else {
@@ -70,12 +74,13 @@ if (isset($_GET['delete_category']) && is_numeric($_GET['delete_category'])) {
 
 // Handle Add Subcategory
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subcategory'])) {
-    $catId = (int) ($_POST['subcategory_category_id'] ?? 0);
-    $name = trim($_POST['subcategory_name'] ?? '');
-    $desc = trim($_POST['subcategory_description'] ?? '');
+    $catId  = (int) ($_POST['subcategory_category_id'] ?? 0);
+    $name   = trim($_POST['subcategory_name'] ?? '');
+    $desc   = trim($_POST['subcategory_description'] ?? '');
+    $roleId = (int) ($_POST['default_role_id'] ?? 0);
     if ($catId && $name !== '') {
         try {
-            $admin->addSubcategory($catId, $name, $desc, $adminId);
+            $admin->addSubcategory($catId, $name, $desc, $adminId, $roleId ?: null);
             $admin->logActivity($adminId, 'subcategory_added', 'category', $catId, $name, "Subcategory '{$name}' added to category #$catId");
             $_SESSION['message'] = "Subcategory '{$name}' added successfully.";
         } catch (Exception $e) {
@@ -90,13 +95,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subcategory'])) {
 
 // Handle Edit Subcategory
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_subcategory'])) {
-    $id = (int) ($_POST['subcategory_id'] ?? 0);
-    $name = trim($_POST['subcategory_name'] ?? '');
-    $desc = trim($_POST['subcategory_description'] ?? '');
+    $id     = (int) ($_POST['subcategory_id'] ?? 0);
+    $name   = trim($_POST['subcategory_name'] ?? '');
+    $desc   = trim($_POST['subcategory_description'] ?? '');
     $status = in_array($_POST['subcategory_status'] ?? '', ['active', 'inactive']) ? $_POST['subcategory_status'] : 'active';
+    $roleId = (int) ($_POST['default_role_id'] ?? 0);
     if ($id && $name !== '') {
         try {
-            $admin->updateSubcategory($id, $name, $desc, $status);
+            $admin->updateSubcategory($id, $name, $desc, $status, $roleId ?: null);
             $admin->logActivity($adminId, 'subcategory_updated', 'category', $id, $name, "Subcategory updated to '{$name}' (status: {$status})");
             $_SESSION['message'] = "Subcategory updated successfully.";
         } catch (Exception $e) {
@@ -126,6 +132,7 @@ if (isset($_GET['delete_subcategory']) && is_numeric($_GET['delete_subcategory']
 $categories = $admin->getAllCategoriesWithStats();
 $subcategories_grouped = $admin->getAllSubcategoriesGrouped();
 $departments = $admin->getAllDepartments();
+$staffRoles = $admin->getAllStaffRoles();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -135,12 +142,17 @@ $departments = $admin->getAllDepartments();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Categories</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
@@ -167,9 +179,10 @@ $departments = $admin->getAllDepartments();
                 <nav aria-label="breadcrumb" class="d-flex justify-content-between align-items-center">
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item">
-                            <a href="#"><i class="fas fa-tags" style="color: black;"></i></a>
+                            <a href="admin_dashboard.php"><i class="fas fa-tags" style="color: black;"></i></a>
                         </li>
-                        <li class="breadcrumb-item active">Admin / Manage Categories</li>
+                        <li class="breadcrumb-item"><a href="admin_dashboard.php" style="color:black;">Admin</a></li>
+                        <li class="breadcrumb-item active">Manage Categories</li>
                     </ol>
                     <button type="button" class="btn btn-add" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
                         <i class="fas fa-plus"></i> Add New Category
@@ -177,7 +190,10 @@ $departments = $admin->getAllDepartments();
                 </nav>
 
                 <div class="container-card shadow-sm mt-3">
-                    <h4 class="mb-1 fw-bold"><i class="fas fa-tags me-2"></i>All Categories</h4>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <h5 class="mb-0 fw-bold"><i class="fas fa-tags me-2"></i>Categories</h5>
+                        <div class="search-input"></div>
+                    </div>
 
                     <div class="table-responsive">
                         <table class="table table-stripped" id="categoriesTable">
@@ -300,6 +316,31 @@ $departments = $admin->getAllDepartments();
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <div class="mb-3 form-check">
+                                    <input type="checkbox" class="form-check-input" name="requires_department_selection"
+                                        id="cat_requires_dept" value="1">
+                                    <label class="form-check-label fw-bold small" for="cat_requires_dept">
+                                        Requires student to pick a department at submission
+                                    </label>
+                                    <div class="form-text">Enable for academic categories (FYP, PT, Labs) where routing
+                                        depends on the student's own department. Leave off for fixed-office categories
+                                        (Finance, Records, SAO, Warden) — those use "Default Department" above as a
+                                        fixed office instead.</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">
+                                        Default Staff Role
+                                        <span class="text-muted fw-normal">(optional — enables auto-routing)</span>
+                                    </label>
+                                    <select name="default_role_id" class="form-select" style="border-radius:10px;">
+                                        <option value="0">— No auto-routing (admin assigns manually) —</option>
+                                        <?php foreach ($staffRoles as $role): ?>
+                                            <option value="<?= $role['role_id'] ?>">
+                                                <?= htmlspecialchars($role['role_name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="submit" name="add_category" class="btn btn-primary fw-bold">
@@ -349,6 +390,27 @@ $departments = $admin->getAllDepartments();
                                         <?php foreach ($departments as $dept): ?>
                                             <option value="<?= $dept['department_id'] ?>">
                                                 <?= htmlspecialchars($dept['department_name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3 form-check">
+                                    <input type="checkbox" class="form-check-input" name="requires_department_selection"
+                                        id="edit_cat_requires_dept" value="1">
+                                    <label class="form-check-label fw-bold small" for="edit_cat_requires_dept">
+                                        Requires student to pick a department at submission
+                                    </label>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">
+                                        Default Staff Role
+                                        <span class="text-muted fw-normal">(optional — enables auto-routing)</span>
+                                    </label>
+                                    <select name="default_role_id" id="edit_cat_role" class="form-select" style="border-radius:10px;">
+                                        <option value="0">— No auto-routing (admin assigns manually) —</option>
+                                        <?php foreach ($staffRoles as $role): ?>
+                                            <option value="<?= $role['role_id'] ?>">
+                                                <?= htmlspecialchars($role['role_name']) ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -432,6 +494,20 @@ $departments = $admin->getAllDepartments();
                                                     rows="2" style="border-radius:8px;"
                                                     placeholder="Brief description..."></textarea>
                                             </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold small">
+                                                    Default Staff Role
+                                                    <span class="text-muted fw-normal">(optional — overrides the category's role)</span>
+                                                </label>
+                                                <select name="default_role_id" class="form-select" style="border-radius:8px;">
+                                                    <option value="0">— Use category's default role —</option>
+                                                    <?php foreach ($staffRoles as $role): ?>
+                                                        <option value="<?= $role['role_id'] ?>">
+                                                            <?= htmlspecialchars($role['role_name']) ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
                                             <button type="submit" name="add_subcategory"
                                                 class="btn btn-primary btn-sm fw-bold">
                                                 <i class="fas fa-plus me-1"></i> Add Subcategory
@@ -477,6 +553,20 @@ $departments = $admin->getAllDepartments();
                                         class="form-control shadow-sm" rows="3" style="border-radius: 10px;"></textarea>
                                 </div>
                                 <div class="mb-3">
+                                    <label class="form-label fw-bold small">
+                                        Default Staff Role
+                                        <span class="text-muted fw-normal">(optional — overrides the category's role)</span>
+                                    </label>
+                                    <select name="default_role_id" id="edit_sub_role" class="form-select" style="border-radius:10px;">
+                                        <option value="0">— Use category's default role —</option>
+                                        <?php foreach ($staffRoles as $role): ?>
+                                            <option value="<?= $role['role_id'] ?>">
+                                                <?= htmlspecialchars($role['role_name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
                                     <label class="form-label fw-bold small">Status</label>
                                     <select name="subcategory_status" id="edit_sub_status" class="form-select">
                                         <option value="active">Active</option>
@@ -505,6 +595,8 @@ $departments = $admin->getAllDepartments();
             document.getElementById('edit_cat_desc').value = cat.category_description || '';
             document.getElementById('edit_cat_status').value = cat.status;
             document.getElementById('edit_cat_dept').value = cat.auto_assign_department_id || '0';
+            document.getElementById('edit_cat_requires_dept').checked = !!parseInt(cat.requires_department_selection);
+            document.getElementById('edit_cat_role').value = cat.default_role_id || '0';
         }
 
         // ── Subcategory helpers ───────────────────────────────────────────────
@@ -570,6 +662,7 @@ $departments = $admin->getAllDepartments();
             document.getElementById('edit_sub_name').value = sub.subcategory_name;
             document.getElementById('edit_sub_desc').value = sub.subcategory_description || '';
             document.getElementById('edit_sub_status').value = sub.status;
+            document.getElementById('edit_sub_role').value = sub.default_role_id || '0';
             new bootstrap.Modal(document.getElementById('editSubcategoryModal')).show();
         }
 
@@ -609,11 +702,16 @@ $departments = $admin->getAllDepartments();
         }
     </script>
 
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/jquery.dataTables.min.js"></script>
-    <script src="assets/js/dataTables.bootstrap4.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery.dataTables.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <!-- <script src="assets/js/dataTables.bootstrap4.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/10.16.7/sweetalert2.all.min.js"></script> -->
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>

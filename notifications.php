@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id'])) {
@@ -26,9 +26,16 @@ if (isset($_GET['mark_all'])) {
 $notifications = $notif->getAll($userId);
 
 $dashboardLink = match ($role) {
-    'admin' => 'admin_dashboard.php',
-    'staff' => 'staff_dashboard.php',
-    default => 'student_dashboard.php',
+    'admin'          => 'admin_dashboard.php',
+    'staff'          => 'staff_dashboard.php',
+    'student_leader' => 'leader_dashboard.php',
+    default          => 'student_dashboard.php',
+};
+$roleLabel = match ($role) {
+    'admin'          => 'Admin',
+    'staff'          => 'Staff',
+    'student_leader' => 'Student Rep',
+    default          => 'Student',
 };
 ?>
 <!DOCTYPE html>
@@ -39,9 +46,12 @@ $dashboardLink = match ($role) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Notifications</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- Local FontAwesome plugins (replaced with CDN for shared hosting compatibility) -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
@@ -68,6 +78,7 @@ $dashboardLink = match ($role) {
                         <li class="breadcrumb-item">
                             <a href="<?= $dashboardLink ?>"><i class="fas fa-home" style="color:black;"></i></a>
                         </li>
+                        <li class="breadcrumb-item"><a href="<?= $dashboardLink ?>" style="color:black;"><?= $roleLabel ?></a></li>
                         <li class="breadcrumb-item active">Notifications</li>
                     </ol>
                     <?php if (!empty($notifications)): ?>
@@ -125,8 +136,10 @@ $dashboardLink = match ($role) {
         </div>
     </div>
 
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
         document.querySelectorAll('.notif-row').forEach(function (el) {

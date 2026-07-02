@@ -56,12 +56,17 @@ $depts      = $leader->getDepartments();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Department Complaints | Student Rep</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
@@ -87,12 +92,66 @@ $depts      = $leader->getDepartments();
                         <li class="breadcrumb-item">
                             <a href="leader_dashboard.php"><i class="fas fa-chart-pie" style="color:black;"></i></a>
                         </li>
-                        <li class="breadcrumb-item active">Student Rep / Department Complaints</li>
+                        <li class="breadcrumb-item"><a href="leader_dashboard.php" style="color:black;">Student Rep</a></li>
+                        <li class="breadcrumb-item active">Department Complaints</li>
                     </ol>
                 </nav>
 
+                <!-- ── Filter Card ──────────────────────────────────────── -->
                 <div class="container-card shadow-sm">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-2">
+                            <label class="form-label small fw-semibold mb-1">Status</label>
+                            <select id="filterStatus" class="form-select form-select-sm">
+                                <option value="">All Statuses</option>
+                                <option value="pending">Pending</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="awaiting_response">Awaiting Response</option>
+                                <option value="resolved">Resolved</option>
+                                <option value="rejected">Rejected</option>
+                                <option value="reopened">Reopened</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-2">
+                            <label class="form-label small fw-semibold mb-1">Priority</label>
+                            <select id="filterPriority" class="form-select form-select-sm">
+                                <option value="">All Priorities</option>
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                            <label class="form-label small fw-semibold mb-1">Category</label>
+                            <select id="filterCategory" class="form-select form-select-sm">
+                                <option value="">All Categories</option>
+                                <?php
+                                $lcats = array_values(array_filter(array_unique(array_column($complaints, 'category_name'))));
+                                sort($lcats);
+                                foreach ($lcats as $cat): ?>
+                                    <option value="<?= htmlspecialchars($cat) ?>"><?= htmlspecialchars($cat) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-2">
+                            <label class="form-label small fw-semibold mb-1">Date From</label>
+                            <input type="date" id="filterDateFrom" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-2">
+                            <label class="form-label small fw-semibold mb-1">Date To</label>
+                            <input type="date" id="filterDateTo" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-auto d-flex align-items-end">
+                            <button type="button" id="clearFilters" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-times me-1"></i>Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Table Card ───────────────────────────────────────── -->
+                <div class="container-card shadow-sm">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
                         <div>
                             <h4 class="mb-1 fw-bold" style="color:var(--udsm-blue);">
                                 <i class="fas fa-file-invoice me-2"></i>Department Complaints
@@ -104,6 +163,7 @@ $depts      = $leader->getDepartments();
                                     : htmlspecialchars(implode(', ', array_column($depts, 'department_name'))) ?>
                             </p>
                         </div>
+                        <div class="search-input"></div>
                     </div>
 
                     <div class="table-responsive">
@@ -140,7 +200,11 @@ $depts      = $leader->getDepartments();
                                     $priorityMap = ['low' => 'bg-success', 'medium' => 'bg-warning text-dark', 'high' => 'bg-danger'];
                                     $priClass = $priorityMap[$c['priority']] ?? 'bg-secondary';
                                     ?>
-                                    <tr>
+                                    <tr data-status="<?= htmlspecialchars($c['complaint_status']) ?>"
+                                        data-priority="<?= htmlspecialchars($c['priority']) ?>"
+                                        data-category="<?= htmlspecialchars($c['category_name']) ?>"
+                                        data-date="<?= date('Y-m-d', strtotime($c['created_at'])) ?>"
+                                        data-href="leader_complaint_details.php?id=<?= (int) $c['complaint_id'] ?>">
                                         <td><?= $n++ ?></td>
                                         <td><?= htmlspecialchars($c['complaint_title']) ?></td>
                                         <td class="text-center">
@@ -240,10 +304,14 @@ $depts      = $leader->getDepartments();
     </div>
     <!-- /Endorse Modal -->
 
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/jquery.dataTables.min.js"></script>
-    <script src="assets/js/dataTables.bootstrap4.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery.dataTables.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <!-- <script src="assets/js/dataTables.bootstrap4.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
         function openEndorseModal(complaintId, complaintTitle) {
@@ -252,11 +320,57 @@ $depts      = $leader->getDepartments();
             document.getElementById('endorse_note').value = '';
         }
 
+        $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+            if (settings.nTable.id !== 'complaintsTable') return true;
+            var rowNode  = settings.aoData[dataIndex] ? settings.aoData[dataIndex].nTr : null;
+            if (!rowNode) return true;
+            var row     = $(rowNode);
+            var rStatus = row.data('status')   || '';
+            var rPri    = row.data('priority') || '';
+            var rCat    = row.data('category') || '';
+            var rDate   = row.data('date')     || '';
+            var fStatus   = $('#filterStatus').val()   || '';
+            var fPriority = $('#filterPriority').val() || '';
+            var fCategory = $('#filterCategory').val() || '';
+            var fFrom     = $('#filterDateFrom').val() || '';
+            var fTo       = $('#filterDateTo').val()   || '';
+            if (fStatus   && rStatus !== fStatus)   return false;
+            if (fPriority && rPri    !== fPriority)  return false;
+            if (fCategory && rCat    !== fCategory)  return false;
+            if (fFrom     && rDate   < fFrom)        return false;
+            if (fTo       && rDate   > fTo)          return false;
+            return true;
+        });
+
+        var leaderTable;
         $(function () {
-            $('#complaintsTable').DataTable({
+            leaderTable = $('#complaintsTable').DataTable({
                 order: [[6, 'desc']],
                 pageLength: 25,
-                responsive: true,
+                bFilter: true,
+                sDom: "fBtlpi",
+                pagingType: "numbers",
+                columnDefs: [{ orderable: false, targets: [7] }],
+                language: {
+                    search: " ",
+                    sLengthMenu: "_MENU_",
+                    searchPlaceholder: "Search complaints...",
+                    info: "_START_ - _END_ of _TOTAL_ items"
+                },
+                initComplete: function() {
+                    $(".dataTables_filter").appendTo(".search-input");
+                }
+            });
+            $('#complaintsTable tbody').on('click', 'tr[data-href]', function(e) {
+                if ($(e.target).closest('a, button, input, label').length) return;
+                window.location.href = $(this).data('href');
+            });
+            $('#filterStatus, #filterPriority, #filterCategory').on('change', function() { leaderTable.draw(); });
+            $('#filterDateFrom, #filterDateTo').on('change', function() { leaderTable.draw(); });
+            $('#clearFilters').on('click', function() {
+                $('#filterStatus, #filterPriority, #filterCategory').val('');
+                $('#filterDateFrom, #filterDateTo').val('');
+                leaderTable.search('').draw();
             });
         });
     </script>

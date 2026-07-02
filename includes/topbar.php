@@ -28,13 +28,21 @@ if (isset($_SESSION['user_id'])) {
 ?>
 
 <!-- Topbar -->
-<nav class="navbar navbar-expand-lg navbar-dark custom-nav">
-    <button id="sidebarCollapse" class="btn btn-dark ms-2">
-        <i class="fas fa-list"></i>
-    </button>
+<nav class="navbar navbar-dark custom-nav">
+    <div class="d-flex align-items-center w-100 px-2 gap-2">
 
-    <div class="container-fluid">
-        <div class="d-flex align-items-center gap-2 ms-auto">
+        <button id="sidebarCollapse" class="btn btn-dark">
+            <i class="fas fa-list"></i>
+        </button>
+
+        <div class="ms-auto d-flex align-items-center gap-2 me-1">
+
+            <!-- Quick sign-out -->
+            <a href="logout.php" title="Sign Out"
+                class="btn p-0 border-0"
+                style="background:rgba(255,107,107,0.18); border-radius:50%; width:38px; height:38px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <i class="fas fa-sign-out-alt" style="font-size:.95rem; color:#ff9090;"></i>
+            </a>
 
             <!-- Notification Bell -->
             <div class="dropdown">
@@ -222,6 +230,7 @@ if (isset($_SESSION['user_id'])) {
             </div>
 
         </div>
+
     </div>
 </nav>
 

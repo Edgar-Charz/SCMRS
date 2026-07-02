@@ -390,12 +390,17 @@ if (isset($_SESSION['message'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
@@ -419,13 +424,13 @@ if (isset($_SESSION['message'])) {
 
             <div class="p-4">
 
-                <!-- <h4 class="mb-1">Dashboard Analytics</h4> -->
                 <nav aria-label="breadcrumb" class="d-flex justify-content-between align-items-center p-2">
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item">
-                            <a href="#"><i class="fa fa-users" style="color: black;"></i></a>
+                            <a href="admin_dashboard.php"><i class="fa fa-users" style="color: black;"></i></a>
                         </li>
-                        <li class="breadcrumb-item active">Admin / User Management</li>
+                        <li class="breadcrumb-item"><a href="admin_dashboard.php" style="color:black;">Admin</a></li>
+                        <li class="breadcrumb-item active">User Management</li>
                     </ol>
                 </nav>
 
@@ -480,15 +485,14 @@ if (isset($_SESSION['message'])) {
                 <div id="students-section" class="management-content d-none">
                     <div class="container-card border-0 shadow-sm p-4">
 
-                        <div class="d-flex justify-content-between align-items-center p-2">
-                            <h4 class="mb-1 fw-bold" style="color: var(--udsm-blue);">
-                                <i class="fas fa-users me-2"></i>
-                                Registered Students
-                            </h4>
+                        <h5 class="mb-2 fw-bold" style="color: var(--udsm-blue);">
+                            <i class="fas fa-users me-2"></i>Registered Students
+                        </h5>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="search-input"></div>
                             <button type="button" class="btn btn-add" data-bs-toggle="modal"
                                 data-bs-target="#addStudentModal">
-                                <i class="fas fa-plus"></i>
-                                Add New Student
+                                <i class="fas fa-plus"></i> Add New Student
                             </button>
                         </div>
 
@@ -820,10 +824,11 @@ if (isset($_SESSION['message'])) {
                 <!-- Student Representatives -->
                 <div id="reps-section" class="management-content d-none">
                     <div class="container-card border-0 shadow-sm p-4">
+                        <h5 class="mb-2 fw-bold" style="color:var(--udsm-blue);">
+                            <i class="fas fa-user-friends me-2"></i>Student Representatives
+                        </h5>
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 class="mb-1 fw-bold" style="color:var(--udsm-blue);">
-                                <i class="fas fa-user-friends me-2"></i>Student Representatives
-                            </h4>
+                            <div class="search-input"></div>
                         </div>
 
                         <?php if (empty($student_reps)): ?>
@@ -910,15 +915,14 @@ if (isset($_SESSION['message'])) {
                 <div id="staff-section" class="management-content d-none">
                     <div class="container-card border-0 shadow-sm p-4">
 
-                        <div class="d-flex justify-content-between align-items-center p-2">
-                            <h4 class="mb-1 fw-bold" style="color: var(--udsm-blue);">
-                                <i class="fas fa-users me-2"></i>
-                                Registered Staffs
-                            </h4>
+                        <h5 class="mb-2 fw-bold" style="color: var(--udsm-blue);">
+                            <i class="fas fa-users me-2"></i>Registered Staffs
+                        </h5>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="search-input"></div>
                             <button type="button" class="btn btn-add" data-bs-toggle="modal"
                                 data-bs-target="#addStaffModal">
-                                <i class="fas fa-plus"></i>
-                                Add New Staff
+                                <i class="fas fa-plus"></i> Add New Staff
                             </button>
                         </div>
 
@@ -1266,10 +1270,10 @@ if (isset($_SESSION['message'])) {
                     <!-- <div class="container-card border-0 shadow-sm p-4">
 
                         <div class="d-flex justify-content-between align-items-center p-2">
-                            <h4 class="mb-1 fw-bold" style="color: var(--udsm-blue);">
+                            <h5 class="mb-1 fw-bold" style="color: var(--udsm-blue);">
                                 <i class="fas fa-check me-2"></i>
                                 Staff Approvals
-                            </h4>
+                            </h5>
                         </div>
                     </div> -->
 
@@ -1299,7 +1303,7 @@ if (isset($_SESSION['message'])) {
 
                     <div class="container-card shadow-sm mb-4">
                         <div class="d-flex align-items-center justify-content-between mb-3">
-                            <h4 class="mb-0 fw-bold"><i class="fas fa-clock me-2"></i>Pending Approval</h4>
+                            <h5 class="mb-0 fw-bold"><i class="fas fa-clock me-2"></i>Pending Approval</h5>
                             <?php if (!empty($pending_staffs)): ?>
                                 <span class="badge bg-warning text-dark fs-6"><?= count($pending_staffs) ?></span>
                             <?php endif; ?>
@@ -1411,7 +1415,7 @@ if (isset($_SESSION['message'])) {
                     </div>
 
                     <div class="container-card shadow-sm">
-                        <h4 class="mb-1 fw-bold"><i class="fas fa-users me-2"></i>Recently Approved Staffs</h4>
+                        <h5 class="mb-1 fw-bold"><i class="fas fa-users me-2"></i>Recently Approved Staffs</h5>
 
                         <div class="table-responsive">
                             <table class="table table-stripped" id="departmentsTable">
@@ -1594,10 +1598,11 @@ if (isset($_SESSION['message'])) {
                 <!-- Staff Roles -->
                 <div id="roles-section" class="management-content d-none">
                     <div class="container-card border-0 shadow-sm p-4">
-                        <div class="d-flex justify-content-between align-items-center p-2 mb-3">
-                            <h4 class="mb-0 fw-bold" style="color: var(--udsm-blue);">
-                                <i class="fas fa-id-badge me-2"></i>Staff Roles
-                            </h4>
+                        <h5 class="mb-2 fw-bold" style="color: var(--udsm-blue);">
+                            <i class="fas fa-id-badge me-2"></i>Staff Roles
+                        </h5>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="search-input"></div>
                             <button type="button" class="btn btn-add" data-bs-toggle="modal"
                                 data-bs-target="#addRoleModal">
                                 <i class="fas fa-plus"></i> Add New Role
@@ -2184,13 +2189,42 @@ if (isset($_SESSION['message'])) {
     </script>
 
 
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/jquery.dataTables.min.js"></script>
-    <script src="assets/js/dataTables.bootstrap4.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery.dataTables.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <!-- <script src="assets/js/dataTables.bootstrap4.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/10.16.7/sweetalert2.all.min.js"></script> -->
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
+    <script>
+        $(document).ready(function () {
+            if ($("#repsTable").length > 0 && !$.fn.DataTable.isDataTable("#repsTable")) {
+                $("#repsTable").DataTable({
+                    destroy: true,
+                    bFilter: true,
+                    sDom: "fBtlpi",
+                    pagingType: "numbers",
+                    ordering: true,
+                    columnDefs: [{ orderable: false, targets: [4] }],
+                    language: {
+                        search: " ",
+                        sLengthMenu: "_MENU_",
+                        searchPlaceholder: "Search Representatives...",
+                        info: "_START_ - _END_ of _TOTAL_ items"
+                    },
+                    initComplete: function (settings) {
+                        $(settings.nTableWrapper).find('.dataTables_filter')
+                            .appendTo($(settings.nTable).closest('.container-card').find('.search-input'));
+                    }
+                });
+            }
+        });
+    </script>
     <script>
         $(document).ready(function () {
             if ($("#studentsTable").length > 0) {
@@ -2207,9 +2241,9 @@ if (isset($_SESSION['message'])) {
                             searchPlaceholder: "Search Students...",
                             info: "_START_ - _END_ of _TOTAL_ items"
                         },
-                        initComplete: function (settings, json) {
-                            $(".dataTables_filter").appendTo("#tableSearch");
-                            $(".dataTables_filter").appendTo(".search-input");
+                        initComplete: function (settings) {
+                            $(settings.nTableWrapper).find('.dataTables_filter')
+                                .appendTo($(settings.nTable).closest('.container-card').find('.search-input'));
                         }
                     });
                 }
@@ -2232,34 +2266,9 @@ if (isset($_SESSION['message'])) {
                             searchPlaceholder: "Search Staffs...",
                             info: "_START_ - _END_ of _TOTAL_ items"
                         },
-                        initComplete: function (settings, json) {
-                            $(".dataTables_filter").appendTo("#tableSearch");
-                            $(".dataTables_filter").appendTo(".search-input");
-                        }
-                    });
-                }
-            }
-        });
-    </script>
-    <script>
-        $(document).ready(function () {
-            if ($("#departmentsTable").length > 0) {
-                if (!$.fn.DataTable.isDataTable("#departmentsTable")) {
-                    $("#departmentsTable").DataTable({
-                        destroy: true,
-                        bFilter: true,
-                        sDom: "fBtlpi",
-                        pagingType: "numbers",
-                        ordering: true,
-                        language: {
-                            search: " ",
-                            sLengthMenu: "_MENU_",
-                            searchPlaceholder: "Search Staffs...",
-                            info: "_START_ - _END_ of _TOTAL_ items"
-                        },
-                        initComplete: function (settings, json) {
-                            $(".dataTables_filter").appendTo("#tableSearch");
-                            $(".dataTables_filter").appendTo(".search-input");
+                        initComplete: function (settings) {
+                            $(settings.nTableWrapper).find('.dataTables_filter')
+                                .appendTo($(settings.nTable).closest('.container-card').find('.search-input'));
                         }
                     });
                 }
@@ -2280,6 +2289,10 @@ if (isset($_SESSION['message'])) {
                         sLengthMenu: "_MENU_",
                         searchPlaceholder: "Search Roles...",
                         info: "_START_ - _END_ of _TOTAL_ items"
+                    },
+                    initComplete: function (settings) {
+                        $(settings.nTableWrapper).find('.dataTables_filter')
+                            .appendTo($(settings.nTable).closest('.container-card').find('.search-input'));
                     }
                 });
             }

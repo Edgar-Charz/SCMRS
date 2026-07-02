@@ -73,12 +73,17 @@ $departments = $admin->getAllDepartmentsWithStats();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Departments</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
@@ -105,9 +110,10 @@ $departments = $admin->getAllDepartmentsWithStats();
                 <nav aria-label="breadcrumb" class="d-flex justify-content-between align-items-center">
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item">
-                            <a href="#"><i class="fas fa-building" style="color: black;"></i></a>
+                            <a href="admin_dashboard.php"><i class="fas fa-building" style="color: black;"></i></a>
                         </li>
-                        <li class="breadcrumb-item active">Admin / Manage Departments</li>
+                        <li class="breadcrumb-item"><a href="admin_dashboard.php" style="color:black;">Admin</a></li>
+                        <li class="breadcrumb-item active">Manage Departments</li>
                     </ol>
                     <button type="button" class="btn btn-add" data-bs-toggle="modal"
                         data-bs-target="#addDepartmentModal">
@@ -116,7 +122,10 @@ $departments = $admin->getAllDepartmentsWithStats();
                 </nav>
 
                 <div class="container-card shadow-sm mt-3">
-                    <h4 class="mb-1 fw-bold"><i class="fas fa-building me-2"></i>All Departments</h4>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <h5 class="mb-0 fw-bold"><i class="fas fa-building me-2"></i>Departments</h5>
+                        <div class="search-input"></div>
+                    </div>
 
                     <div class="table-responsive">
                         <table class="table table-stripped" id="departmentsTable">
@@ -143,6 +152,11 @@ $departments = $admin->getAllDepartmentsWithStats();
                                         </td>
                                         <td class="text-center">
                                             <div class="d-flex justify-content-center">
+                                                <a href="department_hierarchy.php?department_id=<?= $dept['department_id'] ?>"
+                                                    class="btn btn-status btn-outline-secondary me-2"
+                                                    title="view staff hierarchy">
+                                                    <i class="fas fa-sitemap text-dark"></i>
+                                                </a>
                                                 <button type="button" class="btn btn-status btn-outline-secondary me-2"
                                                     onclick="openEditDepartment(<?= htmlspecialchars(json_encode($dept)) ?>)"
                                                     data-bs-toggle="modal" data-bs-target="#editDepartmentModal"
@@ -254,11 +268,16 @@ $departments = $admin->getAllDepartmentsWithStats();
         }
     </script>
 
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/jquery.dataTables.min.js"></script>
-    <script src="assets/js/dataTables.bootstrap4.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery.dataTables.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <!-- <script src="assets/js/dataTables.bootstrap4.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/10.16.7/sweetalert2.all.min.js"></script> -->
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>

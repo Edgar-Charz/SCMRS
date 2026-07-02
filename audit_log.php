@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
@@ -14,16 +14,8 @@ $db = new Database();
 $conn = $db->connect();
 $admin = new Admin($conn);
 
-// Filters
-$filterAction = isset($_GET['action']) && $_GET['action'] !== '' ? $_GET['action'] : null;
-$filterDateFrom = isset($_GET['date_from']) && $_GET['date_from'] !== '' ? $_GET['date_from'] : null;
-$filterDateTo = isset($_GET['date_to']) && $_GET['date_to'] !== '' ? $_GET['date_to'] : null;
-
-$page = max(1, (int) ($_GET['page'] ?? 1));
-$limit = 25;
-$total = $admin->getActivityLogsCount($filterAction, $filterDateFrom, $filterDateTo);
-$pages = (int) ceil($total / $limit);
-$logs = $admin->getActivityLogs($page, $limit, $filterAction, $filterDateFrom, $filterDateTo);
+$logs  = $admin->getActivityLogs(1, 99999, null, null, null);
+$total = count($logs);
 
 // Human-readable labels and badge colours for each action type
 $actionMeta = [
@@ -54,18 +46,6 @@ function actionBadge(string $action, array $meta): string
     return '<span class="badge ' . $m['class'] . '">' . htmlspecialchars($m['label']) . '</span>';
 }
 
-// Build pagination query string
-function pageUrl(int $p, ?string $action, ?string $from, ?string $to): string
-{
-    $q = ['page' => $p];
-    if ($action)
-        $q['action'] = $action;
-    if ($from)
-        $q['date_from'] = $from;
-    if ($to)
-        $q['date_to'] = $to;
-    return 'audit_log.php?' . http_build_query($q);
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -75,10 +55,14 @@ function pageUrl(int $p, ?string $action, ?string $from, ?string $to): string
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audit Log — Admin</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
@@ -106,7 +90,8 @@ function pageUrl(int $p, ?string $action, ?string $from, ?string $to): string
                         <li class="breadcrumb-item">
                             <a href="admin_dashboard.php"><i class="fas fa-chart-pie" style="color:black;"></i></a>
                         </li>
-                        <li class="breadcrumb-item active">Admin / Audit Log</li>
+                        <li class="breadcrumb-item"><a href="admin_dashboard.php" style="color:black;">Admin</a></li>
+                        <li class="breadcrumb-item active">Audit Log</li>
                     </ol>
                 </nav>
 
@@ -118,84 +103,79 @@ function pageUrl(int $p, ?string $action, ?string $from, ?string $to): string
                         </h4>
                         <small class="text-muted">All administrator actions are recorded here</small>
                     </div>
-                    <span class="badge bg-primary fs-6"><?= number_format($total) ?>
+                    <span id="recordsBadge" class="badge bg-primary fs-6"><?= number_format($total) ?>
                         record<?= $total !== 1 ? 's' : '' ?></span>
                 </div>
 
                 <!-- Filters -->
                 <div class="container-card border-0 shadow-sm p-4 mb-4">
-                    <form method="GET" action="audit_log.php" id="auditFilterForm" class="row g-3 align-items-end">
+                    <div class="row g-3 align-items-end">
                         <div class="col-12 col-md-4">
                             <label class="form-label fw-bold small">Action Type</label>
-                            <select name="action" class="form-select" onchange="autoFilter()">
+                            <select id="filterAction" class="form-select">
                                 <option value="">All Actions</option>
                                 <?php foreach ($actionMeta as $key => $meta): ?>
-                                    <option value="<?= $key ?>" <?= $filterAction === $key ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($meta['label']) ?>
-                                    </option>
+                                    <option value="<?= $key ?>"><?= htmlspecialchars($meta['label']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-12 col-md-3">
                             <label class="form-label fw-bold small">Date From</label>
-                            <input type="date" name="date_from" class="form-control"
-                                value="<?= htmlspecialchars($filterDateFrom ?? '') ?>" onchange="autoFilter()">
+                            <input type="date" id="filterDateFrom" class="form-control">
                         </div>
                         <div class="col-12 col-md-3">
                             <label class="form-label fw-bold small">Date To</label>
-                            <input type="date" name="date_to" class="form-control"
-                                value="<?= htmlspecialchars($filterDateTo ?? '') ?>" onchange="autoFilter()">
+                            <input type="date" id="filterDateTo" class="form-control">
                         </div>
-                        <div class="col-12 col-md-2 d-flex gap-2 align-items-end">
-                            <!-- Loading indicator shown while form is submitting -->
-                            <span id="filterSpinner" class="d-none me-1">
-                                <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
-                            </span>
-                            <a href="audit_log.php" class="btn btn-outline-secondary" title="Clear filters">
+                        <div class="col-12 col-md-2 d-flex align-items-end">
+                            <button type="button" id="clearFilters" class="btn btn-outline-secondary" title="Clear filters">
                                 <i class="fas fa-times"></i>
-                            </a>
+                            </button>
                         </div>
-                    </form>
+                    </div>
                 </div>
 
                 <!-- Log table -->
                 <div class="container-card border-0 shadow-sm p-4">
-                    <?php if (empty($logs)): ?>
-                        <div class="text-center text-muted py-5">
-                            <i class="fas fa-clipboard-list fa-3x mb-3 d-block" style="opacity:.3;"></i>
-                            <p class="mb-0">No activity records
-                                found<?= ($filterAction || $filterDateFrom || $filterDateTo) ? ' for the selected filters' : '' ?>.
-                            </p>
-                        </div>
-                    <?php else: ?>
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0 fw-bold text-muted">Log Entries</h6>
+                        <div class="search-input"></div>
+                    </div>
+                    <div class="table-responsive">
+                        <table id="auditTable" class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:160px;">DATE &amp; TIME</th>
+                                    <th style="width:140px;">ACTION</th>
+                                    <th>PERFORMED BY</th>
+                                    <th>TARGET</th>
+                                    <th>DETAILS</th>
+                                    <th style="width:110px;">IP ADDRESS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($logs)): ?>
                                     <tr>
-                                        <th style="width:160px;">DATE &amp; TIME</th>
-                                        <th style="width:140px;">ACTION</th>
-                                        <th>PERFORMED BY</th>
-                                        <th>TARGET</th>
-                                        <th>DETAILS</th>
-                                        <th style="width:110px;">IP ADDRESS</th>
+                                        <td colspan="6" class="text-center text-muted py-5">
+                                            <i class="fas fa-clipboard-list fa-3x mb-3 d-block" style="opacity:.3;"></i>
+                                            No activity records found.
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody>
+                                <?php else: ?>
                                     <?php foreach ($logs as $log): ?>
-                                        <tr>
+                                        <tr data-action="<?= htmlspecialchars($log['action']) ?>"
+                                            data-date="<?= date('Y-m-d', strtotime($log['created_at'])) ?>">
                                             <td class="text-nowrap" style="font-size:.82rem; color:#555;">
                                                 <?= date('d M Y', strtotime($log['created_at'])) ?>
                                                 <br>
-                                                <span
-                                                    class="text-muted"><?= date('H:i:s', strtotime($log['created_at'])) ?></span>
+                                                <span class="text-muted"><?= date('H:i:s', strtotime($log['created_at'])) ?></span>
                                             </td>
                                             <td><?= actionBadge($log['action'], $actionMeta) ?></td>
                                             <td>
                                                 <span class="fw-semibold"><?= htmlspecialchars($log['admin_name']) ?></span>
                                             </td>
                                             <td>
-                                                <span
-                                                    class="fw-semibold"><?= htmlspecialchars($log['target_name'] ?? '—') ?></span>
+                                                <span class="fw-semibold"><?= htmlspecialchars($log['target_name'] ?? '—') ?></span>
                                                 <?php if ($log['target_id']): ?>
                                                     <small class="text-muted d-block">#<?= $log['target_id'] ?></small>
                                                 <?php endif; ?>
@@ -208,73 +188,73 @@ function pageUrl(int $p, ?string $action, ?string $from, ?string $to): string
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <!-- Pagination -->
-                        <?php if ($pages > 1): ?>
-                            <nav class="mt-4 d-flex align-items-center justify-content-between">
-                                <small class="text-muted">
-                                    Showing <?= (($page - 1) * $limit) + 1 ?>–<?= min($page * $limit, $total) ?>
-                                    of <?= number_format($total) ?> records
-                                </small>
-                                <ul class="pagination pagination-sm mb-0">
-                                    <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
-                                        <a class="page-link"
-                                            href="<?= pageUrl($page - 1, $filterAction, $filterDateFrom, $filterDateTo) ?>">
-                                            <i class="fas fa-chevron-left"></i>
-                                        </a>
-                                    </li>
-                                    <?php
-                                    $start = max(1, $page - 2);
-                                    $end = min($pages, $page + 2);
-                                    if ($start > 1): ?>
-                                        <li class="page-item">
-                                            <a class="page-link"
-                                                href="<?= pageUrl(1, $filterAction, $filterDateFrom, $filterDateTo) ?>">1</a>
-                                        </li>
-                                        <?php if ($start > 2): ?>
-                                            <li class="page-item disabled"><span class="page-link">…</span></li><?php endif; ?>
-                                    <?php endif; ?>
-                                    <?php for ($i = $start; $i <= $end; $i++): ?>
-                                        <li class="page-item <?= $i === $page ? 'active' : '' ?>">
-                                            <a class="page-link"
-                                                href="<?= pageUrl($i, $filterAction, $filterDateFrom, $filterDateTo) ?>"><?= $i ?></a>
-                                        </li>
-                                    <?php endfor; ?>
-                                    <?php if ($end < $pages): ?>
-                                        <?php if ($end < $pages - 1): ?>
-                                            <li class="page-item disabled"><span class="page-link">…</span></li><?php endif; ?>
-                                        <li class="page-item">
-                                            <a class="page-link"
-                                                href="<?= pageUrl($pages, $filterAction, $filterDateFrom, $filterDateTo) ?>"><?= $pages ?></a>
-                                        </li>
-                                    <?php endif; ?>
-                                    <li class="page-item <?= $page >= $pages ? 'disabled' : '' ?>">
-                                        <a class="page-link"
-                                            href="<?= pageUrl($page + 1, $filterAction, $filterDateFrom, $filterDateTo) ?>">
-                                            <i class="fas fa-chevron-right"></i>
-                                        </a>
-                                    </li>
-                                </ul>
-                            </nav>
-                        <?php endif; ?>
-                    <?php endif; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
             </div>
         </div>
     </div>
 
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
-        function autoFilter() {
-            document.getElementById('filterSpinner').classList.remove('d-none');
-            document.getElementById('auditFilterForm').submit();
-        }
+        $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+            if (settings.nTable.id !== 'auditTable') return true;
+            var rowNode = settings.aoData[dataIndex] ? settings.aoData[dataIndex].nTr : null;
+            if (!rowNode) return true;
+            var row    = $(rowNode);
+            var rAction = row.data('action') || '';
+            var rDate   = row.data('date')   || '';
+            var fAction = $('#filterAction').val()   || '';
+            var fFrom   = $('#filterDateFrom').val() || '';
+            var fTo     = $('#filterDateTo').val()   || '';
+            if (fAction && rAction !== fAction) return false;
+            if (fFrom   && rDate   < fFrom)    return false;
+            if (fTo     && rDate   > fTo)      return false;
+            return true;
+        });
+
+        var auditTable;
+        $(function() {
+            auditTable = $('#auditTable').DataTable({
+                order:      [[0, 'desc']],
+                pageLength: 25,
+                bFilter:    true,
+                sDom:       "fBtlpi",
+                pagingType: "numbers",
+                language: {
+                    search:            " ",
+                    sLengthMenu:       "_MENU_",
+                    searchPlaceholder: "Search logs...",
+                    info:              "_START_ - _END_ of _TOTAL_ entries"
+                },
+                initComplete: function() {
+                    $(".dataTables_filter").appendTo(".search-input");
+                }
+            });
+
+            auditTable.on('draw.dt', function() {
+                var info  = auditTable.page.info();
+                var count = info.recordsDisplay;
+                $('#recordsBadge').text(count.toLocaleString() + ' record' + (count !== 1 ? 's' : ''));
+            });
+
+            $('#filterAction').on('change', function() { auditTable.draw(); });
+            $('#filterDateFrom, #filterDateTo').on('change', function() { auditTable.draw(); });
+            $('#clearFilters').on('click', function() {
+                $('#filterAction').val('');
+                $('#filterDateFrom, #filterDateTo').val('');
+                auditTable.search('').draw();
+            });
+        });
     </script>
 </body>
 

@@ -47,11 +47,15 @@ if (isset($_SESSION['message'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Email Queue | SCMRS Admin</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
@@ -78,6 +82,7 @@ if (isset($_SESSION['message'])) {
                         <li class="breadcrumb-item">
                             <a href="admin_dashboard.php"><i class="fas fa-home" style="color:black;"></i></a>
                         </li>
+                        <li class="breadcrumb-item"><a href="admin_dashboard.php" style="color:black;">Admin</a></li>
                         <li class="breadcrumb-item active">Email Queue</li>
                     </ol>
                 </nav>
@@ -165,8 +170,9 @@ if (isset($_SESSION['message'])) {
 
                 <!-- Queue table -->
                 <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white fw-bold">
-                        Recent Emails (last 100)
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">Recent Emails (last 100)</span>
+                        <div class="search-input"></div>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -233,17 +239,34 @@ if (isset($_SESSION['message'])) {
         </div><!-- /#content -->
     </div>
 
-    <script src="assets/js/jquery.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/jquery.dataTables.min.js"></script>
-    <script src="assets/js/dataTables.bootstrap4.min.js"></script>
+    <!-- <script src="assets/js/jquery.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery.dataTables.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <!-- <script src="assets/js/dataTables.bootstrap4.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
         $(document).ready(function () {
             $('#emailTable').DataTable({
                 order: [[0, 'desc']],
                 pageLength: 25,
-                columnDefs: [{ orderable: false, targets: [7] }]
+                bFilter: true,
+                sDom: "fBtlpi",
+                pagingType: "numbers",
+                columnDefs: [{ orderable: false, targets: [7] }],
+                language: {
+                    search: " ",
+                    sLengthMenu: "_MENU_",
+                    searchPlaceholder: "Search emails...",
+                    info: "_START_ - _END_ of _TOTAL_ items"
+                },
+                initComplete: function (settings) {
+                    $(settings.nTableWrapper).find('.dataTables_filter')
+                        .appendTo($(settings.nTable).closest('.card').find('.search-input'));
+                }
             });
         });
     </script>

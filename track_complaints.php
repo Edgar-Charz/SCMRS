@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'student') {
@@ -43,12 +43,12 @@ if (isset($_SESSION['message_error'])) {
     unset($_SESSION['message_error']);
 }
 
-// Get filter parameter
+// Get filter parameter (used only for initial active tab — all complaints are always loaded)
 $filter = isset($_GET['filter']) ? $_GET['filter'] : 'all';
 
-// Get filtered complaints
+// Always load ALL complaints; JS handles client-side filtering
 $student_id = $studentId;
-$complaints = $student->getFilteredComplaints($student_id, $filter);
+$complaints = $student->getFilteredComplaints($student_id, 'all');
 
 // Get counts for filter tabs
 $counts = $student->getComplaintCounts($student_id);
@@ -66,12 +66,17 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Dashboard</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
@@ -98,32 +103,32 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item">
-                            <a href="#"><i class="fas fa-search-location" style="color: black;"></i></a>
+                            <a href="student_dashboard.php"><i class="fas fa-search-location" style="color: black;"></i></a>
                         </li>
-                        <li class="breadcrumb-item active">Student / Track Complaints</li>
+                        <li class="breadcrumb-item"><a href="student_dashboard.php" style="color:black;">Student</a></li>
+                        <li class="breadcrumb-item active">Track Complaints</li>
                     </ol>
                 </nav>
-
-
 
                 <!-- <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 6px solid var(--warning); padding: var(--spacing-lg); border-radius: var(--radius-lg); margin-bottom: var(--spacing-xl);">
                         <strong style="color: #92400e;"><i class="fas fa-exclamation-circle"></i> Action required</strong>
                         <p style="margin: var(--spacing-xs) 0 0 0; color: #78350f;">You have complaint(s) with a request for more information from staff. Open them and submit your response.</p>
                     </div> -->
 
-                <div class="card sticky-top" style="z-index: 1020;">
+                <div class="card sticky-top mb-2" style="z-index: 100;">
                     <div class="card-body pb-0">
                         <ul class="nav nav-tabs custom-tabs" role="tablist">
                             <li class="nav-item" role="presentation">
                                 <a href="track_complaints.php?filter=all"
-                                    class="nav-link <?php echo $filter === 'all' ? 'active' : ''; ?>">
+                                    class="nav-link <?php echo $filter === 'all' ? 'active' : ''; ?>" data-filter="all">
                                     <i class="fas fa-list"></i> All
                                     <span class="badge btn-primary me-2"><?php echo $counts['all']; ?></span>
                                 </a>
                             </li>
                             <li class="nav-item" role="presentation">
                                 <a href="track_complaints.php?filter=awaiting_student_response"
-                                    class="nav-link <?php echo $filter === STATUS_AWAITING_RESPONSE ? 'active' : ''; ?>"
+                                    class="nav-link <?php echo $filter === 'awaiting_student_response' ? 'active' : ''; ?>"
+                                    data-filter="awaiting_student_response"
                                     style="<?php echo $action_needed_count > 0 ? 'border-bottom: 2px solid var(--warning);' : ''; ?>">
                                     <i class="fas fa-user-check"></i> Awaiting your response
                                     <span
@@ -132,28 +137,32 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                             </li>
                             <li class="nav-item" role="presentation">
                                 <a href="track_complaints.php?filter=pending"
-                                    class="nav-link <?php echo $filter === STATUS_PENDING ? 'active' : ''; ?>">
+                                    class="nav-link <?php echo $filter === 'pending' ? 'active' : ''; ?>"
+                                    data-filter="pending">
                                     <i class="fas fa-clock"></i> Pending
                                     <span class="badge btn-primary me-2"><?php echo $counts['pending']; ?></span>
                                 </a>
                             </li>
                             <li class="nav-item" role="presentation">
                                 <a href="track_complaints.php?filter=in_progress"
-                                    class="nav-link <?php echo $filter === STATUS_IN_PROGRESS ? 'active' : ''; ?>">
+                                    class="nav-link <?php echo $filter === 'in_progress' ? 'active' : ''; ?>"
+                                    data-filter="in_progress">
                                     <i class="fas fa-spinner"></i> In Progress
                                     <span class="badge btn-primary me-2"><?php echo $counts['in_progress']; ?></span>
                                 </a>
                             </li>
                             <li class="nav-item" role="presentation">
                                 <a href="track_complaints.php?filter=resolved"
-                                    class="nav-link <?php echo $filter === STATUS_RESOLVED ? 'active' : ''; ?>">
+                                    class="nav-link <?php echo $filter === 'resolved' ? 'active' : ''; ?>"
+                                    data-filter="resolved">
                                     <i class="fas fa-check-circle"></i> Resolved
                                     <span class="badge btn-primary me-2"><?php echo $counts['resolved']; ?></span>
                                 </a>
                             </li>
                             <li class="nav-item" role="presentation">
                                 <a href="track_complaints.php?filter=rejected"
-                                    class="nav-link <?php echo $filter === STATUS_REJECTED ? 'active' : ''; ?>">
+                                    class="nav-link <?php echo $filter === 'rejected' ? 'active' : ''; ?>"
+                                    data-filter="rejected">
                                     <i class="fas fa-times-circle"></i> Rejected
                                     <span class="badge btn-primary me-2"><?php echo $counts['rejected']; ?></span>
                                 </a>
@@ -162,10 +171,29 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                     </div>
                 </div>
 
+                <!-- Submit button -->
+                <div class="d-flex justify-content-end mb-2">
+                    <a href="create_complaint.php" class="btn btn-primary fw-bold"
+                        style="background-color:var(--udsm-blue);border-radius:8px;">
+                        <i class="fas fa-plus-circle me-1"></i>
+                        Submit New Complaint
+                    </a>
+                </div>
+
                 <?php if (!empty($complaints)): ?>
+                    <!-- JS empty-filter state (shown when active filter has 0 results) -->
+                    <div id="empty-filter-state" class="empty-state" style="display:none;">
+                        <i class="fas fa-filter"></i>
+                        <h3>No Complaints Found</h3>
+                        <p id="empty-filter-text">You don't have any complaints in this category.</p>
+                        <a href="#" class="btn btn-primary" onclick="applyFilter('all');return false;">
+                            <i class="fas fa-list"></i> View All Complaints
+                        </a>
+                    </div>
+
                     <?php foreach ($complaints as $complaint_row): ?>
-                        <div
-                            class="complaint-card <?php echo strtolower(str_replace('_', '-', $complaint_row['complaint_status'])); ?>">
+                        <div class="complaint-card <?php echo strtolower(str_replace('_', '-', $complaint_row['complaint_status'])); ?>"
+                            data-status="<?= htmlspecialchars($complaint_row['complaint_status']) ?>">
                             <div class="complaint-header">
                                 <div class="complaint-title">
                                     <span class="complaint-id">Complaint #<?php echo $complaint_row['complaint_id']; ?></span>
@@ -337,34 +365,65 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
         });
     </script>
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const hash = window.location.hash;
-            const storedTab = localStorage.getItem('activeTab');
-            const target = hash || storedTab;
+        function applyFilter(filter) {
+            var cards = document.querySelectorAll('.complaint-card[data-status]');
+            var visible = 0;
 
-            if (target) {
-                const tabTrigger = document.querySelector(`[data-bs-target="${target}"]`);
-                if (tabTrigger) {
-                    const tab = new bootstrap.Tab(tabTrigger);
-                    tab.show();
-                }
+            cards.forEach(function (card) {
+                var show = (filter === 'all') || (card.dataset.status === filter);
+                card.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+
+            // Show/hide JS empty state
+            var emptyState = document.getElementById('empty-filter-state');
+            if (emptyState) emptyState.style.display = (visible === 0) ? '' : 'none';
+
+            // Update active tab
+            document.querySelectorAll('.nav-link[data-filter]').forEach(function (tab) {
+                tab.classList.toggle('active', tab.dataset.filter === filter);
+            });
+
+            // Update URL without reload
+            var url = new URL(window.location.href);
+            if (filter === 'all') {
+                url.searchParams.delete('filter');
+            } else {
+                url.searchParams.set('filter', filter);
             }
+            history.pushState({ filter: filter }, '', url.toString());
+        }
 
-            // Store tab and update hash without scrolling
-            document.querySelectorAll('.nav-link[data-bs-toggle="tab"]').forEach(tab => {
-                tab.addEventListener('shown.bs.tab', function (e) {
-                    const targetTab = e.target.getAttribute('data-bs-target');
-                    localStorage.setItem('activeTab', targetTab);
-                    history.replaceState(null, null, targetTab);
+        document.addEventListener('DOMContentLoaded', function () {
+            // Intercept tab clicks
+            document.querySelectorAll('.nav-link[data-filter]').forEach(function (tab) {
+                tab.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    applyFilter(this.dataset.filter);
                 });
             });
+
+            // Handle browser back/forward
+            window.addEventListener('popstate', function (e) {
+                var filter = (e.state && e.state.filter) || 'all';
+                applyFilter(filter);
+            });
+
+            // Apply initial filter from URL
+            var urlFilter = new URLSearchParams(window.location.search).get('filter') || 'all';
+            applyFilter(urlFilter);
         });
     </script>
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/jquery.dataTables.min.js"></script>
-    <script src="assets/js/dataTables.bootstrap4.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery.dataTables.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <!-- <script src="assets/js/dataTables.bootstrap4.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/10.16.7/sweetalert2.all.min.js"></script> -->
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>

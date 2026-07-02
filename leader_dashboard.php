@@ -15,9 +15,11 @@ $db     = new Database();
 $conn   = $db->connect();
 $leader = new StudentLeader($conn, $userId);
 
-$stats  = $leader->getStats();
-$depts  = $leader->getDepartments();
-$recent = $leader->getComplaints(5);
+$stats              = $leader->getStats();
+$depts              = $leader->getDepartments();
+$recent             = $leader->getComplaints(5);
+$myComplaintCounts  = $leader->getMyComplaintCounts();
+$unendorsedPending  = $leader->getUnendorsedPendingCount();
 
 $message = $error = '';
 if (isset($_SESSION['message'])) {
@@ -36,11 +38,15 @@ if (isset($_SESSION['message_error'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leader Dashboard</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
@@ -64,9 +70,10 @@ if (isset($_SESSION['message_error'])) {
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item">
-                            <a href="#"><i class="fas fa-user-friends" style="color:black;"></i></a>
+                            <a href="leader_dashboard.php"><i class="fas fa-user-friends" style="color:black;"></i></a>
                         </li>
-                        <li class="breadcrumb-item active">Student Rep / Dashboard</li>
+                        <li class="breadcrumb-item"><a href="leader_dashboard.php" style="color:black;">Student Rep</a></li>
+                        <li class="breadcrumb-item active">Dashboard</li>
                     </ol>
                 </nav>
 
@@ -82,10 +89,26 @@ if (isset($_SESSION['message_error'])) {
                     </p>
                 </div>
 
+                <!-- Attention alert for unendorsed pending complaints -->
+                <?php if ($unendorsedPending > 0): ?>
+                <div class="alert alert-warning alert-dismissible d-flex align-items-center mb-4 shadow-sm"
+                     role="alert" style="border-left:5px solid #f59e0b;border-radius:10px;">
+                    <i class="fas fa-exclamation-triangle fa-lg me-3 flex-shrink-0" style="color:#f59e0b;"></i>
+                    <a href="leader_complaints.php" class="text-decoration-none text-reset flex-grow-1 d-flex align-items-center" style="cursor:pointer;">
+                        <div class="flex-grow-1">
+                            <strong><?= $unendorsedPending ?> pending complaint<?= $unendorsedPending > 1 ? 's need' : ' needs' ?> your endorsement.</strong>
+                            <span class="ms-2 text-muted small">Review and endorse to escalate priority &rarr;</span>
+                        </div>
+                        <span class="badge bg-warning text-dark fs-6 me-2"><?= $unendorsedPending ?></span>
+                    </a>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
+                </div>
+                <?php endif; ?>
+
                 <!-- Stat cards -->
                 <div class="row g-3 mb-4">
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                             <div style="width:48px;height:48px;border-radius:12px;background:rgba(79,70,229,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                 <i class="fas fa-folder-open fa-lg" style="color:#4f46e5;"></i>
                             </div>
@@ -96,7 +119,7 @@ if (isset($_SESSION['message_error'])) {
                         </div>
                     </div>
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                             <div style="width:48px;height:48px;border-radius:12px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                 <i class="fas fa-clock fa-lg" style="color:#f59e0b;"></i>
                             </div>
@@ -107,7 +130,7 @@ if (isset($_SESSION['message_error'])) {
                         </div>
                     </div>
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                             <div style="width:48px;height:48px;border-radius:12px;background:rgba(22,163,74,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                 <i class="fas fa-check-circle fa-lg" style="color:#16a34a;"></i>
                             </div>
@@ -118,7 +141,7 @@ if (isset($_SESSION['message_error'])) {
                         </div>
                     </div>
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                             <div style="width:48px;height:48px;border-radius:12px;background:rgba(111,66,193,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                 <i class="fas fa-thumbs-up fa-lg" style="color:#6f42c1;"></i>
                             </div>
@@ -127,6 +150,75 @@ if (isset($_SESSION['message_error'])) {
                                 <p class="mb-0 fw-bold small">Endorsed by You</p>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- My Complaints stats + Needs Endorsement -->
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
+                            <div style="width:48px;height:48px;border-radius:12px;background:rgba(14,165,233,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <i class="fas fa-paper-plane fa-lg" style="color:#0ea5e9;"></i>
+                            </div>
+                            <div class="text-end">
+                                <h2 class="mb-0 fw-bold" style="color:#0ea5e9;"><?= $myComplaintCounts['total'] ?></h2>
+                                <p class="mb-0 fw-bold small">My Submitted</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
+                            <div style="width:48px;height:48px;border-radius:12px;background:rgba(22,163,74,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <i class="fas fa-check-double fa-lg" style="color:#16a34a;"></i>
+                            </div>
+                            <div class="text-end">
+                                <h2 class="mb-0 fw-bold" style="color:#16a34a;"><?= $myComplaintCounts['resolved'] ?></h2>
+                                <p class="mb-0 fw-bold small">My Resolved</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
+                            <div style="width:48px;height:48px;border-radius:12px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <i class="fas fa-clock fa-lg" style="color:#f59e0b;"></i>
+                            </div>
+                            <div class="text-end">
+                                <h2 class="mb-0 fw-bold" style="color:#f59e0b;"><?= $myComplaintCounts['pending'] ?></h2>
+                                <p class="mb-0 fw-bold small">My Pending</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <a href="leader_complaints.php" style="text-decoration:none;">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm"
+                             style="<?= $unendorsedPending > 0 ? 'border:2px solid #f59e0b;' : '' ?>">
+                            <div style="width:48px;height:48px;border-radius:12px;background:rgba(239,68,68,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <i class="fas fa-bell fa-lg" style="color:#ef4444;"></i>
+                            </div>
+                            <div class="text-end">
+                                <h2 class="mb-0 fw-bold" style="color:#ef4444;"><?= $unendorsedPending ?></h2>
+                                <p class="mb-0 fw-bold small">Needs Endorsement</p>
+                            </div>
+                        </div>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Action cards -->
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-md-6">
+                        <a href="leader_create_complaint.php" class="action-card action-card--blue">
+                            <i class="fas fa-plus-circle action-icon"></i>
+                            <h5>Submit a Complaint</h5>
+                            <small>File a new complaint and optionally suggest a staff member</small>
+                        </a>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <a href="leader_my_complaints.php" class="action-card action-card--blue">
+                            <i class="fas fa-search action-icon"></i>
+                            <h5>My Complaints</h5>
+                            <small>Track the status of complaints you've submitted</small>
+                        </a>
                     </div>
                 </div>
 
@@ -203,8 +295,10 @@ if (isset($_SESSION['message_error'])) {
         </div><!-- /content -->
     </div>
 
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     <script src="assets/js/script.js"></script>
 </body>
 </html>

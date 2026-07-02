@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once 'config/session.php';
 
 require_once "config/Database.php";
@@ -85,12 +85,17 @@ if (isset($_POST["loginBTN"])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login | SCMRS</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/auth-style.css">
     <style>
         body {
@@ -98,7 +103,7 @@ if (isset($_POST["loginBTN"])) {
             position: relative;
         }
 
-        /* ── Slideshow backgrounds (same photos as register page) ── */
+        /* ── Slideshow backgrounds ── */
         .slide-bg {
             position: fixed;
             inset: 0;
@@ -206,7 +211,7 @@ if (isset($_POST["loginBTN"])) {
 
 <body>
 
-    <div id="loader">
+    <div id="loader" class="loader-branded">
         <div class="loader-content">
             <img src="assets/img/logo.png" alt="UDSM" class="loader-logo">
             <div class="spinner"></div>
@@ -281,7 +286,8 @@ if (isset($_POST["loginBTN"])) {
     </div><!-- /.auth-wrap -->
 
     <script src="assets/js/auth-script.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>

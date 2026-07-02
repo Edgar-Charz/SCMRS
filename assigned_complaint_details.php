@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'staff') {
@@ -223,8 +223,23 @@ $feedback           = $staff->getComplaintFeedback($complaintId);
 $progressUpdates    = $staff->getProgressUpdates($complaintId);
 
 $isClosed       = in_array($complaint['complaint_status'], [STATUS_RESOLVED, STATUS_REJECTED]);
+$isReadOnly     = ($complaint['assignment_status'] ?? '') === 'forwarded';
 $studentDisplay = $complaint['is_anonymous'] ? 'Anonymous Student' : htmlspecialchars($complaint['student_name'] ?? 'N/A');
 $studentUserId  = (int) ($complaint['student_user_id'] ?? 0);
+
+function statusLabel(string $status): string
+{
+    $map = [
+        STATUS_PENDING           => 'Pending',
+        STATUS_IN_PROGRESS       => 'In Progress',
+        STATUS_AWAITING_RESPONSE => 'Awaiting Response',
+        STATUS_RESOLVED          => 'Resolved',
+        STATUS_REJECTED          => 'Rejected',
+        STATUS_REOPENED          => 'Reopened',
+        'on_hold'                => 'On Hold',
+    ];
+    return $map[$status] ?? ucwords(str_replace('_', ' ', $status));
+}
 
 function statusBadge($status)
 {
@@ -234,7 +249,7 @@ function statusBadge($status)
         STATUS_AWAITING_RESPONSE => ['bg-primary text-white', 'Awaiting Response'],
         STATUS_RESOLVED => ['bg-success text-white', 'Resolved'],
         STATUS_REJECTED => ['bg-danger text-white',  'Rejected'],
-        STATUS_REOPENED => ['bg-orange text-white',  'Reopened'],
+        STATUS_REOPENED => ['bg-warning text-dark',  'Reopened'],
         'on_hold'                   => ['bg-secondary text-white', 'On Hold'],
     ];
     [$class, $label] = $map[$status] ?? ['bg-secondary text-white', ucwords(str_replace('_', ' ', $status))];
@@ -249,12 +264,17 @@ function statusBadge($status)
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Complaint #<?= $complaintId ?> | Staff</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
@@ -284,6 +304,9 @@ function statusBadge($status)
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item">
                             <a href="staff_dashboard.php"><i class="fas fa-home" style="color:black;"></i></a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a href="staff_dashboard.php" style="color:black;">Staff</a>
                         </li>
                         <li class="breadcrumb-item">
                             <a href="assigned_complaints.php" style="color:black;">Assigned Complaints</a>
@@ -382,7 +405,7 @@ function statusBadge($status)
 
                     <div class="mb-3 mt-2">
                         <div class="detail-label fw-bold mb-1">Description:</div>
-                        <div class="p-3 bg-light rounded border">
+                        <div class="p-4 bg-light rounded border">
                             <?= htmlspecialchars($complaint['complaint_description']) ?>
                         </div>
                     </div>
@@ -435,10 +458,15 @@ function statusBadge($status)
                 </div>
 
                 <!-- Respond / Resolve -->
-                <div class="container-card shadow-sm">
+                <div id="respond" class="container-card shadow-sm">
                     <h4 class="mb-3 fw-bold"><i class="fas fa-reply me-2"></i>Submit Response</h4>
 
-                    <?php if ($isClosed): ?>
+                    <?php if ($isReadOnly): ?>
+                        <div class="alert alert-secondary mb-0">
+                            <i class="fas fa-eye me-2"></i>
+                            You delegated this complaint and can view it in read-only mode. Actions are only available to the currently assigned staff.
+                        </div>
+                    <?php elseif ($isClosed): ?>
                         <div class="alert alert-info mb-0">
                             <i class="fas fa-info-circle me-2"></i>
                             This complaint is already
@@ -448,8 +476,6 @@ function statusBadge($status)
                         <form method="POST" action="assigned_complaint_details.php?id=<?= $complaintId ?>">
                             <?= csrf_field() ?>
                             <input type="hidden" name="action" value="respond">
-                            <input type="hidden" name="response_action" id="responseAction" value="">
-
                             <div class="mb-4">
                                 <label class="form-label fw-bold">
                                     Response / Resolution <span class="text-danger">*</span>
@@ -461,19 +487,22 @@ function statusBadge($status)
                             </div>
 
                             <div class="d-flex gap-2 flex-wrap">
-                                <button type="button" class="btn btn-success p-3 fw-bold flex-fill"
+                                <button type="submit" name="response_action" value="resolve"
+                                    class="btn btn-success p-3 fw-bold flex-fill"
                                     style="border-radius:10px;"
-                                    onclick="submitResponse('resolve')">
+                                    onclick="return confirmAction(this)">
                                     <i class="fas fa-check-circle me-1"></i>Resolve
                                 </button>
-                                <button type="button" class="btn btn-warning p-3 fw-bold flex-fill"
+                                <button type="submit" name="response_action" value="in_progress"
+                                    class="btn btn-warning p-3 fw-bold flex-fill"
                                     style="border-radius:10px;"
-                                    onclick="submitResponse('in_progress')">
+                                    onclick="return confirmAction(this)">
                                     <i class="fas fa-spinner me-1"></i>Mark In Progress
                                 </button>
-                                <button type="button" class="btn btn-danger p-3 fw-bold flex-fill"
+                                <button type="submit" name="response_action" value="reject"
+                                    class="btn btn-danger p-3 fw-bold flex-fill"
                                     style="border-radius:10px;"
-                                    onclick="submitResponse('reject')">
+                                    onclick="return confirmAction(this)">
                                     <i class="fas fa-times-circle me-1"></i>Reject
                                 </button>
                             </div>
@@ -502,6 +531,7 @@ function statusBadge($status)
                         <p class="text-muted small">No collaboration notes yet.</p>
                     <?php endif; ?>
 
+                    <?php if (!$isReadOnly): ?>
                     <form method="POST" action="assigned_complaint_details.php?id=<?= $complaintId ?>" class="mt-3">
                         <?= csrf_field() ?>
                         <input type="hidden" name="action" value="add_note">
@@ -516,6 +546,7 @@ function statusBadge($status)
                             <i class="fas fa-plus me-1"></i>Add Note
                         </button>
                     </form>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Information Requests List -->
@@ -564,7 +595,7 @@ function statusBadge($status)
                 <?php endif; ?>
 
                 <!-- Request Information from Student -->
-                <?php if (!$isClosed): ?>
+                <?php if (!$isClosed && !$isReadOnly): ?>
                     <div class="container-card shadow-sm">
                         <h4 class="mb-3 fw-bold">
                             <i class="fas fa-question-circle me-2"></i>Request Information from Student
@@ -596,7 +627,12 @@ function statusBadge($status)
                 <?php endif; ?>
 
                 <!-- Escalate Complaint -->
-                <?php if (!$isClosed && !empty($staffForEscalation)): ?>
+                <?php if (!$isReadOnly && !$isClosed && empty($staffForEscalation)): ?>
+                    <div class="container-card shadow-sm">
+                        <h4 class="mb-2 fw-bold text-muted"><i class="fas fa-level-up-alt me-2"></i>Escalate Complaint</h4>
+                        <p class="text-muted mb-0 small"><i class="fas fa-info-circle me-1"></i>No higher-ranked staff available for escalation.</p>
+                    </div>
+                <?php elseif (!$isReadOnly && !$isClosed && !empty($staffForEscalation)): ?>
                     <div class="container-card shadow-sm">
                         <h4 class="mb-3 fw-bold">
                             <i class="fas fa-level-up-alt me-2"></i>Escalate Complaint
@@ -619,7 +655,7 @@ function statusBadge($status)
                                                 (<?= htmlspecialchars($s['role_name']) ?>)
                                             <?php endif; ?>
                                             <?php if ($s['department_name']): ?>
-                                                — <?= htmlspecialchars($s['department_name']) ?>
+                                                - <?= htmlspecialchars($s['department_name']) ?>
                                             <?php endif; ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -642,7 +678,12 @@ function statusBadge($status)
                 <?php endif; ?>
 
                 <!-- Delegate Complaint -->
-                <?php if (!$isClosed && !empty($staffForDelegation)): ?>
+                <?php if (!$isReadOnly && !$isClosed && empty($staffForDelegation)): ?>
+                    <div class="container-card shadow-sm">
+                        <h4 class="mb-2 fw-bold text-muted"><i class="fas fa-level-down-alt me-2"></i>Delegate Complaint</h4>
+                        <p class="text-muted mb-0 small"><i class="fas fa-info-circle me-1"></i>No staff available for delegation.</p>
+                    </div>
+                <?php elseif (!$isReadOnly && !$isClosed && !empty($staffForDelegation)): ?>
                     <div class="container-card shadow-sm">
                         <h4 class="mb-3 fw-bold">
                             <i class="fas fa-level-down-alt me-2"></i>Delegate Complaint
@@ -666,7 +707,7 @@ function statusBadge($status)
                                                 (<?= htmlspecialchars($s['role_name']) ?>)
                                             <?php endif; ?>
                                             <?php if ($s['department_name']): ?>
-                                                — <?= htmlspecialchars($s['department_name']) ?>
+                                                - <?= htmlspecialchars($s['department_name']) ?>
                                             <?php endif; ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -689,7 +730,7 @@ function statusBadge($status)
                 <?php endif; ?>
 
                 <!-- Target Resolution Date -->
-                <?php if (!$isClosed): ?>
+                <?php if (!$isReadOnly && !$isClosed): ?>
                 <div class="container-card shadow-sm">
                     <h4 class="mb-3 fw-bold"><i class="fas fa-calendar-alt me-2"></i>Target Resolution Date</h4>
 
@@ -721,7 +762,7 @@ function statusBadge($status)
                 <?php endif; ?>
 
                 <!-- Send Progress Update-->
-                <?php if (!$isClosed): ?>
+                <?php if (!$isReadOnly && !$isClosed): ?>
                 <div class="container-card shadow-sm">
                     <h4 class="mb-3 fw-bold"><i class="fas fa-bullhorn me-2"></i>Send Progress Update to Student</h4>
 
@@ -760,7 +801,7 @@ function statusBadge($status)
                 <?php endif; ?>
 
                 <!-- Put On Hold -->
-                <?php if (!$isClosed && $complaint['complaint_status'] !== 'on_hold'): ?>
+                <?php if (!$isReadOnly && !$isClosed && $complaint['complaint_status'] !== 'on_hold'): ?>
                 <div class="container-card shadow-sm">
                     <h4 class="mb-3 fw-bold"><i class="fas fa-pause-circle me-2 text-secondary"></i>Put Complaint On Hold</h4>
                     <p class="text-muted small mb-3">Use this when waiting on a third party outside the system.</p>
@@ -784,7 +825,7 @@ function statusBadge($status)
                 <?php endif; ?>
 
                 <!-- Resume from Hold -->
-                <?php if ($complaint['complaint_status'] === 'on_hold'): ?>
+                <?php if (!$isReadOnly && $complaint['complaint_status'] === 'on_hold'): ?>
                 <div class="container-card shadow-sm" style="border-left:4px solid #6c757d;">
                     <h4 class="mb-3 fw-bold"><i class="fas fa-pause-circle me-2 text-secondary"></i>Complaint is On Hold</h4>
 
@@ -807,7 +848,7 @@ function statusBadge($status)
                 <?php endif; ?>
 
                 <!-- Reject Assignment -->
-                <?php if (!$isClosed): ?>
+                <?php if (!$isReadOnly && !$isClosed): ?>
                 <div class="container-card shadow-sm" style="border:1px solid #f8d7da;">
                     <h4 class="mb-3 fw-bold text-danger"><i class="fas fa-times-circle me-2"></i>Reject This Assignment</h4>
                     <div class="alert alert-warning py-2 small mb-3">
@@ -942,11 +983,11 @@ function statusBadge($status)
                                     <?php if ($log['old_status'] && $log['new_status']): ?>
                                         &nbsp;·&nbsp;
                                         <span class="text-muted">
-                                            <?= ucwords(str_replace('_', ' ', $log['old_status'])) ?>
+                                            <?= htmlspecialchars(statusLabel($log['old_status'])) ?>
                                         </span>
                                         <i class="fas fa-arrow-right mx-1 text-muted"></i>
                                         <span>
-                                            <?= ucwords(str_replace('_', ' ', $log['new_status'])) ?>
+                                            <?= htmlspecialchars(statusLabel($log['new_status'])) ?>
                                         </span>
                                     <?php endif; ?>
                                 </div>
@@ -968,34 +1009,45 @@ function statusBadge($status)
 
     </div><!-- /d-flex -->
 
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/10.16.7/sweetalert2.all.min.js"></script> -->
     <script src="assets/js/script.js"></script>
 
     <script>
-        function submitResponse(action) {
+        function confirmAction(btn) {
             const labels = {
-                resolve:     { title: 'Resolve Complaint?',      text: 'Are you sure you want to resolve this complaint?',          icon: 'question', color: '#198754' },
-                reject:      { title: 'Reject Complaint?',       text: 'Are you sure you want to reject this complaint?',           icon: 'warning',  color: '#dc3545' },
-                in_progress: { title: 'Mark as In Progress?',   text: 'Are you sure you want to mark this complaint as in progress?', icon: 'info',   color: '#0d6efd' },
+                resolve:     'Are you sure you want to resolve this complaint?',
+                reject:      'Are you sure you want to reject this complaint?',
+                in_progress: 'Are you sure you want to mark this complaint as in progress?',
             };
-            const cfg = labels[action];
-            Swal.fire({
-                icon: cfg.icon,
-                title: cfg.title,
-                text: cfg.text,
-                showCancelButton: true,
-                confirmButtonColor: cfg.color,
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Yes, proceed',
-                cancelButtonText: 'Cancel'
-            }).then(function (result) {
-                if (result.isConfirmed) {
-                    document.getElementById('responseAction').value = action;
-                    document.querySelector('form input[name="response_action"]').closest('form').submit();
-                }
-            });
+            const msg = labels[btn.value] || 'Are you sure?';
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: 'Confirm Action',
+                    text: msg,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonColor: btn.value === 'resolve' ? '#198754' : btn.value === 'reject' ? '#dc3545' : '#0d6efd',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Yes, proceed',
+                    cancelButtonText: 'Cancel'
+                }).then(function (result) {
+                    if (result.isConfirmed) {
+                        var hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = btn.name;
+                        hidden.value = btn.value;
+                        btn.form.appendChild(hidden);
+                        btn.form.submit();
+                    }
+                });
+                return false;
+            }
+            return confirm(msg);
         }
 
         function confirmEscalate() {

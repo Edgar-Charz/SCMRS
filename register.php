@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once 'config/session.php';
 require_once "includes/csrf.php";
 require_once "config/Database.php";
@@ -84,13 +84,19 @@ $staffPost   = isset($_POST['registerStaffBTN']);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register | SCMRS</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="assets/plugins/toastr/toatr.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/toastr/toatr.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/2.1.4/toastr.min.css">
     <link rel="stylesheet" href="assets/css/auth-style.css">
     <style>
         body {
@@ -308,7 +314,8 @@ $staffPost   = isset($_POST['registerStaffBTN']);
 
             .split-right {
                 padding: 5vh 16px 40px;
-                align-items: flex-start;
+                align-items: center;
+                min-height: 100svh;
             }
         }
 
@@ -581,7 +588,7 @@ $staffPost   = isset($_POST['registerStaffBTN']);
 
 <body>
 
-    <div id="loader">
+    <div id="loader" class="loader-branded">
         <div class="loader-content">
             <img src="assets/img/logo.png" alt="UDSM" class="loader-logo">
             <div class="spinner"></div>
@@ -934,8 +941,9 @@ $staffPost   = isset($_POST['registerStaffBTN']);
             });
         }
     </script>
-    <script src="assets/plugins/toastr/toastr.min.js"></script>
-    <script src="assets/plugins/toastr/toastr.js"></script>
+    <!-- <script src="assets/plugins/toastr/toastr.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/2.1.4/toastr.min.js"></script>
+    \<!-- <script src="assets/plugins/toastr/toastr.js"></script> -->
     <script>
     // Inline blur-based field validation for both registration forms
     (function () {

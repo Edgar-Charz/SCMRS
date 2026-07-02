@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once 'config/session.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
@@ -94,12 +94,17 @@ function fmtHours($val): string
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reports &amp; Analytics | Admin</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
@@ -128,6 +133,7 @@ function fmtHours($val): string
                         <li class="breadcrumb-item">
                             <a href="admin_dashboard.php"><i class="fas fa-home" style="color:black;"></i></a>
                         </li>
+                        <li class="breadcrumb-item"><a href="admin_dashboard.php" style="color:black;">Admin</a></li>
                         <li class="breadcrumb-item active">Reports &amp; Analytics</li>
                     </ol>
                 </nav>
@@ -310,7 +316,10 @@ function fmtHours($val): string
 
                     <!-- Complaints by Department -->
                     <div class="container-card shadow-sm mb-4">
-                        <h4 class="mb-1 fw-bold"><i class="fas fa-building me-2"></i>Complaints by Department</h4>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h5 class="mb-0 fw-bold"><i class="fas fa-building me-2"></i>Complaints by Department</h5>
+                            <div class="search-input" id="si-department"></div>
+                        </div>
                         <p class="text-muted small mb-3">Breakdown of complaints per department</p>
                         <div class="table-responsive">
                             <table id="tbl_department" class="table table-striped">
@@ -348,7 +357,10 @@ function fmtHours($val): string
 
                     <!-- Complaints by Category -->
                     <div class="container-card shadow-sm mb-4">
-                        <h4 class="mb-1 fw-bold"><i class="fas fa-tags me-2"></i>Complaints by Category</h4>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h5 class="mb-0 fw-bold"><i class="fas fa-tags me-2"></i>Complaints by Category</h5>
+                            <div class="search-input" id="si-category"></div>
+                        </div>
                         <p class="text-muted small mb-3">Breakdown of complaints per category</p>
                         <div class="table-responsive">
                             <table id="tbl_category" class="table table-striped">
@@ -386,7 +398,7 @@ function fmtHours($val): string
 
                     <!-- Priority Breakdown -->
                     <div class="container-card shadow-sm mb-4">
-                        <h4 class="mb-1 fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>Complaints by Priority</h4>
+                        <h5 class="mb-1 fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>Complaints by Priority</h5>
                         <p class="text-muted small mb-3">Distribution across priority levels</p>
                         <?php if (empty($byPriority)): ?>
                             <p class="text-center text-muted py-3">No data for the selected filters.</p>
@@ -434,7 +446,10 @@ function fmtHours($val): string
 
                     <!-- Staff Performance -->
                     <div class="container-card shadow-sm mb-4">
-                        <h4 class="mb-1 fw-bold"><i class="fas fa-user-tie me-2"></i>Staff Performance</h4>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h5 class="mb-0 fw-bold"><i class="fas fa-user-tie me-2"></i>Staff Performance</h5>
+                            <div class="search-input" id="si-staff"></div>
+                        </div>
                         <p class="text-muted small mb-3">Complaints handled per staff member</p>
                         <div class="table-responsive">
                             <table id="tbl_staff" class="table table-striped">
@@ -486,7 +501,7 @@ function fmtHours($val): string
 
                     <!-- Monthly Trend -->
                     <div class="container-card shadow-sm mb-4">
-                        <h4 class="mb-1 fw-bold"><i class="fas fa-chart-line me-2"></i>Monthly Trend</h4>
+                        <h5 class="mb-1 fw-bold"><i class="fas fa-chart-line me-2"></i>Monthly Trend</h5>
                         <p class="text-muted small mb-3">
                             <?= ($filterDateFrom || $filterDateTo) ? 'Complaints within selected date range' : 'Complaints over the last 12 months' ?>
                         </p>
@@ -524,7 +539,10 @@ function fmtHours($val): string
 
                     <!-- Oldest Pending -->
                     <div class="container-card shadow-sm mb-4">
-                        <h4 class="mb-1 fw-bold"><i class="fas fa-hourglass-end me-2 text-danger"></i>Oldest Pending Complaints</h4>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h5 class="mb-0 fw-bold"><i class="fas fa-hourglass-end me-2 text-danger"></i>Oldest Pending Complaints</h5>
+                            <div class="search-input" id="si-oldest"></div>
+                        </div>
                         <p class="text-muted small mb-3">Top 10 complaints waiting the longest — requires immediate attention</p>
                         <div class="table-responsive">
                             <table id="tbl_oldest" class="table table-striped">
@@ -690,10 +708,14 @@ function fmtHours($val): string
         </div><!-- /content -->
     </div><!-- /d-flex -->
 
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/jquery.dataTables.min.js"></script>
-    <script src="assets/js/dataTables.bootstrap4.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery.dataTables.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <!-- <script src="assets/js/dataTables.bootstrap4.min.js"></script> -->
+    <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
@@ -720,15 +742,20 @@ function fmtHours($val): string
 
     // DataTables
     $(document).ready(function () {
+        function dtInitComplete(settings) {
+            $(settings.nTableWrapper).find('.dataTables_filter')
+                .appendTo($(settings.nTable).closest('.container-card').find('.search-input'));
+        }
         var dtOpts = {
             destroy: true, bFilter: true, sDom: 'fBtlpi', pagingType: 'numbers', ordering: true,
-            language: { search: ' ', sLengthMenu: '_MENU_', searchPlaceholder: 'Search...', info: '_START_ - _END_ of _TOTAL_ items', emptyTable: 'No data available' }
+            language: { search: ' ', sLengthMenu: '_MENU_', searchPlaceholder: 'Search...', info: '_START_ - _END_ of _TOTAL_ items', emptyTable: 'No data available' },
+            initComplete: dtInitComplete
         };
-        $('#tbl_department').DataTable($.extend({}, dtOpts, { language: { searchPlaceholder: 'Search department...' } }));
-        $('#tbl_category').DataTable($.extend({}, dtOpts, { language: { searchPlaceholder: 'Search category...' } }));
-        $('#tbl_staff').DataTable($.extend({}, dtOpts, { language: { searchPlaceholder: 'Search staff...' }, order: [[3, 'desc']] }));
-        $('#tbl_monthly').DataTable($.extend({}, dtOpts, { paging: false, bFilter: false, sDom: 'tip', ordering: false }));
-        $('#tbl_oldest').DataTable($.extend({}, dtOpts, { language: { searchPlaceholder: 'Search complaints...' }, paging: false, order: [[6, 'desc']] }));
+        $('#tbl_department').DataTable($.extend({}, dtOpts, { language: { search: ' ', sLengthMenu: '_MENU_', info: '_START_ - _END_ of _TOTAL_ items', searchPlaceholder: 'Search department...' } }));
+        $('#tbl_category').DataTable($.extend({}, dtOpts, { language: { search: ' ', sLengthMenu: '_MENU_', info: '_START_ - _END_ of _TOTAL_ items', searchPlaceholder: 'Search category...' } }));
+        $('#tbl_staff').DataTable($.extend({}, dtOpts, { language: { search: ' ', sLengthMenu: '_MENU_', info: '_START_ - _END_ of _TOTAL_ items', searchPlaceholder: 'Search staff...' }, order: [[3, 'desc']] }));
+        $('#tbl_monthly').DataTable($.extend({}, dtOpts, { paging: false, bFilter: false, sDom: 'tip', ordering: false, initComplete: null }));
+        $('#tbl_oldest').DataTable($.extend({}, dtOpts, { language: { search: ' ', sLengthMenu: '_MENU_', info: '_START_ - _END_ of _TOTAL_ items', searchPlaceholder: 'Search complaints...' }, paging: false, order: [[6, 'desc']] }));
     });
 
     // Chart.js 

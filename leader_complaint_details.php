@@ -85,10 +85,13 @@ $priClass = $priorityMap[$complaint['priority']] ?? 'bg-secondary';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Complaint Details | Student Rep</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
@@ -115,7 +118,10 @@ $priClass = $priorityMap[$complaint['priority']] ?? 'bg-secondary';
                             <a href="leader_dashboard.php"><i class="fas fa-chart-pie" style="color:black;"></i></a>
                         </li>
                         <li class="breadcrumb-item">
-                            <a href="leader_complaints.php">Department Complaints</a>
+                            <a href="leader_dashboard.php" style="color:black;">Student Rep</a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a href="leader_complaints.php" style="color:black;">Department Complaints</a>
                         </li>
                         <li class="breadcrumb-item active">Complaint #<?= $complaintId ?></li>
                     </ol>
@@ -173,7 +179,7 @@ $priClass = $priorityMap[$complaint['priority']] ?? 'bg-secondary';
                             </div>
 
                             <p class="mb-1 text-muted small fw-bold">DESCRIPTION</p>
-                            <div class="p-3 rounded" style="background:#f8f9fa;white-space:pre-wrap;line-height:1.7;">
+                            <div class="p-4 rounded"style="background:#f8f9fa;white-space:pre-wrap;line-height:1.7;">
                                 <?= htmlspecialchars($complaint['complaint_description']) ?>
                             </div>
                         </div>
@@ -247,8 +253,10 @@ $priClass = $priorityMap[$complaint['priority']] ?? 'bg-secondary';
         </div><!-- /content -->
     </div>
 
-    <script src="assets/js/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
+    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     <script src="assets/js/script.js"></script>
 </body>
 </html>
