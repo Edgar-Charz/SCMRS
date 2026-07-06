@@ -1,62 +1,8 @@
-// Sidebar toggle
-// document
-//   .getElementById("sidebarCollapse")
-//   .addEventListener("click", function () {
-//     document.getElementById("sidebar").classList.toggle("active");
-//   });
-
-// document.addEventListener("DOMContentLoaded", function () {
-//   const sidebar = document.getElementById("sidebar");
-//   const sidebarCollapse = document.getElementById("sidebarCollapse");
-
-//   // 1. Check local storage on page load
-//   const sidebarStatus = localStorage.getItem("sidebarStatus");
-//   if (sidebarStatus === "collapsed") {
-//     sidebar.classList.add("active");
-//   }
-
-//   // 2. Toggle and Save state
-//   sidebarCollapse.addEventListener("click", function () {
-//     sidebar.classList.toggle("active");
-
-//     // Save the current state
-//     if (sidebar.classList.contains("active")) {
-//       localStorage.setItem("sidebarStatus", "collapsed");
-//     } else {
-//       localStorage.setItem("sidebarStatus", "expanded");
-//     }
-//   });
-// });
-
-// document.addEventListener("DOMContentLoaded", function () {
-//   const sidebar = document.getElementById("sidebar");
-//   const sidebarCollapse = document.getElementById("sidebarCollapse");
-
-//   // Load saved state
-//   if (localStorage.getItem("sidebarStatus") === "permanent-expanded") {
-//     sidebar.classList.add("expanded");
-//   }
-
-//   // Toggle Permanent State
-//   sidebarCollapse.addEventListener("click", function () {
-//     sidebar.classList.toggle("expanded");
-
-//     if (sidebar.classList.contains("expanded")) {
-//       localStorage.setItem("sidebarStatus", "permanent-expanded");
-//     } else {
-//       localStorage.setItem("sidebarStatus", "collapsed");
-
-//       const openSubmenus = sidebar.querySelectorAll(".collapse.show");
-//       openSubmenus.forEach((menu) => menu.classList.remove("show"));
-//     }
-//   });
-// });
-
 document.addEventListener("DOMContentLoaded", function () {
   const sidebar = document.getElementById("sidebar");
   const sidebarCollapse = document.getElementById("sidebarCollapse");
 
-  // Create an overlay fro mobile if not exists
+  // Create an overlay for mobile if not exists
   if (!document.querySelector(".overlay")) {
     const overlay = document.createElement("div");
     overlay.classList.add("overlay");
@@ -98,16 +44,22 @@ document.addEventListener("DOMContentLoaded", function () {
 // Active menu highlighting
 const currentURL = window.location.pathname.split("/").pop();
 
-// Pages not in the sidebar — map them to their parent nav link
+// Pages not in the sidebar - map them to their parent nav link
 const parentPageMap = {
   "complaint_details.php":          "manage_complaints.php",
   "respond_complaint.php":          "manage_complaints.php",
   "assigned_complaint_details.php": "assigned_complaints.php",
   "respond_assigned_complaint.php": "assigned_complaints.php",
   "student_complaint_details.php":  "track_complaints.php",
+  "edit_student_complaint.php":     "track_complaints.php",
+  "leader_complaint_details.php":   "leader_complaints.php",
+  "department_hierarchy.php":       "manage_departments.php",
 };
 
-const activeURL = parentPageMap[currentURL] ?? currentURL;
+// Role-aware pages inject window._activeSidebarLink to override the map
+const activeURL = (typeof window._activeSidebarLink === "string" && window._activeSidebarLink)
+  ? window._activeSidebarLink
+  : (parentPageMap[currentURL] ?? currentURL);
 
 document.querySelectorAll("#sidebar ul li a").forEach((link) => {
   const cleanLinkURL = link.getAttribute("href").split("?")[0];
@@ -154,7 +106,14 @@ $(document).ready(function () {
 // Loader
 function hideLoader() {
   var el = document.getElementById("loader");
-  if (el) el.style.display = "none";
+  if (!el) return;
+  el.style.transition = "opacity 0.28s ease";
+  el.style.opacity = "0";
+  setTimeout(function () {
+    el.style.display = "none";
+    el.style.opacity = "";
+    el.style.transition = "";
+  }, 320);
 }
 
 // Hides loader on normal load AND on back/forward cache restore
@@ -176,7 +135,7 @@ function showLoader() {
 // Management tabs js
 $(document).ready(function () {
   if (!$("#userManagementTabs").length) return;
-  // switchTab is defined inline in user_management.php — re-trigger here so
+  // switchTab is defined inline in user_management.php - re-trigger here so
   // DataTable column widths are adjusted after tables have been initialised.
   if (typeof window.switchTab === "function") {
     const hash = location.hash.slice(1);
