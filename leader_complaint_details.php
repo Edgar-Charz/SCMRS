@@ -34,19 +34,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
 
     if ($action === 'endorse') {
-        $note = trim($_POST['note'] ?? '');
-        if ($leader->endorse($complaintId, $note)) {
-            $_SESSION['message'] = "Complaint endorsed successfully.";
+        if ($leader->isComplaintFinalized($complaintId)) {
+            $_SESSION['message_error'] = "This complaint has already been resolved or rejected and can no longer be endorsed.";
         } else {
-            $_SESSION['message_error'] = "You have already endorsed this complaint.";
+            $note = trim($_POST['note'] ?? '');
+            if ($leader->endorse($complaintId, $note)) {
+                $_SESSION['message'] = "Complaint endorsed successfully.";
+            } else {
+                $_SESSION['message_error'] = "You have already endorsed this complaint.";
+            }
         }
         header("Location: leader_complaint_details.php?id=$complaintId");
         exit;
     }
 
     if ($action === 'remove_endorsement') {
-        $leader->removeEndorsement($complaintId);
-        $_SESSION['message'] = "Endorsement removed.";
+        if ($leader->isComplaintFinalized($complaintId)) {
+            $_SESSION['message_error'] = "This complaint has already been resolved or rejected; its endorsement can no longer be changed.";
+        } else {
+            $leader->removeEndorsement($complaintId);
+            $_SESSION['message'] = "Endorsement removed.";
+        }
         header("Location: leader_complaint_details.php?id=$complaintId");
         exit;
     }
@@ -65,6 +73,7 @@ if (isset($_SESSION['message_error'])) {
 $complaint    = $leader->getComplaintById($complaintId);
 $endorsements = $leader->getEndorsementsForComplaint($complaintId);
 $iEndorsed    = (bool)($complaint['i_endorsed'] ?? false);
+$isFinalized  = in_array($complaint['complaint_status'], [STATUS_RESOLVED, STATUS_REJECTED], true);
 
 $statusMap = [
     STATUS_PENDING           => ['bg-warning text-dark',  'Pending'],
@@ -143,15 +152,37 @@ $priClass = $priorityMap[$complaint['priority']] ?? 'bg-secondary';
                 <div class="row g-4">
                     <!-- Complaint details -->
                     <div class="col-lg-8">
-                        <div class="container-card shadow-sm">
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <h4 class="fw-bold mb-0" style="color:var(--udsm-blue);">
-                                    <?= htmlspecialchars($complaint['complaint_title']) ?>
-                                </h4>
-                                <span class="badge <?= $sc ?>"><?= $sl ?></span>
-                            </div>
 
-                            <div class="row g-3 mb-4">
+                        <!-- Header card -->
+                        <div class="container-card shadow-sm mb-4">
+                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                <div>
+                                    <h4 class="fw-bold mb-1" style="color:var(--udsm-blue);">
+                                        <?= htmlspecialchars($complaint['complaint_title']) ?>
+                                    </h4>
+                                    <p class="text-muted small mb-0">
+                                        Complaint #<?= $complaintId ?> &middot;
+                                        Submitted <?= date('d M Y, H:i', strtotime($complaint['created_at'])) ?>
+                                    </p>
+                                </div>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <span class="badge <?= $sc ?>"><?= $sl ?></span>
+                                    <span class="badge <?= $priClass ?>"><?= ucfirst($complaint['priority']) ?> Priority</span>
+                                    <?php if (!empty($endorsements)): ?>
+                                        <span class="badge text-white" style="background-color:#6f42c1;">
+                                            <i class="fas fa-thumbs-up me-1"></i><?= count($endorsements) ?> Endorsement<?= count($endorsements) === 1 ? '' : 's' ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Complaint information card -->
+                        <div class="container-card shadow-sm mb-4">
+                            <h5 class="fw-bold mb-3" style="color:var(--udsm-blue);">
+                                <i class="fas fa-circle-info me-2"></i>Complaint Information
+                            </h5>
+                            <div class="row g-3">
                                 <div class="col-sm-6">
                                     <p class="mb-1 text-muted small fw-bold">STUDENT</p>
                                     <p class="mb-0">
@@ -162,34 +193,35 @@ $priClass = $priorityMap[$complaint['priority']] ?? 'bg-secondary';
                                 </div>
                                 <div class="col-sm-6">
                                     <p class="mb-1 text-muted small fw-bold">DEPARTMENT</p>
-                                    <p class="mb-0"><?= htmlspecialchars($complaint['department_name']) ?></p>
+                                    <p class="mb-0"><?= htmlspecialchars($complaint['department_name'] ?? 'Not department-specific') ?></p>
                                 </div>
                                 <div class="col-sm-6">
                                     <p class="mb-1 text-muted small fw-bold">CATEGORY</p>
                                     <p class="mb-0"><?= htmlspecialchars($complaint['category_name']) ?></p>
                                 </div>
                                 <div class="col-sm-6">
-                                    <p class="mb-1 text-muted small fw-bold">PRIORITY</p>
-                                    <span class="badge <?= $priClass ?>"><?= ucfirst($complaint['priority']) ?></span>
-                                </div>
-                                <div class="col-sm-6">
-                                    <p class="mb-1 text-muted small fw-bold">SUBMITTED ON</p>
-                                    <p class="mb-0"><?= date('d M Y, H:i', strtotime($complaint['created_at'])) ?></p>
+                                    <p class="mb-1 text-muted small fw-bold">SUBCATEGORY</p>
+                                    <p class="mb-0"><?= htmlspecialchars($complaint['subcategory_name'] ?? '-') ?></p>
                                 </div>
                             </div>
+                        </div>
 
-                            <p class="mb-1 text-muted small fw-bold">DESCRIPTION</p>
-                            <div class="p-4 rounded"style="background:#f8f9fa;white-space:pre-wrap;line-height:1.7;">
-                                <?= htmlspecialchars($complaint['complaint_description']) ?>
+                        <!-- Description card -->
+                        <div class="container-card shadow-sm">
+                            <h5 class="fw-bold mb-3" style="color:var(--udsm-blue);">
+                                <i class="fas fa-align-left me-2"></i>Description
+                            </h5>
+                            <div class="p-4 rounded" style="background:#f8f9fa;overflow-wrap:anywhere;word-break:break-word;line-height:1.7;">
+                                <?= nl2br(htmlspecialchars(trim($complaint['complaint_description']))) ?>
                             </div>
                         </div>
                     </div>
 
                     <!-- Endorsement panel -->
                     <div class="col-lg-4">
-                        <div class="container-card shadow-sm">
+                        <div class="container-card shadow-sm mb-4">
                             <h5 class="fw-bold mb-3" style="color:#6f42c1;">
-                                <i class="fas fa-thumbs-up me-2"></i>Endorsement
+                                <i class="fas fa-thumbs-up me-2"></i>Your Endorsement
                             </h5>
 
                             <?php if ($iEndorsed): ?>
@@ -197,12 +229,24 @@ $priClass = $priorityMap[$complaint['priority']] ?? 'bg-secondary';
                                     <i class="fas fa-check-circle me-1"></i>
                                     You have endorsed this complaint.
                                 </div>
-                                <form method="POST">
-                                    <input type="hidden" name="action" value="remove_endorsement">
-                                    <button type="submit" class="btn btn-outline-danger w-100">
-                                        <i class="fas fa-times me-1"></i>Remove My Endorsement
-                                    </button>
-                                </form>
+                                <?php if ($isFinalized): ?>
+                                    <p class="text-muted small mb-0">
+                                        <i class="fas fa-lock me-1"></i>
+                                        This complaint has been <?= htmlspecialchars($complaint['complaint_status']) ?> and can no longer be changed.
+                                    </p>
+                                <?php else: ?>
+                                    <form method="POST">
+                                        <input type="hidden" name="action" value="remove_endorsement">
+                                        <button type="submit" class="btn btn-outline-danger w-100">
+                                            <i class="fas fa-times me-1"></i>Remove My Endorsement
+                                        </button>
+                                    </form>
+                                <?php endif; ?>
+                            <?php elseif ($isFinalized): ?>
+                                <p class="text-muted small mb-0">
+                                    <i class="fas fa-lock me-1"></i>
+                                    This complaint has already been <?= htmlspecialchars($complaint['complaint_status']) ?> and can no longer be endorsed.
+                                </p>
                             <?php else: ?>
                                 <p class="text-muted small mb-3">
                                     Endorsing a complaint signals to administrators that this issue is important
@@ -221,12 +265,16 @@ $priClass = $priorityMap[$complaint['priority']] ?? 'bg-secondary';
                                     </button>
                                 </form>
                             <?php endif; ?>
+                        </div>
 
+                        <!-- All endorsements card -->
+                        <div class="container-card shadow-sm mb-4">
+                            <h6 class="fw-bold mb-3">
+                                <i class="fas fa-users me-2"></i>All Endorsements (<?= count($endorsements) ?>)
+                            </h6>
                             <?php if (!empty($endorsements)): ?>
-                                <hr>
-                                <h6 class="fw-bold mb-3">All Endorsements (<?= count($endorsements) ?>)</h6>
                                 <?php foreach ($endorsements as $e): ?>
-                                    <div class="border rounded p-2 mb-2 bg-light">
+                                    <div class="p-2 mb-2" style="border-left:4px solid #6f42c1;background:#f8f7fd;border-radius:4px;">
                                         <div class="d-flex justify-content-between">
                                             <span class="fw-bold small"><?= htmlspecialchars($e['leader_name']) ?></span>
                                             <span class="text-muted" style="font-size:0.75rem;">
@@ -234,18 +282,18 @@ $priClass = $priorityMap[$complaint['priority']] ?? 'bg-secondary';
                                             </span>
                                         </div>
                                         <?php if (!empty($e['note'])): ?>
-                                            <p class="mb-0 small mt-1 text-muted"><?= htmlspecialchars($e['note']) ?></p>
+                                            <p class="mb-0 small mt-1 text-muted"><?= nl2br(htmlspecialchars($e['note'])) ?></p>
                                         <?php endif; ?>
                                     </div>
                                 <?php endforeach; ?>
+                            <?php else: ?>
+                                <p class="text-muted small mb-0">No leader has endorsed this complaint yet.</p>
                             <?php endif; ?>
                         </div>
 
-                        <div class="mt-3">
-                            <a href="leader_complaints.php" class="btn btn-outline-secondary w-100">
-                                <i class="fas fa-arrow-left me-1"></i>Back to Complaints
-                            </a>
-                        </div>
+                        <a href="leader_complaints.php" class="btn btn-outline-secondary w-100">
+                            <i class="fas fa-arrow-left me-1"></i>Back to Complaints
+                        </a>
                     </div>
                 </div>
 

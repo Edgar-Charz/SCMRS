@@ -79,7 +79,6 @@ CREATE TABLE `complaints` (
   `category_id` int(11) NOT NULL,
   `subcategory_id` int(11) DEFAULT NULL,
   `department_id` int(11) DEFAULT NULL,
-  `assigned_staff_id` varchar(20) DEFAULT NULL,
   `preferred_staff_id` varchar(20) DEFAULT NULL,
   `complaint_title` varchar(200) NOT NULL,
   `complaint_description` text NOT NULL,
@@ -105,7 +104,7 @@ CREATE TABLE `complaint_assignments` (
   `assignment_id` int(11) NOT NULL,
   `complaint_id` int(11) NOT NULL,
   `staff_id` varchar(20) NOT NULL,
-  `assigned_by` int(11) NOT NULL COMMENT 'users.user_id of admin or escalating staff',
+  `assigned_by` int(11) DEFAULT NULL COMMENT 'users.user_id of admin or escalating staff; NULL = auto-assigned by the system',
   `is_lead` tinyint(1) DEFAULT 1 COMMENT '1=primary handler for this complaint',
   `status` enum('active','forwarded','completed','rejected') NOT NULL DEFAULT 'active',
   `rejection_reason` text DEFAULT NULL,
@@ -144,6 +143,7 @@ CREATE TABLE `complaint_categories` (
   `category_name` varchar(150) NOT NULL,
   `category_description` text DEFAULT NULL,
   `requires_department_selection` tinyint(1) DEFAULT 0,
+  `leader_endorsable` tinyint(1) NOT NULL DEFAULT 0,
   `auto_assign_department_id` int(11) DEFAULT NULL,
   `default_role_id` int(11) DEFAULT NULL,
   `created_by` int(11) DEFAULT NULL,
@@ -241,6 +241,7 @@ CREATE TABLE `complaint_subcategories` (
   `category_id` int(11) NOT NULL,
   `subcategory_name` varchar(150) NOT NULL,
   `subcategory_description` text DEFAULT NULL,
+  `leader_endorsable` tinyint(1) NOT NULL DEFAULT 0,
   `status` enum('active','inactive') DEFAULT 'active',
   `default_role_id` int(11) DEFAULT NULL,
   `created_by` int(11) DEFAULT NULL,
@@ -320,7 +321,7 @@ CREATE TABLE `notifications` (
   `user_id` int(11) NOT NULL,
   `complaint_id` int(11) DEFAULT NULL,
   `message` varchar(255) NOT NULL,
-  `type` enum('status_change','new_assignment','request_info','new_complaint','new_registration','staff_approved','info_responded','complaint_rejected','complaint_resolved','staff_rejected','complaint_deleted') NOT NULL DEFAULT 'status_change',
+  `type` enum('status_change','new_assignment','request_info','new_complaint','new_registration','staff_approved','info_responded','complaint_rejected','complaint_resolved','staff_rejected','complaint_deleted','complaint_reopened','complaint_delegated','complaint_delegated_resolved','complaint_overdue','new_complaint_in_rep_scope','endorsed_complaint_updated','system','password_reset_admin') NOT NULL DEFAULT 'status_change',
   `link` varchar(255) DEFAULT NULL,
   `is_read` tinyint(1) DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
@@ -355,18 +356,6 @@ CREATE TABLE `staffs` (
   `staff_approval_status` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Unapproved, 1=Approved, 2=Disapproved',
   `staff_approved_by` int(11) DEFAULT NULL,
   `staff_approved_at` datetime DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `staff_departments`
---
-
-CREATE TABLE `staff_departments` (
-  `id` int(11) NOT NULL,
-  `staff_id` varchar(20) NOT NULL,
-  `department_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -408,6 +397,34 @@ CREATE TABLE `student_rep_departments` (
   `department_id` int(11) NOT NULL,
   `assigned_by` int(11) NOT NULL,
   `assigned_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `system_settings`
+--
+
+CREATE TABLE `system_settings` (
+  `id` int(11) NOT NULL DEFAULT 1,
+  `smtp_host` varchar(150) NOT NULL DEFAULT 'localhost',
+  `smtp_port` int(11) NOT NULL DEFAULT 1025,
+  `smtp_username` varchar(150) DEFAULT NULL,
+  `smtp_password` varchar(255) DEFAULT NULL,
+  `smtp_encryption` varchar(10) DEFAULT NULL,
+  `from_email` varchar(150) NOT NULL DEFAULT 'noreply@scmrs.udsm.ac.tz',
+  `from_name` varchar(150) NOT NULL DEFAULT 'UDSM SCMRS',
+  `app_url` varchar(255) NOT NULL DEFAULT 'http://localhost/scmrs',
+  `email_max_attempts` int(11) NOT NULL DEFAULT 3,
+  `email_batch_size` int(11) NOT NULL DEFAULT 10,
+  `sla_high_days` int(11) NOT NULL DEFAULT 2,
+  `sla_medium_days` int(11) NOT NULL DEFAULT 5,
+  `sla_low_days` int(11) NOT NULL DEFAULT 10,
+  `institution_name` varchar(150) NOT NULL DEFAULT 'UDSM',
+  `institution_logo_path` varchar(255) DEFAULT 'assets/img/logo.png',
+  `institution_contact_email` varchar(150) DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
+  `updated_by` int(11) DEFAULT NULL COMMENT 'users.user_id of admin who last saved settings; no FK on purpose'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -465,7 +482,6 @@ ALTER TABLE `complaints`
   ADD KEY `category_id` (`category_id`),
   ADD KEY `subcategory_id` (`subcategory_id`),
   ADD KEY `department_id` (`department_id`),
-  ADD KEY `assigned_staff_id` (`assigned_staff_id`),
   ADD KEY `preferred_staff_id` (`preferred_staff_id`);
 
 --
@@ -599,14 +615,6 @@ ALTER TABLE `staffs`
   ADD KEY `staff_approved_by` (`staff_approved_by`);
 
 --
--- Indexes for table `staff_departments`
---
-ALTER TABLE `staff_departments`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `staff_id` (`staff_id`),
-  ADD KEY `department_id` (`department_id`);
-
---
 -- Indexes for table `staff_roles`
 --
 ALTER TABLE `staff_roles`
@@ -629,6 +637,12 @@ ALTER TABLE `student_rep_departments`
   ADD UNIQUE KEY `uq_rep_dept` (`user_id`,`department_id`),
   ADD KEY `department_id` (`department_id`),
   ADD KEY `assigned_by` (`assigned_by`);
+
+--
+-- Indexes for table `system_settings`
+--
+ALTER TABLE `system_settings`
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `users`
@@ -756,12 +770,6 @@ ALTER TABLE `password_resets`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `staff_departments`
---
-ALTER TABLE `staff_departments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
 -- AUTO_INCREMENT for table `staff_roles`
 --
 ALTER TABLE `staff_roles`
@@ -806,7 +814,6 @@ ALTER TABLE `collaboration_notes`
 -- Constraints for table `complaints`
 --
 ALTER TABLE `complaints`
-  ADD CONSTRAINT `complaints_ibfk_1` FOREIGN KEY (`assigned_staff_id`) REFERENCES `staffs` (`staff_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `complaints_ibfk_2` FOREIGN KEY (`category_id`) REFERENCES `complaint_categories` (`category_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `complaints_ibfk_3` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `complaints_ibfk_4` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`) ON DELETE CASCADE ON UPDATE CASCADE,
@@ -834,6 +841,13 @@ ALTER TABLE `complaint_attachments`
 ALTER TABLE `complaint_categories`
   ADD CONSTRAINT `complaint_categories_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_category_default_role` FOREIGN KEY (`default_role_id`) REFERENCES `staff_roles` (`role_id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+--
+-- Constraints for table `complaint_endorsements`
+--
+ALTER TABLE `complaint_endorsements`
+  ADD CONSTRAINT `fk_endorsement_complaint` FOREIGN KEY (`complaint_id`) REFERENCES `complaints` (`complaint_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_endorsement_leader` FOREIGN KEY (`leader_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Constraints for table `complaint_escalations`
@@ -900,13 +914,6 @@ ALTER TABLE `staffs`
   ADD CONSTRAINT `staffs_ibfk_2` FOREIGN KEY (`staff_department_id`) REFERENCES `departments` (`department_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `staffs_ibfk_3` FOREIGN KEY (`staff_user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `staffs_ibfk_4` FOREIGN KEY (`staff_role_id`) REFERENCES `staff_roles` (`role_id`) ON DELETE CASCADE ON UPDATE CASCADE;
-
---
--- Constraints for table `staff_departments`
---
-ALTER TABLE `staff_departments`
-  ADD CONSTRAINT `staff_departments_ibfk_1` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `staff_departments_ibfk_2` FOREIGN KEY (`staff_id`) REFERENCES `staffs` (`staff_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Constraints for table `students`

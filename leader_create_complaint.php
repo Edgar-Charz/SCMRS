@@ -10,19 +10,22 @@ $userId = (int)$_SESSION['user_id'];
 
 require_once 'config/Database.php';
 require_once 'classes/StudentLeader.php';
-require_once 'classes/Category.php';
 require_once 'classes/Complaint.php';
+require_once 'classes/Department.php';
 require_once 'classes/Notification.php';
 require_once 'includes/csrf.php';
 
-$db       = new Database();
-$conn     = $db->connect();
-$leader   = new StudentLeader($conn, $userId);
-$category = new Category($conn);
+$db        = new Database();
+$conn      = $db->connect();
+$leader    = new StudentLeader($conn, $userId);
 $complaint = new Complaint($conn);
+$department = new Department($conn);
 
-$depts      = $leader->getDepartments();
-$categories = $category->getCategories();
+// This form is for a leader's own complaint (they're a student too) and is unrelated
+// to which department(s) they represent as a leader - so, like any student, they can
+// pick from every department, and only when the chosen category calls for it.
+$categories = $complaint->getComplaintCategories();
+$departments = $department->getDepartments();
 $studentId  = $leader->getStudentId();
 
 $message = $error = '';
@@ -42,14 +45,23 @@ if (isset($_POST['submitComplaintBTN'])) {
         $preferred_staff_id = trim($_POST['preferred_staff_id'] ?? '');
         $is_anonymous   = isset($_POST['is_anonymous']) ? 1 : 0;
 
-        // Restrict to assigned departments only
-        $allowedDeptIds = array_column($depts, 'department_id');
-        if ($department_id && !in_array($department_id, $allowedDeptIds)) {
-            throw new Exception("You can only submit complaints for your assigned department(s).");
+        $categoryMeta = $category_id ? $complaint->getCategoryRoutingMeta($category_id) : null;
+        if (!$categoryMeta) {
+            throw new Exception("Please select a valid category.");
+        }
+
+        $requiresDeptSelection = (int) $categoryMeta['requires_department_selection'] === 1;
+        if ($requiresDeptSelection) {
+            if (empty($department_id)) {
+                throw new Exception("Please select your department for this category.");
+            }
+            $effectiveDepartmentId = $department_id;
+        } else {
+            $effectiveDepartmentId = $categoryMeta['auto_assign_department_id'];
         }
 
         $newComplaintId = $complaint->createComplaint(
-            $title, $description, $category_id, $department_id,
+            $title, $description, $category_id, $effectiveDepartmentId,
             $is_anonymous, $studentId, $userId, $subcategory_id
         );
 
@@ -159,7 +171,8 @@ if (isset($_SESSION['message'])) {
                                     <option value="" selected disabled>--- Choose Category ---</option>
                                     <?php if ($categories): ?>
                                         <?php while ($cat_row = $categories->fetch_assoc()): ?>
-                                            <option value="<?= $cat_row['category_id'] ?>">
+                                            <option value="<?= $cat_row['category_id'] ?>"
+                                                data-requires-dept="<?= (int) $cat_row['requires_department_selection'] ?>">
                                                 <?= htmlspecialchars($cat_row['category_name']) ?>
                                             </option>
                                         <?php endwhile; ?>
@@ -175,28 +188,21 @@ if (isset($_SESSION['message'])) {
                                 </select>
                             </div>
 
-                            <div class="col-12 col-md-6 mb-2">
+                            <div class="col-12 col-md-6 mb-2" id="departmentFieldWrap" style="display:none;">
                                 <label class="form-label fw-bold">Department <span class="text-danger">*</span></label>
-                                <?php if (empty($depts)): ?>
-                                    <div class="alert alert-warning py-2 mb-0">
-                                        <i class="fas fa-exclamation-triangle me-1"></i>
-                                        No departments assigned. Contact an administrator.
-                                    </div>
-                                    <input type="hidden" name="department_id" value="">
-                                <?php else: ?>
-                                    <select class="form-select p-3 shadow-sm" name="department_id" id="department_id"
-                                        style="border-radius:10px;border:1px solid #e0e6ed;" required>
-                                        <option value="" selected disabled>--- Select Department ---</option>
-                                        <?php foreach ($depts as $dept): ?>
-                                            <option value="<?= $dept['department_id'] ?>">
-                                                <?= htmlspecialchars($dept['department_name']) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <small class="form-hint">
-                                        <i class="fas fa-info-circle"></i> Only your assigned department(s) are shown.
-                                    </small>
-                                <?php endif; ?>
+                                <select class="form-select p-3 shadow-sm" name="department_id" id="department_id"
+                                    style="border-radius:10px;border:1px solid #e0e6ed;">
+                                    <option value="" selected disabled>--- Select Department ---</option>
+                                    <?php foreach ($departments as $dept): ?>
+                                        <option value="<?= $dept['department_id'] ?>">
+                                            <?= htmlspecialchars($dept['department_name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="form-hint">
+                                    <i class="fas fa-info-circle"></i> This category requires your department to route
+                                    the complaint to the right staff member.
+                                </small>
                             </div>
 
                             <div class="col-12 col-md-6 mb-2">
@@ -209,7 +215,7 @@ if (isset($_SESSION['message'])) {
                                     <option value="">--- Select department first ---</option>
                                 </select>
                                 <small class="form-hint">
-                                    <i class="fas fa-info-circle"></i> This is a suggestion only — the final assignment is made by an administrator.
+                                    <i class="fas fa-info-circle"></i> This is a suggestion only - the final assignment is made by an administrator.
                                 </small>
                             </div>
                         </div>
@@ -234,7 +240,7 @@ if (isset($_SESSION['message'])) {
                                 accept=".pdf,.jpg,.jpeg,.png" class="form-control p-3 shadow-sm"
                                 style="border-radius:10px;border:1px solid #e0e6ed;">
                             <small class="form-hint">
-                                <i class="fas fa-info-circle"></i> PDF, JPG, JPEG, PNG — max 5 MB each.
+                                <i class="fas fa-info-circle"></i> PDF, JPG, JPEG, PNG - max 5 MB each.
                             </small>
                             <div id="fileList" style="margin-top:10px;"></div>
                         </div>
@@ -259,8 +265,7 @@ if (isset($_SESSION['message'])) {
                     <div class="d-rigid gap-2 text-center">
                         <button type="submit" name="submitComplaintBTN"
                             class="btn btn-primary p-3 fw-bold mb-2"
-                            style="border-radius:10px;background-color:var(--udsm-blue);width:70%;"
-                            <?= empty($depts) ? 'disabled' : '' ?>>
+                            style="border-radius:10px;background-color:var(--udsm-blue);width:70%;">
                             Submit Complaint
                         </button>
                         <a href="leader_dashboard.php" class="btn btn-danger p-3 fw-bold mb-2"
@@ -336,11 +341,11 @@ if (isset($_SESSION['message'])) {
                 Array.from(this.files).forEach(file => {
                     const ext = '.' + file.name.split('.').pop().toLowerCase();
                     if (!ALLOWED_EXT.includes(ext) || !ALLOWED_MIME.includes(file.type)) {
-                        errors.push(`"${file.name}" — invalid format.`);
+                        errors.push(`"${file.name}" - invalid format.`);
                         return;
                     }
                     if (file.size > MAX_SIZE) {
-                        errors.push(`"${file.name}" — exceeds 5 MB.`);
+                        errors.push(`"${file.name}" - exceeds 5 MB.`);
                         return;
                     }
                     if (!selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
@@ -361,16 +366,27 @@ if (isset($_SESSION['message'])) {
     <script>
         $(function () {
             // Subcategory loader
-            const $cat    = $('#category_id');
-            const $subcat = $('#subcategory_id');
+            const $cat     = $('#category_id');
+            const $subcat  = $('#subcategory_id');
+            const $deptWrap = $('#departmentFieldWrap');
+            const $deptSelect = $('#department_id');
 
             function resetSubcat(msg) {
                 $subcat.prop('disabled', true).html(`<option value="" disabled selected>${msg}</option>`);
             }
             resetSubcat('--- Choose category first ---');
 
+            function toggleDepartmentField(selectEl) {
+                const selectedOpt = selectEl.options[selectEl.selectedIndex];
+                const requiresDept = !!(selectedOpt && selectedOpt.dataset.requiresDept === '1');
+                $deptWrap.toggle(requiresDept);
+                $deptSelect.prop('required', requiresDept);
+                if (!requiresDept) $deptSelect.val('');
+            }
+
             $cat.on('change', function () {
                 const catId = $(this).val();
+                toggleDepartmentField(this);
                 if (!catId) { resetSubcat('--- Choose category first ---'); return; }
                 resetSubcat('Loading...');
                 $.getJSON('ajax/get_subcategories.php', { category_id: catId })
@@ -386,7 +402,7 @@ if (isset($_SESSION['message'])) {
                     .fail(function () { resetSubcat('--- Failed to load ---'); });
             });
 
-            // Staff loader — loads staff based on selected department
+            // Staff loader - loads staff based on selected department
             const $dept   = $('#department_id');
             const $staff  = $('#preferred_staff_id');
 
