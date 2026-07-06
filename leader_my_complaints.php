@@ -45,7 +45,7 @@ if (isset($_SESSION['message_error'])) {
 
 $filter     = $_GET['filter'] ?? 'all';
 $counts     = $leader->getMyComplaintCounts();
-$complaints = $leader->getMyComplaints(); // always all; JS handles tab filtering
+$complaints = $leader->getMyComplaints(); 
 
 $statusMap = [
     STATUS_PENDING           => ['bg-warning text-dark',  'Pending'],

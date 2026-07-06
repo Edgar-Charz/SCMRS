@@ -82,7 +82,7 @@ if (isset($_SESSION['message_error'])) {
                     <p class="mb-0 opacity-75">
                         Representing:
                         <?php if (empty($depts)): ?>
-                            <em>No departments assigned yet — contact an administrator.</em>
+                            <strong><i class="fas fa-crown me-1"></i>All Departments (Senior Leader)</strong>
                         <?php else: ?>
                             <strong><?= htmlspecialchars(implode(', ', array_column($depts, 'department_name'))) ?></strong>
                         <?php endif; ?>
@@ -228,7 +228,7 @@ if (isset($_SESSION['message_error'])) {
                     <h4 class="mb-1 fw-bold"><i class="fas fa-file-invoice me-2"></i>Recent Department Complaints</h4>
                     <p class="text-muted small mb-3">Latest complaints submitted in your department(s)</p>
                     <div class="table-responsive">
-                        <table class="table table-stripped">
+                        <table class="table table-striped">
                             <thead class="table-light">
                                 <tr>
                                     <th>#</th>

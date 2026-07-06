@@ -22,11 +22,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $cid  = (int)($_POST['complaint_id'] ?? 0);
     $note = trim($_POST['note'] ?? '');
     if ($cid > 0) {
-        if ($_POST['action'] === 'endorse') {
+        if ($leader->isComplaintFinalized($cid)) {
+            $_SESSION['message_error'] = "This complaint has already been resolved or rejected and can no longer be endorsed.";
+        } elseif ($_POST['action'] === 'endorse') {
             if ($leader->endorse($cid, $note)) {
                 $_SESSION['message'] = "Complaint endorsed successfully.";
             } else {
-                $_SESSION['message_error'] = "Could not endorse — you may have already endorsed this complaint.";
+                $_SESSION['message_error'] = "Could not endorse - you may have already endorsed this complaint.";
             }
         } elseif ($_POST['action'] === 'remove_endorsement') {
             $leader->removeEndorsement($cid);
@@ -97,7 +99,7 @@ $depts      = $leader->getDepartments();
                     </ol>
                 </nav>
 
-                <!-- ── Filter Card ──────────────────────────────────────── -->
+                <!-- Filter Card -->
                 <div class="container-card shadow-sm">
                     <div class="row g-2 align-items-end">
                         <div class="col-12 col-sm-6 col-md-4 col-lg-2">
@@ -149,7 +151,7 @@ $depts      = $leader->getDepartments();
                     </div>
                 </div>
 
-                <!-- ── Table Card ───────────────────────────────────────── -->
+                <!-- Table Card -->
                 <div class="container-card shadow-sm">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <div>
@@ -159,7 +161,7 @@ $depts      = $leader->getDepartments();
                             <p class="text-muted small mb-0">
                                 Complaints from:
                                 <?= empty($depts)
-                                    ? '<em>No departments assigned</em>'
+                                    ? '<span class="fw-bold" style="color:#b8860b;"><i class="fas fa-crown me-1"></i>All Departments (Senior Leader)</span>'
                                     : htmlspecialchars(implode(', ', array_column($depts, 'department_name'))) ?>
                             </p>
                         </div>
@@ -167,7 +169,7 @@ $depts      = $leader->getDepartments();
                     </div>
 
                     <div class="table-responsive">
-                        <table id="complaintsTable" class="table table-stripped">
+                        <table id="complaintsTable" class="table table-striped">
                             <thead class="table-light">
                                 <tr>
                                     <th>#</th>
@@ -199,6 +201,7 @@ $depts      = $leader->getDepartments();
                                     [$sc, $sl] = $statusMap[$c['complaint_status']] ?? ['bg-secondary text-white', ucfirst($c['complaint_status'])];
                                     $priorityMap = ['low' => 'bg-success', 'medium' => 'bg-warning text-dark', 'high' => 'bg-danger'];
                                     $priClass = $priorityMap[$c['priority']] ?? 'bg-secondary';
+                                    $isFinalized = in_array($c['complaint_status'], [STATUS_RESOLVED, STATUS_REJECTED], true);
                                     ?>
                                     <tr data-status="<?= htmlspecialchars($c['complaint_status']) ?>"
                                         data-priority="<?= htmlspecialchars($c['priority']) ?>"
@@ -229,7 +232,13 @@ $depts      = $leader->getDepartments();
                                                    class="btn btn-status btn-outline-secondary" title="View Details">
                                                     <i class="fas fa-eye text-dark"></i>
                                                 </a>
-                                                <?php if ($c['i_endorsed']): ?>
+                                                <?php if ($c['i_endorsed'] && $isFinalized): ?>
+                                                    <button type="button" class="btn btn-status btn-outline-secondary" disabled
+                                                            title="Endorsed - complaint is <?= htmlspecialchars($c['complaint_status']) ?>, can no longer be changed"
+                                                            style="background-color:#6f42c1;border-color:#6f42c1;opacity:.65;">
+                                                        <i class="fas fa-lock text-white"></i>
+                                                    </button>
+                                                <?php elseif ($c['i_endorsed']): ?>
                                                     <form method="POST" style="display:inline;">
                                                         <input type="hidden" name="action" value="remove_endorsement">
                                                         <input type="hidden" name="complaint_id" value="<?= $c['complaint_id'] ?>">
@@ -241,6 +250,11 @@ $depts      = $leader->getDepartments();
                                                             <i class="fas fa-thumbs-up text-white"></i>
                                                         </button>
                                                     </form>
+                                                <?php elseif ($isFinalized): ?>
+                                                    <button type="button" class="btn btn-status btn-outline-secondary" disabled
+                                                            title="Complaint is already <?= htmlspecialchars($c['complaint_status']) ?>, can no longer be endorsed">
+                                                        <i class="fas fa-lock text-muted"></i>
+                                                    </button>
                                                 <?php else: ?>
                                                     <button type="button"
                                                             class="btn btn-status btn-outline-secondary"
