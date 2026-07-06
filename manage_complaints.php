@@ -166,6 +166,7 @@ function statusBadge($status)
         STATUS_RESOLVED => ['bg-success text-white', 'Resolved'],
         STATUS_REJECTED => ['bg-danger text-white',  'Rejected'],
         STATUS_REOPENED => ['bg-warning text-white',  'Reopened'],
+        'on_hold'       => ['bg-secondary text-white', 'On Hold'],
     ];
     [$class, $label] = $map[$status] ?? ['bg-secondary text-white', ucfirst(str_replace('_', ' ', $status))];
     return "<span class=\"badge $class\">$label</span>";
@@ -244,7 +245,7 @@ function statusBadge($status)
                 <nav aria-label="breadcrumb" class="d-flex justify-content-between align-items-center mb-3">
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item">
-                            <a href="admin_dashboard.php"><i class="fas fa-home" style="color: black;"></i></a>
+                            <a href="admin_dashboard.php"><i class="fas fa-file-invoice" style="color: black;"></i></a>
                         </li>
                         <li class="breadcrumb-item"><a href="admin_dashboard.php" style="color:black;">Admin</a></li>
                         <li class="breadcrumb-item active">Manage Complaints</li>
@@ -267,7 +268,7 @@ function statusBadge($status)
                     </button>
                 </div>
 
-                <!-- ── Filter Card ──────────────────────────────────────── -->
+                <!-- Filter Card -->
                 <div class="container-card shadow-sm">
                     <div class="row g-2 align-items-end">
                         <div class="col-12 col-sm-6 col-md-4 col-lg-2">
@@ -276,10 +277,11 @@ function statusBadge($status)
                                 <option value="">All Statuses</option>
                                 <option value="pending">Pending</option>
                                 <option value="in_progress">In Progress</option>
-                                <option value="awaiting_response">Awaiting Response</option>
+                                <option value="awaiting_student_response">Awaiting Response</option>
                                 <option value="resolved">Resolved</option>
                                 <option value="rejected">Rejected</option>
                                 <option value="reopened">Reopened</option>
+                                <option value="on_hold">On Hold</option>
                                 <option value="overdue">Overdue</option>
                             </select>
                         </div>
@@ -326,7 +328,7 @@ function statusBadge($status)
                     </div>
                 </div>
 
-                <!-- ── Table Card ───────────────────────────────────────── -->
+                <!-- Table Card -->
                 <div class="container-card shadow-sm">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="mb-0 fw-bold"><i class="fas fa-file-invoice me-2"></i>Student Complaints</h4>
@@ -507,7 +509,7 @@ function statusBadge($status)
                                 <span class="badge bg-info text-white ms-1" id="autoDeptBadge" style="display:none;font-size:0.7rem;">Auto-suggested</span>
                             </label>
                             <select id="assignDeptFilter" class="form-select">
-                                <option value="0">— All Departments —</option>
+                                <option value="0">- All Departments -</option>
                                 <?php foreach ($departments as $dept): ?>
                                     <option value="<?= $dept['department_id'] ?>">
                                         <?= htmlspecialchars($dept['department_name']) ?>
@@ -527,7 +529,7 @@ function statusBadge($status)
                                     <option value="<?= $s['staff_id'] ?>"
                                         data-dept="<?= (int)($s['staff_department_id'] ?? 0) ?>">
                                         <?= htmlspecialchars($s['username']) ?>
-                                        <?= $s['department_name'] ? ' — ' . htmlspecialchars($s['department_name']) : '' ?>
+                                        <?= $s['department_name'] ? ' - ' . htmlspecialchars($s['department_name']) : '' ?>
                                         <?= $s['role_name'] ? ' (' . htmlspecialchars($s['role_name']) . ')' : '' ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -589,7 +591,7 @@ function statusBadge($status)
                         <div class="mb-3">
                             <label class="form-label fw-bold">Filter by Department</label>
                             <select id="bulkDeptFilter" class="form-select">
-                                <option value="0">— All Departments —</option>
+                                <option value="0">- All Departments -</option>
                                 <?php foreach ($departments as $dept): ?>
                                     <option value="<?= $dept['department_id'] ?>">
                                         <?= htmlspecialchars($dept['department_name']) ?>
@@ -606,7 +608,7 @@ function statusBadge($status)
                                     <option value="<?= $s['staff_id'] ?>"
                                         data-dept="<?= (int)($s['staff_department_id'] ?? 0) ?>">
                                         <?= htmlspecialchars($s['username']) ?>
-                                        <?= $s['department_name'] ? ' — ' . htmlspecialchars($s['department_name']) : '' ?>
+                                        <?= $s['department_name'] ? ' - ' . htmlspecialchars($s['department_name']) : '' ?>
                                         <?= $s['role_name'] ? ' (' . htmlspecialchars($s['role_name']) . ')' : '' ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -639,7 +641,7 @@ function statusBadge($status)
         </div>
     </div>
 
-    <!-- Single: Hidden delete form -->
+    <!-- Hidden delete form -->
     <form id="deleteForm" method="POST" action="manage_complaints.php">
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="delete">
@@ -647,7 +649,7 @@ function statusBadge($status)
         <input type="hidden" name="delete_reason" id="deleteReason">
     </form>
 
-    <!-- Single: Delete Reason Modal -->
+    <!-- Delete Reason Modal -->
     <div class="modal fade" id="deleteReasonModal" tabindex="-1" aria-labelledby="deleteReasonModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg rounded-3">
@@ -693,7 +695,7 @@ function statusBadge($status)
                     <div class="modal-body">
                         <p class="text-muted mb-2">
                             Deleting <strong id="bulkDeleteCount">0</strong> complaint(s).
-                            Only <em>pending</em> complaints can be deleted — others will be skipped.
+                            Only <em>pending</em> complaints can be deleted - others will be skipped.
                         </p>
                         <label class="form-label fw-semibold">Reason <span class="text-danger">*</span></label>
                         <textarea name="delete_reason" id="bulkDeleteReason" class="form-control" rows="3"

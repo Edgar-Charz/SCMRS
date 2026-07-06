@@ -14,8 +14,15 @@ $db = new Database();
 $conn = $db->connect();
 $admin = new Admin($conn);
 
-$logs  = $admin->getActivityLogs(1, 99999, null, null, null);
-$total = count($logs);
+$perPage     = 100;
+$currentPage = max(1, (int)($_GET['page'] ?? 1));
+$filterAction = $_GET['filter_action'] ?? null;
+$filterFrom   = $_GET['filter_from'] ?? null;
+$filterTo     = $_GET['filter_to'] ?? null;
+
+$logs  = $admin->getActivityLogs($currentPage, $perPage, $filterAction ?: null, $filterFrom ?: null, $filterTo ?: null);
+$total = $admin->getActivityLogsCount($filterAction ?: null, $filterFrom ?: null, $filterTo ?: null);
+$totalPages = max(1, (int)ceil($total / $perPage));
 
 // Human-readable labels and badge colours for each action type
 $actionMeta = [
@@ -53,7 +60,7 @@ function actionBadge(string $action, array $meta): string
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audit Log — Admin</title>
+    <title>Audit Log | Admin</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
     <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
@@ -88,7 +95,7 @@ function actionBadge(string $action, array $meta): string
                 <nav aria-label="breadcrumb" class="d-flex justify-content-between align-items-center p-2 mb-3">
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item">
-                            <a href="admin_dashboard.php"><i class="fas fa-chart-pie" style="color:black;"></i></a>
+                            <a href="admin_dashboard.php"><i class="fas fa-clipboard-list" style="color:black;"></i></a>
                         </li>
                         <li class="breadcrumb-item"><a href="admin_dashboard.php" style="color:black;">Admin</a></li>
                         <li class="breadcrumb-item active">Audit Log</li>
@@ -175,16 +182,16 @@ function actionBadge(string $action, array $meta): string
                                                 <span class="fw-semibold"><?= htmlspecialchars($log['admin_name']) ?></span>
                                             </td>
                                             <td>
-                                                <span class="fw-semibold"><?= htmlspecialchars($log['target_name'] ?? '—') ?></span>
+                                                <span class="fw-semibold"><?= htmlspecialchars($log['target_name'] ?? '-') ?></span>
                                                 <?php if ($log['target_id']): ?>
                                                     <small class="text-muted d-block">#<?= $log['target_id'] ?></small>
                                                 <?php endif; ?>
                                             </td>
                                             <td style="font-size:.85rem; color:#555; max-width:280px;">
-                                                <?= htmlspecialchars($log['details'] ?? '—') ?>
+                                                <?= htmlspecialchars($log['details'] ?? '-') ?>
                                             </td>
                                             <td style="font-size:.8rem; color:#777; font-family:monospace;">
-                                                <?= htmlspecialchars($log['ip_address'] ?? '—') ?>
+                                                <?= htmlspecialchars($log['ip_address'] ?? '-') ?>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -192,6 +199,36 @@ function actionBadge(string $action, array $meta): string
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Pagination -->
+                    <?php if ($totalPages > 1): ?>
+                    <nav class="mt-3">
+                        <ul class="pagination pagination-sm justify-content-center flex-wrap">
+                            <?php
+                            $qBase = http_build_query(array_filter([
+                                'filter_action' => $filterAction,
+                                'filter_from'   => $filterFrom,
+                                'filter_to'     => $filterTo,
+                            ]));
+                            $qBase = $qBase ? '&' . $qBase : '';
+                            ?>
+                            <li class="page-item <?= $currentPage <= 1 ? 'disabled' : '' ?>">
+                                <a class="page-link" href="?page=<?= $currentPage - 1 . $qBase ?>">‹ Prev</a>
+                            </li>
+                            <?php for ($p = max(1, $currentPage - 2); $p <= min($totalPages, $currentPage + 2); $p++): ?>
+                                <li class="page-item <?= $p === $currentPage ? 'active' : '' ?>">
+                                    <a class="page-link" href="?page=<?= $p . $qBase ?>"><?= $p ?></a>
+                                </li>
+                            <?php endfor; ?>
+                            <li class="page-item <?= $currentPage >= $totalPages ? 'disabled' : '' ?>">
+                                <a class="page-link" href="?page=<?= $currentPage + 1 . $qBase ?>">Next ›</a>
+                            </li>
+                        </ul>
+                        <p class="text-center text-muted small">
+                            Showing page <?= $currentPage ?> of <?= $totalPages ?> (<?= $total ?> total entries)
+                        </p>
+                    </nav>
+                    <?php endif; ?>
                 </div>
 
             </div>

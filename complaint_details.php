@@ -11,10 +11,11 @@ $adminId = $_SESSION['user_id'];
 require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/Admin.php";
+require_once "classes/StudentLeader.php";
 require_once "includes/csrf.php";
- 
+
 $db    = new Database();
-$conn  = $db->connect();  
+$conn  = $db->connect();
 $admin = new Admin($conn);
 
 $message = $error = "";
@@ -57,10 +58,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } elseif ($action === 'add_note') {
+        csrf_verify();
         $noteText = trim($_POST['note_text'] ?? '');
         if (empty($noteText)) {
             $error = "Note cannot be empty.";
         } elseif ($admin->addCollaborationNote($complaintId, $adminId, $noteText)) {
+            $admin->logActivity($adminId, 'note_added', 'complaint', $complaintId, "Complaint #$complaintId", 'Admin added an internal note');
             $_SESSION['message'] = "Note added.";
             header("Location: complaint_details.php?id=$complaintId");
             exit;
@@ -68,12 +71,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = "Failed to add note.";
         }
     } elseif ($action === 'request_info') {
+        csrf_verify();
         $requestMsg = trim($_POST['request_message'] ?? '');
         if (empty($requestMsg)) {
             $error = "Request message cannot be empty.";
         } else {
             try {
                 $admin->requestInformation($complaintId, $adminId, $requestMsg);
+                $admin->logActivity($adminId, 'info_requested', 'complaint', $complaintId, "Complaint #$complaintId", 'Admin requested additional information from student');
                 $_SESSION['message'] = "Information requested from student.";
                 header("Location: complaint_details.php?id=$complaintId");
                 exit;
@@ -91,6 +96,10 @@ if (isset($_SESSION['message'])) {
 
 $attachments  = $admin->getComplaintAttachments($complaintId);
 $notes        = $admin->getCollaborationNotes($complaintId);
+$leaderNotes  = array_filter(
+    (new StudentLeader($conn))->getEndorsementsForComplaint($complaintId),
+    fn($e) => !empty($e['note'])
+);
 $infoRequests = $admin->getInformationRequests($complaintId);
 $statusLogs   = $admin->getComplaintStatusLogs($complaintId);
 $feedback     = $admin->getComplaintFeedback($complaintId);
@@ -111,6 +120,7 @@ function statusBadge($status)
         STATUS_RESOLVED => ['bg-success text-white', 'Resolved'],
         STATUS_REJECTED => ['bg-danger text-white',  'Rejected'],
         STATUS_REOPENED => ['bg-warning text-white',  'Reopened'],
+        'on_hold'       => ['bg-secondary text-white', 'On Hold'],
     ];
     [$class, $label] = $map[$status] ?? ['bg-secondary text-white', ucfirst(str_replace('_', ' ', $status))];
     return "<span class=\"badge $class\">$label</span>";
@@ -196,7 +206,7 @@ $irStatusMap = [
                 <nav aria-label="breadcrumb" class="mb-3">
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item">
-                            <a href="admin_dashboard.php"><i class="fas fa-home" style="color: black;"></i></a>
+                            <a href="admin_dashboard.php"><i class="fas fa-file-invoice" style="color: black;"></i></a>
                         </li>
                         <li class="breadcrumb-item">
                             <a href="admin_dashboard.php" style="color:black;">Admin</a>
@@ -208,7 +218,7 @@ $irStatusMap = [
                     </ol>
                 </nav>
 
-                <!-- ── Complaint Details ───────────────────────────────── -->
+                <!-- Complaint Details -->
                 <div class="container-card shadow-sm">
                     <div class="mb-3" style="border-bottom: 2px solid #e9ecef;">
                         <div class="d-flex justify-content-between align-items-start mb-3">
@@ -262,6 +272,11 @@ $irStatusMap = [
                     <div class="detail-row">
                         <div class="detail-label fw-bold">Category:</div>
                         <div class="detail-value"><?= htmlspecialchars($complaint['category_name']) ?></div>
+                    </div>
+
+                    <div class="detail-row">
+                        <div class="detail-label fw-bold">Sub-Category:</div>
+                        <div class="detail-value"><?= htmlspecialchars($complaint['subcategory_name']) ?></div>
                     </div>
 
                     <div class="detail-row">
@@ -349,7 +364,7 @@ $irStatusMap = [
                     <?php endif; ?>
                 </div>
 
-                <!-- ── Submit Response ───────────────────────────────────── -->
+                <!-- Submit Response -->
                 <?php if (!$isClosed && !$isAssigned): ?>
                 <div id="respond" class="container-card shadow-sm">
                     <h4 class="mb-3 fw-bold"><i class="fas fa-reply me-2"></i>Submit Response</h4>
@@ -395,7 +410,27 @@ $irStatusMap = [
                 </div>
                 <?php endif; ?>
 
-                <!-- ── Collaboration Notes ─────────────────────────────── -->
+                <!-- Leader Endorsements (read-only; only shown when a leader has written a note) -->
+                <?php if (!empty($leaderNotes)): ?>
+                    <div class="container-card shadow-sm">
+                        <h4 class="mb-3 fw-bold">
+                            <i class="fas fa-thumbs-up me-2"></i>Leader Endorsements (<?= count($leaderNotes) ?>)
+                        </h4>
+                        <?php foreach ($leaderNotes as $ln): ?>
+                            <div class="mb-2 p-2 rounded" style="background:#f8f7fd; border-left: 4px solid #6f42c1;">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <strong><?= htmlspecialchars($ln['leader_name']) ?></strong>
+                                    <span class="text-muted" style="font-size:.85rem;">
+                                        <?= date('d M Y, H:i', strtotime($ln['created_at'])) ?>
+                                    </span>
+                                </div>
+                                <div><?= nl2br(htmlspecialchars($ln['note'])) ?></div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+
+                <!-- Collaboration Notes -->
                 <div class="container-card shadow-sm">
                     <div class="mb-3">
                         <h4 class="mb-3 fw-bold">
@@ -421,6 +456,7 @@ $irStatusMap = [
                     <?php endif; ?>
 
                     <form method="POST" action="complaint_details.php?id=<?= $complaintId ?>" class="mt-3">
+                        <?= csrf_field() ?>
                         <input type="hidden" name="action" value="add_note">
                         <div class="mb-3">
                             <label class="form-label fw-bold">Add a Note</label>
@@ -434,7 +470,7 @@ $irStatusMap = [
                     </form>
                 </div>
 
-                <!-- ── Information Requests Log ───────────────────────── -->
+                <!-- Information Requests Log -->
                 <?php if (!empty($infoRequests)): ?>
                     <div class="container-card shadow-sm">
                         <h4 class="mb-3 fw-bold">
@@ -469,12 +505,13 @@ $irStatusMap = [
                     </div>
                 <?php endif; ?>
 
-                <!-- ── Request Information ────────────────────────────── -->
+                <!-- Request Information -->
                 <div class="container-card shadow-sm">
                     <h4 class="mb-3 fw-bold">
                         <i class="fas fa-question-circle me-2"></i>Request Information from Student
                     </h4>
                     <form method="POST" action="complaint_details.php?id=<?= $complaintId ?>">
+                        <?= csrf_field() ?>
                         <input type="hidden" name="action" value="request_info">
                         <div class="mb-3">
                             <label class="form-label fw-bold">Request</label>
@@ -489,7 +526,7 @@ $irStatusMap = [
                     </form>
                 </div>
 
-                <!-- ── Status Timeline ────────────────────────────────── -->
+                <!-- Status Timeline -->
                 <div class="container-card shadow-sm">
                     <h4 class="mb-3 fw-bold">
                         <i class="fas fa-history me-2"></i>Complaint Timeline
@@ -535,7 +572,7 @@ $irStatusMap = [
                     <?php endif; ?>
                 </div>
 
-                <!-- ── Student Feedback ───────────────────────────────── -->
+                <!-- Student Feedback -->
                 <?php if ($complaint['complaint_status'] === STATUS_RESOLVED): ?>
                     <div class="container-card shadow-sm">
                         <h4 class="mb-3 fw-bold">

@@ -12,6 +12,7 @@ require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/Admin.php";
 require_once "classes/StudentLeader.php";
+require_once "classes/Notification.php";
 require_once "includes/csrf.php";
 
 $message = $error = "";
@@ -25,43 +26,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
 }
 
-// Handle Delete Student
-if (isset($_GET['delete_student']) && is_numeric($_GET['delete_student'])) {
-    $student_id = (int) $_GET['delete_student'];
-    try {
+// Handle destructive actions (POST-only for CSRF protection)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['danger_action'])) {
+    $dangerAction = $_POST['danger_action'] ?? '';
+    $dangerId     = is_numeric($_POST['danger_id'] ?? '') ? (int)$_POST['danger_id'] : 0;
+    if ($dangerId > 0) {
         $uStmt = $conn->prepare("SELECT username FROM users WHERE user_id = ?");
-        $uStmt->bind_param("i", $student_id);
+        $uStmt->bind_param("i", $dangerId);
         $uStmt->execute();
         $uRow = $uStmt->get_result()->fetch_assoc();
         $uStmt->close();
-        if ($admin->deleteStudent($student_id)) {
-            $admin->logActivity($adminId, 'user_deleted', 'user', $student_id, $uRow['username'] ?? "User #$student_id", 'Student account deleted');
-            $_SESSION['message'] = "Student deleted successfully.";
-            header("Location: user_management.php#students");
-            exit;
+        $uName = $uRow['username'] ?? "User #$dangerId";
+        try {
+            switch ($dangerAction) {
+                case 'delete_student':
+                    if ($admin->deleteStudent($dangerId)) {
+                        $admin->logActivity($adminId, 'user_deleted', 'user', $dangerId, $uName, 'Student account deleted');
+                        $_SESSION['message'] = "Student deleted successfully.";
+                    }
+                    header("Location: user_management.php#students"); exit;
+                case 'delete_staff':
+                    if ($admin->deleteStaff($dangerId)) {
+                        $admin->logActivity($adminId, 'user_deleted', 'user', $dangerId, $uName, 'Staff account deleted');
+                        $_SESSION['message'] = "Staff deleted successfully.";
+                    }
+                    header("Location: user_management.php#staff"); exit;
+                case 'reject_staff':
+                    if ($admin->rejectStaff($dangerId)) {
+                        $admin->logActivity($adminId, 'staff_rejected', 'user', $dangerId, $uName, 'Staff registration rejected and account deleted');
+                        $_SESSION['message'] = "Staff rejected successfully.";
+                    }
+                    header("Location: user_management.php#approval"); exit;
+                case 'demote_staff':
+                    $rStmt = $conn->prepare("UPDATE staffs SET staff_approval_status = 0 WHERE staff_user_id = ?");
+                    $rStmt->bind_param("i", $dangerId);
+                    if ($rStmt->execute()) {
+                        $admin->logActivity($adminId, 'staff_demoted', 'user', $dangerId, $uName, 'Staff approval revoked (moved back to pending)');
+                        $_SESSION['message'] = "Staff approval revoked successfully.";
+                    }
+                    $rStmt->close();
+                    header("Location: user_management.php#approval"); exit;
+            }
+        } catch (Exception $e) {
+            $_SESSION['message_error'] = $e->getMessage();
+            header("Location: user_management.php"); exit;
         }
-    } catch (Exception $e) {
-        $error = $e->getMessage();
-    }
-}
-
-// Handle Delete Staff
-if (isset($_GET['delete_staff']) && is_numeric($_GET['delete_staff'])) {
-    $staff_id = (int) $_GET['delete_staff'];
-    try {
-        $uStmt = $conn->prepare("SELECT username FROM users WHERE user_id = ?");
-        $uStmt->bind_param("i", $staff_id);
-        $uStmt->execute();
-        $uRow = $uStmt->get_result()->fetch_assoc();
-        $uStmt->close();
-        if ($admin->deleteStaff($staff_id)) {
-            $admin->logActivity($adminId, 'user_deleted', 'user', $staff_id, $uRow['username'] ?? "User #$staff_id", 'Staff account deleted');
-            $_SESSION['message'] = "Staff deleted successfully.";
-            header("Location: user_management.php#staff");
-            exit;
-        }
-    } catch (Exception $e) {
-        $error = $e->getMessage();
     }
 }
 
@@ -82,49 +91,6 @@ if (isset($_POST['approve_staff']) && is_numeric($_POST['approve_staff'])) {
             header("Location: user_management.php#approval");
             exit;
         }
-    } catch (Exception $e) {
-        $error = $e->getMessage();
-    }
-}
-
-// Handle Staff Rejection
-if (isset($_GET['reject_staff']) && is_numeric($_GET['reject_staff'])) {
-    $staff_id = (int) $_GET['reject_staff'];
-    try {
-        $uStmt = $conn->prepare("SELECT username FROM users WHERE user_id = ?");
-        $uStmt->bind_param("i", $staff_id);
-        $uStmt->execute();
-        $uRow = $uStmt->get_result()->fetch_assoc();
-        $uStmt->close();
-        if ($admin->rejectStaff($staff_id)) {
-            $admin->logActivity($adminId, 'staff_rejected', 'user', $staff_id, $uRow['username'] ?? "User #$staff_id", 'Staff registration rejected and account deleted');
-            $_SESSION['message'] = "Staff rejected successfully.";
-            header("Location: user_management.php#approval");
-            exit;
-        }
-    } catch (Exception $e) {
-        $error = $e->getMessage();
-    }
-}
-
-// Handle Revoke Staff Approval (set back to pending)
-if (isset($_GET['demote_staff']) && is_numeric($_GET['demote_staff'])) {
-    $staff_id = (int) $_GET['demote_staff'];
-    try {
-        $uStmt = $conn->prepare("SELECT username FROM users WHERE user_id = ?");
-        $uStmt->bind_param("i", $staff_id);
-        $uStmt->execute();
-        $uRow = $uStmt->get_result()->fetch_assoc();
-        $uStmt->close();
-        $revoke_stmt = $conn->prepare("UPDATE staffs SET staff_approval_status = '0' WHERE staff_user_id = ?");
-        $revoke_stmt->bind_param("i", $staff_id);
-        if ($revoke_stmt->execute()) {
-            $admin->logActivity($adminId, 'staff_demoted', 'user', $staff_id, $uRow['username'] ?? "User #$staff_id", 'Staff approval revoked (moved back to pending)');
-            $_SESSION['message'] = "Staff approval revoked successfully.";
-            header("Location: user_management.php#approval");
-            exit;
-        }
-        $revoke_stmt->close();
     } catch (Exception $e) {
         $error = $e->getMessage();
     }
@@ -198,6 +164,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_reset_password'
         $uRow = $uStmt->get_result()->fetch_assoc();
         $uStmt->close();
         $admin->logActivity($adminId, 'password_reset', 'user', $userId, $uRow['username'] ?? "User #$userId", 'Password reset by admin');
+        (new Notification($conn))->create(
+            $userId,
+            "Your account password has been reset by an administrator. If you did not request this change, please contact support immediately.",
+            'system',
+            'profile.php',
+            null
+        );
         $_SESSION['message'] = "Password for '{$uRow['username']}' reset successfully.";
     } catch (Exception $e) {
         $_SESSION['message_error'] = $e->getMessage();
@@ -363,6 +336,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['revoke_rep'])) {
     exit;
 }
 
+// Handle Promote to Senior Leader (all-department rep, no single department scope)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['promote_senior'])) {
+    $repUserId = (int) ($_POST['rep_user_id'] ?? 0);
+    if ($repUserId > 0) {
+        try {
+            $studentLeader->setUserId($repUserId);
+            $username = $studentLeader->getUsername();
+            $studentLeader->promoteAsSeniorLeader();
+            $admin->logActivity($adminId, 'role_changed', 'user', $repUserId, $username, 'Promoted to Senior Leader (all departments)');
+            $_SESSION['message'] = "Student promoted to Senior Leader.";
+        } catch (Exception $e) {
+            $_SESSION['message_error'] = $e->getMessage();
+        }
+    }
+    header("Location: user_management.php#reps");
+    exit;
+}
+
+// Handle Demote Senior Leader back to plain student
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['demote_senior'])) {
+    $repUserId = (int) ($_POST['rep_user_id'] ?? 0);
+    if ($repUserId > 0) {
+        try {
+            $studentLeader->setUserId($repUserId);
+            $username = $studentLeader->getUsername();
+            $studentLeader->demoteToStudent();
+            $admin->logActivity($adminId, 'role_changed', 'user', $repUserId, $username, 'Demoted from Senior Leader to student');
+            $_SESSION['message'] = "Senior Leader demoted to student.";
+        } catch (Exception $e) {
+            $_SESSION['message_error'] = $e->getMessage();
+        }
+    }
+    header("Location: user_management.php#reps");
+    exit;
+}
+
+// Handle Edit Student
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['updateStudentBTN'])) {
+    $editUserId  = (int) ($_POST['edit_student_user_id'] ?? 0);
+    $editName    = trim($_POST['edit_student_name'] ?? '');
+    $editEmail   = trim($_POST['edit_student_email'] ?? '');
+    $editReg     = trim($_POST['edit_student_reg'] ?? '');
+    $editProgram = trim($_POST['edit_student_program'] ?? '');
+    $editCollege = (int) ($_POST['edit_student_college_id'] ?? 0);
+    try {
+        if (!$editUserId || empty($editName) || empty($editEmail) || empty($editReg)) {
+            throw new Exception("Name, email, and registration number are required.");
+        }
+        $admin->updateStudent($editUserId, $editName, $editEmail, $editReg, $editProgram, $editCollege);
+        $admin->logActivity($adminId, 'user_updated', 'user', $editUserId, $editName, 'Student information updated by admin');
+        $_SESSION['message'] = "Student '{$editName}' updated successfully.";
+    } catch (Exception $e) {
+        $_SESSION['message_error'] = $e->getMessage();
+    }
+    header("Location: user_management.php#students");
+    exit;
+}
+
+// Handle Edit Staff
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['updateStaffBTN'])) {
+    $editUserId  = (int) ($_POST['edit_staff_user_id'] ?? 0);
+    $editName    = trim($_POST['edit_staff_name'] ?? '');
+    $editEmail   = trim($_POST['edit_staff_email'] ?? '');
+    $editDept    = (int) ($_POST['edit_staff_department_id'] ?? 0);
+    $editRole    = (int) ($_POST['edit_staff_role_id'] ?? 0);
+    try {
+        if (!$editUserId || empty($editName) || empty($editEmail)) {
+            throw new Exception("Name and email are required.");
+        }
+        $admin->updateStaff($editUserId, $editName, $editEmail, $editDept, $editRole);
+        $admin->logActivity($adminId, 'user_updated', 'user', $editUserId, $editName, 'Staff information updated by admin');
+        $_SESSION['message'] = "Staff '{$editName}' updated successfully.";
+    } catch (Exception $e) {
+        $_SESSION['message_error'] = $e->getMessage();
+    }
+    header("Location: user_management.php#staff");
+    exit;
+}
+
 // Get data
 $registered_students = $admin->getAllStudents();
 $registered_staffs = $admin->getAllStaff();
@@ -388,7 +440,7 @@ if (isset($_SESSION['message'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard</title>
+    <title>Admin Dashboard | User Management</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
     <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
@@ -497,12 +549,13 @@ if (isset($_SESSION['message'])) {
                         </div>
 
                         <div class="table-responsive">
-                            <table class="table table-stripped" id="studentsTable">
+                            <table class="table table-striped" id="studentsTable">
                                 <thead class="table-light">
                                     <tr>
                                         <th>#</th>
                                         <th class="text-center">STUDENT NAME</th>
                                         <th class="text-center">REG. NUMBER</th>
+                                        <th class="text-center">ROLE</th>
                                         <th class="text-center">STATUS</th>
                                         <th class="text-center">ACTION</th>
                                     </tr>
@@ -521,13 +574,25 @@ if (isset($_SESSION['message'])) {
                                                     <?php echo htmlspecialchars($student['student_registration_number']); ?>
                                                 </td>
                                                 <td class="text-center">
+                                                    <?php if (($student['user_role'] ?? '') === 'student_leader'): ?>
+                                                        <?php if ((int) ($student['rep_department_count'] ?? 0) === 0): ?>
+                                                            <span class="badge" style="background-color:#b8860b;">
+                                                                <i class="fas fa-crown me-1"></i>Senior Leader
+                                                            </span>
+                                                        <?php else: ?>
+                                                            <span class="badge" style="background-color:#6f42c1;">
+                                                                <i class="fas fa-user-friends me-1"></i>Dept. Leader
+                                                            </span>
+                                                        <?php endif; ?>
+                                                    <?php else: ?>
+                                                        <span class="badge bg-light text-dark border">Student</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td class="text-center">
                                                     <?php if ($student['user_status'] === 'active'): ?>
                                                         <span class="badge bg-success">Active</span>
                                                     <?php else: ?>
                                                         <span class="badge bg-danger">Suspended</span>
-                                                    <?php endif; ?>
-                                                    <?php if (($student['user_role'] ?? '') === 'student_leader'): ?>
-                                                        <span class="badge ms-1" style="background-color:#6f42c1;">Rep</span>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td class="text-center">
@@ -538,6 +603,14 @@ if (isset($_SESSION['message'])) {
                                                             onclick="viewStudent(<?php echo htmlspecialchars(json_encode($student)); ?>)"
                                                             title="view">
                                                             <i class="fas fa-eye text-dark"></i>
+                                                        </button>
+
+                                                        <!-- Edit Button -->
+                                                        <button type="button" class="btn btn-status btn-outline-secondary me-2"
+                                                            data-bs-toggle="modal" data-bs-target="#editStudent"
+                                                            onclick="openEditStudent(<?php echo htmlspecialchars(json_encode($student)); ?>)"
+                                                            title="edit">
+                                                            <i class="fas fa-edit text-dark"></i>
                                                         </button>
 
                                                         <!-- Suspend / Activate Button -->
@@ -571,6 +644,21 @@ if (isset($_SESSION['message'])) {
                                                             style="color:#6f42c1;border-color:#6f42c1;">
                                                             <i class="fas fa-user-friends" style="color:#6f42c1;"></i>
                                                         </button>
+
+                                                        <?php if (($student['user_role'] ?? '') !== 'student_leader'): ?>
+                                                        <!-- Promote as Senior Leader Button -->
+                                                        <form method="POST" style="display:inline;" id="promoteSeniorForm<?= $student['user_id'] ?>">
+                                                            <?= csrf_field() ?>
+                                                            <input type="hidden" name="promote_senior" value="1">
+                                                            <input type="hidden" name="rep_user_id" value="<?= $student['user_id'] ?>">
+                                                        </form>
+                                                        <button type="button" class="btn btn-status btn-outline-secondary me-2"
+                                                            onclick="confirmPromoteSenior(<?= $student['user_id'] ?>, '<?= htmlspecialchars($student['username'], ENT_QUOTES) ?>')"
+                                                            title="Promote to Senior Leader (all departments)"
+                                                            style="color:#b8860b;border-color:#b8860b;">
+                                                            <i class="fas fa-crown" style="color:#b8860b;"></i>
+                                                        </button>
+                                                        <?php endif; ?>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -660,51 +748,47 @@ if (isset($_SESSION['message'])) {
                                                         data-bs-dismiss="modal" aria-label="Close"></button>
                                                 </div>
 
-                                                <form action="" method="POST" id="update-student-form"
-                                                    enctype="multipart/form-data">
+                                                <form action="user_management.php" method="POST" id="update-student-form">
+                                                    <?= csrf_field() ?>
+                                                    <input type="hidden" name="edit_student_user_id" id="edit_student_user_id" value="">
                                                     <div class="modal-body">
                                                         <div class="container-fluid">
                                                             <div class="row g-2">
-                                                                <!-- Student Info -->
                                                                 <div class="col-lg-6 col-sm-12 col-12">
-                                                                    <label class="form-label fw-bold">Student
-                                                                        Name</label>
-                                                                    <input type="text" name="" class="form-control"
-                                                                        value="" required>
+                                                                    <label class="form-label fw-bold">Student Name</label>
+                                                                    <input type="text" name="edit_student_name" id="edit_student_name" class="form-control" required>
                                                                 </div>
                                                                 <div class="col-lg-6 col-sm-12 col-12">
-                                                                    <label class="form-label fw-bold">Registration
-                                                                        Number</label>
-                                                                    <input type="text" name="" class="form-control"
-                                                                        value="" required>
+                                                                    <label class="form-label fw-bold">Registration Number</label>
+                                                                    <input type="text" name="edit_student_reg" id="edit_student_reg" class="form-control" required>
                                                                 </div>
                                                                 <div class="col-lg-6 col-sm-12 col-12">
-                                                                    <label class="form-label fw-bold">Email
-                                                                        Address</label>
-                                                                    <input type="text" name="" class="form-control"
-                                                                        value="" required>
+                                                                    <label class="form-label fw-bold">Email Address</label>
+                                                                    <input type="email" name="edit_student_email" id="edit_student_email" class="form-control" required>
+                                                                </div>
+                                                                <div class="col-lg-6 col-sm-12 col-12">
+                                                                    <label class="form-label fw-bold">Programme / Course</label>
+                                                                    <input type="text" name="edit_student_program" id="edit_student_program" class="form-control">
                                                                 </div>
                                                                 <div class="col-lg-6 col-sm-12 col-12">
                                                                     <label class="form-label fw-bold">College</label>
-                                                                    <select name="" id="" class="form-select">
-                                                                        <option value="">CoICT</option>
-                                                                        <option value="">UDBS</option>
-                                                                        <option value="">SJMC</option>
+                                                                    <select name="edit_student_college_id" id="edit_student_college_id" class="form-select">
+                                                                        <option value="0">-- No College --</option>
+                                                                        <?php foreach ($colleges as $col): ?>
+                                                                            <option value="<?= $col['college_id'] ?>">
+                                                                                <?= htmlspecialchars($col['college_name']) ?>
+                                                                            </option>
+                                                                        <?php endforeach; ?>
                                                                     </select>
                                                                 </div>
-
                                                             </div>
                                                         </div>
                                                     </div>
 
                                                     <div class="modal-footer">
-                                                        <button type="submit" name="updateStudentBTN"
-                                                            class="btn btn-success me-2">Save changes</button>
-                                                        <button type="button" class="btn btn-secondary"
-                                                            data-bs-dismiss="modal">Close</button>
+                                                        <button type="submit" name="updateStudentBTN" class="btn btn-success me-2">Save changes</button>
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                                     </div>
-
-
                                                 </form>
                                                 <!-- /Edit Student Form -->
                                             </div>
@@ -840,7 +924,7 @@ if (isset($_SESSION['message'])) {
                             </div>
                         <?php else: ?>
                             <div class="table-responsive">
-                                <table class="table table-stripped" id="repsTable">
+                                <table class="table table-striped" id="repsTable">
                                     <thead class="table-light">
                                         <tr>
                                             <th>#</th>
@@ -854,33 +938,41 @@ if (isset($_SESSION['message'])) {
                                         <?php $n = 1;
                                         foreach ($student_reps as $rep): ?>
                                             <?php
-                                            $deptNames = explode(', ', $rep['departments']);
-                                            $deptIds = explode(',', $rep['department_ids']);
+                                            $isSenior = empty($rep['departments']);
+                                            $deptNames = $isSenior ? [] : explode(', ', $rep['departments']);
+                                            $deptIds = $isSenior ? [] : explode(',', $rep['department_ids']);
                                             ?>
                                             <tr>
                                                 <td><?= $n++ ?></td>
                                                 <td><?= htmlspecialchars($rep['username']) ?></td>
                                                 <td><?= htmlspecialchars($rep['user_email']) ?></td>
                                                 <td>
-                                                    <?php foreach ($deptNames as $idx => $dName): ?>
-                                                        <span class="badge me-1 mb-1" style="background-color:#6f42c1;">
-                                                            <?= htmlspecialchars($dName) ?>
-                                                            <form method="POST" style="display:inline;"
-                                                                onsubmit="return confirm('Remove this rep scope?');">
-                                                                <input type="hidden" name="revoke_rep" value="1">
-                                                                <input type="hidden" name="rep_user_id"
-                                                                    value="<?= $rep['user_id'] ?>">
-                                                                <input type="hidden" name="rep_department_id"
-                                                                    value="<?= (int) ($deptIds[$idx] ?? 0) ?>">
-                                                                <?= csrf_field() ?>
-                                                                <button type="submit" class="btn p-0 ms-1"
+                                                    <?php if ($isSenior): ?>
+                                                        <span class="badge me-1 mb-1" style="background-color:#b8860b;">
+                                                            <i class="fas fa-crown me-1"></i>All Departments (Senior)
+                                                        </span>
+                                                    <?php else: ?>
+                                                        <?php foreach ($deptNames as $idx => $dName): ?>
+                                                            <?php $revokeFormId = 'revokeRepForm' . $rep['user_id'] . '_' . (int) ($deptIds[$idx] ?? 0); ?>
+                                                            <span class="badge me-1 mb-1" style="background-color:#6f42c1;">
+                                                                <?= htmlspecialchars($dName) ?>
+                                                                <form method="POST" style="display:inline;" id="<?= $revokeFormId ?>">
+                                                                    <input type="hidden" name="revoke_rep" value="1">
+                                                                    <input type="hidden" name="rep_user_id"
+                                                                        value="<?= $rep['user_id'] ?>">
+                                                                    <input type="hidden" name="rep_department_id"
+                                                                        value="<?= (int) ($deptIds[$idx] ?? 0) ?>">
+                                                                    <?= csrf_field() ?>
+                                                                </form>
+                                                                <button type="button" class="btn p-0 ms-1"
+                                                                    onclick="confirmRevokeRep('<?= $revokeFormId ?>', '<?= htmlspecialchars($rep['username'], ENT_QUOTES) ?>', '<?= htmlspecialchars($dName, ENT_QUOTES) ?>')"
                                                                     style="color:rgba(255,255,255,0.8);line-height:1;"
                                                                     title="Remove scope">
                                                                     <i class="fas fa-times" style="font-size:0.7rem;"></i>
                                                                 </button>
-                                                            </form>
-                                                        </span>
-                                                    <?php endforeach; ?>
+                                                            </span>
+                                                        <?php endforeach; ?>
+                                                    <?php endif; ?>
                                                 </td>
                                                 <td class="text-center">
                                                     <div class="d-flex justify-content-center gap-1">
@@ -892,14 +984,28 @@ if (isset($_SESSION['message'])) {
                                                             title="View rep details">
                                                             <i class="fas fa-eye text-dark"></i>
                                                         </button>
-                                                        <!-- Add another department -->
-                                                        <button type="button"
-                                                            class="btn btn-status btn-outline-secondary"
-                                                            data-bs-toggle="modal" data-bs-target="#assignRepModal"
-                                                            onclick="openAssignRep(<?= $rep['user_id'] ?>, '<?= htmlspecialchars($rep['username'], ENT_QUOTES) ?>')"
-                                                            title="Add another department">
-                                                            <i class="fas fa-plus text-dark"></i>
-                                                        </button>
+                                                        <?php if ($isSenior): ?>
+                                                            <!-- Demote Senior Leader -->
+                                                            <form method="POST" style="display:inline;" id="demoteSeniorForm<?= $rep['user_id'] ?>">
+                                                                <?= csrf_field() ?>
+                                                                <input type="hidden" name="demote_senior" value="1">
+                                                                <input type="hidden" name="rep_user_id" value="<?= $rep['user_id'] ?>">
+                                                            </form>
+                                                            <button type="button" class="btn btn-status btn-outline-secondary"
+                                                                onclick="confirmDemoteSenior(<?= $rep['user_id'] ?>, '<?= htmlspecialchars($rep['username'], ENT_QUOTES) ?>')"
+                                                                title="Demote to student">
+                                                                <i class="fas fa-times text-dark"></i>
+                                                            </button>
+                                                        <?php else: ?>
+                                                            <!-- Add another department -->
+                                                            <button type="button"
+                                                                class="btn btn-status btn-outline-secondary"
+                                                                data-bs-toggle="modal" data-bs-target="#assignRepModal"
+                                                                onclick="openAssignRep(<?= $rep['user_id'] ?>, '<?= htmlspecialchars($rep['username'], ENT_QUOTES) ?>')"
+                                                                title="Add another department">
+                                                                <i class="fas fa-plus text-dark"></i>
+                                                            </button>
+                                                        <?php endif; ?>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -927,7 +1033,7 @@ if (isset($_SESSION['message'])) {
                         </div>
 
                         <div class="table-responsive">
-                            <table class="table table-stripped" id="staffsTable">
+                            <table class="table table-striped" id="staffsTable">
                                 <thead class="table-light">
                                     <tr>
                                         <th>#</th>
@@ -1086,62 +1192,6 @@ if (isset($_SESSION['message'])) {
                                     </div>
                                     <!-- /View Staff Modal -->
 
-                                    <!-- Edit Staff Modal -->
-                                    <div class="modal fade" id="editStaff" tabindex="-1"
-                                        aria-labelledby="editStaffModalLabel" aria-hidden="true">
-                                        <div class="modal-dialog">
-                                            <div class="modal-content shadow-lg rounded-3">
-                                                <div class="modal-header bg-secondary text-white">
-                                                    <h5 class="modal-title fw-bold text-white" id="editStaffModalLabel">
-                                                        EDIT STAFF INFORMATION
-                                                    </h5>
-                                                    <button type="button" class="btn-close btn-close-white"
-                                                        data-bs-dismiss="modal" aria-label="Close"></button>
-                                                </div>
-
-                                                <form action="" method="POST" id="update-staff-form"
-                                                    enctype="multipart/form-data">
-                                                    <div class="modal-body">
-                                                        <div class="container-fluid">
-                                                            <div class="row g-2">
-                                                                <!-- Student Info -->
-                                                                <div class="mb-2">
-                                                                    <label class="form-label fw-bold">Staff Name</label>
-                                                                    <input type="text" name="" class="form-control"
-                                                                        value="" required>
-                                                                </div>
-                                                                <div class="mb-2">
-                                                                    <label class="form-label fw-bold">Email
-                                                                        Address</label>
-                                                                    <input type="email" name="" class="form-control"
-                                                                        value="" required>
-                                                                </div>
-                                                                <div class="mb-2">
-                                                                    <label class="form-label fw-bold">Department</label>
-                                                                    <select name="" id="" class="form-select">
-                                                                        <option value="">IT</option>
-                                                                        <option value="">Maintenance</option>
-                                                                        <option value="">Accomodation</option>
-                                                                    </select>
-                                                                </div>
-
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div class="modal-footer">
-                                                        <button type="submit" name="updateStudentBTN"
-                                                            class="btn btn-success me-2">Save changes</button>
-                                                        <button type="button" class="btn btn-secondary"
-                                                            data-bs-dismiss="modal">Close</button>
-                                                    </div>
-
-
-                                                </form>
-                                                <!-- /Edit Student Form -->
-                                            </div>
-                                        </div>
-                                    </div>
                                 </tbody>
                             </table>
                         </div>
@@ -1397,11 +1447,11 @@ if (isset($_SESSION['message'])) {
                                                     class="btn btn-success fw-bold flex-fill p-2" style="border-radius:8px;">
                                                     <i class="fas fa-check me-1"></i>Approve
                                                 </button>
-                                                <a href="?reject_staff=<?= $pending_staff['user_id'] ?>"
+                                                <button type="button"
                                                     class="btn btn-danger fw-bold flex-fill p-2" style="border-radius:8px;"
-                                                    onclick="return confirm('Reject this staff member? Their account will be permanently deleted.')">
+                                                    onclick="submitDangerAction('reject_staff', <?= $pending_staff['user_id'] ?>)">
                                                     <i class="fas fa-times me-1"></i>Reject
-                                                </a>
+                                                </button>
                                             </div>
                                         </form>
                                     </div>
@@ -1418,7 +1468,7 @@ if (isset($_SESSION['message'])) {
                         <h5 class="mb-1 fw-bold"><i class="fas fa-users me-2"></i>Recently Approved Staffs</h5>
 
                         <div class="table-responsive">
-                            <table class="table table-stripped" id="departmentsTable">
+                            <table class="table table-striped" id="departmentsTable">
                                 <thead class="table-light">
                                     <tr>
                                         <th>#</th>
@@ -1455,6 +1505,14 @@ if (isset($_SESSION['message'])) {
                                                             onclick="viewApprovedStaff(<?php echo htmlspecialchars(json_encode($staff)); ?>)"
                                                             title='view'>
                                                             <i class="fas fa-eye text-dark"></i>
+                                                        </button>
+
+                                                        <!-- Edit Button -->
+                                                        <button type="button" class="btn btn-status btn-outline-secondary me-2"
+                                                            data-bs-toggle="modal" data-bs-target="#editStaff"
+                                                            onclick="openEditStaff(<?php echo htmlspecialchars(json_encode($staff)); ?>)"
+                                                            title="edit">
+                                                            <i class="fas fa-edit text-dark"></i>
                                                         </button>
 
                                                         <!-- Revoke Approval Button -->
@@ -1547,7 +1605,7 @@ if (isset($_SESSION['message'])) {
                                     <!-- Edit Staff Modal -->
                                     <div class="modal fade" id="editStaff" tabindex="-1"
                                         aria-labelledby="editStaffModalLabel" aria-hidden="true">
-                                        <div class="modal-dialog modal-xl">
+                                        <div class="modal-dialog modal-lg">
                                             <div class="modal-content shadow-lg rounded-3">
                                                 <div class="modal-header text-white"
                                                     style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
@@ -1556,36 +1614,54 @@ if (isset($_SESSION['message'])) {
                                                         Edit Staff Information
                                                     </h5>
                                                     <button type="button" class="btn-close btn-close-white"
-                                                        data-bs-dismiss="modal" aria-label="Close">x</button>
+                                                        data-bs-dismiss="modal" aria-label="Close"></button>
                                                 </div>
-
-                                                <form action="" method="POST" id="update-staff-form"
-                                                    enctype="multipart/form-data">
+                                                <form action="user_management.php" method="POST" id="update-staff-form">
+                                                    <?= csrf_field() ?>
+                                                    <input type="hidden" name="edit_staff_user_id" id="edit_staff_user_id" value="">
                                                     <div class="modal-body">
-                                                        <div class="card">
-                                                            <div class="card-body">
-
+                                                        <div class="row g-3">
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-bold">Staff Name</label>
+                                                                <input type="text" name="edit_staff_name" id="edit_staff_name" class="form-control" required>
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-bold">Email Address</label>
+                                                                <input type="email" name="edit_staff_email" id="edit_staff_email" class="form-control" required>
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-bold">Department</label>
+                                                                <select name="edit_staff_department_id" id="edit_staff_department_id" class="form-select">
+                                                                    <option value="0">-- No Department --</option>
+                                                                    <?php foreach ($departments as $dept): ?>
+                                                                        <option value="<?= $dept['department_id'] ?>">
+                                                                            <?= htmlspecialchars($dept['department_name']) ?>
+                                                                        </option>
+                                                                    <?php endforeach; ?>
+                                                                </select>
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <label class="form-label fw-bold">Role</label>
+                                                                <select name="edit_staff_role_id" id="edit_staff_role_id" class="form-select">
+                                                                    <option value="0">-- No Role --</option>
+                                                                    <?php foreach ($staff_roles as $role): ?>
+                                                                        <option value="<?= $role['role_id'] ?>">
+                                                                            <?= htmlspecialchars($role['role_name']) ?>
+                                                                        </option>
+                                                                    <?php endforeach; ?>
+                                                                </select>
                                                             </div>
                                                         </div>
                                                     </div>
+                                                    <div class="modal-footer">
+                                                        <button type="submit" name="updateStaffBTN" class="btn btn-success me-2">Save changes</button>
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                    </div>
+                                                </form>
                                             </div>
-
-                                            <div class="col-lg-12">
-                                                <div class="modal-footer">
-                                                    <button type="submit" name="updateStaffBTN"
-                                                        class="btn btn-submit me-2">Save
-                                                        changes</button>
-                                                    <button type="button" class="btn btn-secondary"
-                                                        data-bs-dismiss="modal">Close</button>
-                                                </div>
-                                            </div>
-
-                                            </form>
-                                            <!-- /Edit Staff Form -->
-
-                                            <!--/ Edit Staff Modal -->
                                         </div>
                                     </div>
+                                    <!-- /Edit Staff Modal -->
                                 </tbody>
                             </table>
                         </div>
@@ -1610,7 +1686,7 @@ if (isset($_SESSION['message'])) {
                         </div>
 
                         <div class="table-responsive">
-                            <table class="table table-stripped" id="rolesTable">
+                            <table class="table table-striped" id="rolesTable">
                                 <thead class="table-light">
                                     <tr>
                                         <th>#</th>
@@ -1686,8 +1762,8 @@ if (isset($_SESSION['message'])) {
                                                     class="text-danger">*</span></label>
                                             <input type="number" name="role_rank" class="form-control p-3 shadow-sm"
                                                 style="border-radius: 10px;" placeholder="e.g., 2" min="1" required>
-                                            <small class="text-muted">Higher rank = more authority. Must be
-                                                unique.</small>
+                                            <small class="text-muted">Higher rank = more authority. Roles can share a
+                                                rank if they're peers who don't escalate to each other.</small>
                                         </div>
                                     </div>
                                     <div class="modal-footer">
@@ -1732,8 +1808,8 @@ if (isset($_SESSION['message'])) {
                                             <input type="number" name="role_rank" id="edit_role_rank"
                                                 class="form-control p-3 shadow-sm" style="border-radius: 10px;" min="1"
                                                 required>
-                                            <small class="text-muted">Higher rank = more authority. Must be
-                                                unique.</small>
+                                            <small class="text-muted">Higher rank = more authority. Roles can share a
+                                                rank if they're peers who don't escalate to each other.</small>
                                         </div>
                                     </div>
                                     <div class="modal-footer">
@@ -1810,7 +1886,7 @@ if (isset($_SESSION['message'])) {
                     </div>
                 </div>
 
-                <!-- Assign Role Modal (shared, lives outside tab sections) -->
+                <!-- Assign Role Modal -->
                 <div class="modal fade" id="assignRoleModal" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-dialog-centered">
                         <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
@@ -1858,7 +1934,7 @@ if (isset($_SESSION['message'])) {
         </div>
     </div>
 
-    <!-- Assign Rep Modal (body-level so it works from any tab) -->
+    <!-- Assign Rep Modal -->
     <div class="modal fade" id="assignRepModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content shadow-lg rounded-3">
@@ -2027,6 +2103,28 @@ if (isset($_SESSION['message'])) {
                 : 'N/A';
         }
 
+        function openEditStudent(student) {
+            document.getElementById('edit_student_user_id').value = student.user_id || '';
+            document.getElementById('edit_student_name').value = student.username || '';
+            document.getElementById('edit_student_email').value = student.user_email || '';
+            document.getElementById('edit_student_reg').value = student.student_registration_number || '';
+            document.getElementById('edit_student_program').value = student.student_program || '';
+            const collegeSelect = document.getElementById('edit_student_college_id');
+            if (collegeSelect) {
+                collegeSelect.value = student.student_college_id || '0';
+            }
+        }
+
+        function openEditStaff(staff) {
+            document.getElementById('edit_staff_user_id').value = staff.user_id || '';
+            document.getElementById('edit_staff_name').value = staff.username || '';
+            document.getElementById('edit_staff_email').value = staff.user_email || '';
+            const deptSelect = document.getElementById('edit_staff_department_id');
+            if (deptSelect) deptSelect.value = staff.staff_department_id || '0';
+            const roleSelect = document.getElementById('edit_staff_role_id');
+            if (roleSelect) roleSelect.value = staff.staff_role_id || '0';
+        }
+
         function viewApprovedStaff(staff) {
             document.getElementById('astaff_name').textContent = staff.username || '-';
             document.getElementById('astaff_id').textContent = staff.staff_id || '-';
@@ -2061,6 +2159,63 @@ if (isset($_SESSION['message'])) {
             }
         }
 
+        function submitDangerAction(action, id) {
+            document.getElementById('dangerActionName').value = action;
+            document.getElementById('dangerActionId').value = id;
+            document.getElementById('dangerActionForm').submit();
+        }
+
+        function confirmRevokeRep(formId, username, deptName) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Remove Department Scope?',
+                text: `"${username}" will no longer represent or be able to endorse complaints for "${deptName}".`,
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, remove',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById(formId).submit();
+                }
+            });
+        }
+
+        function confirmPromoteSenior(userId, username) {
+            Swal.fire({
+                icon: 'question',
+                title: 'Promote to Senior Leader?',
+                text: `"${username}" will see and be able to endorse complaints across every department, not just one.`,
+                showCancelButton: true,
+                confirmButtonColor: '#b8860b',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, promote',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('promoteSeniorForm' + userId).submit();
+                }
+            });
+        }
+
+        function confirmDemoteSenior(userId, username) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Demote Senior Leader?',
+                text: `"${username}" will be demoted back to a regular student and lose all leader access.`,
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, demote',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('demoteSeniorForm' + userId).submit();
+                }
+            });
+        }
+
         function confirmDeleteStudent(studentId) {
             Swal.fire({
                 icon: 'warning',
@@ -2073,7 +2228,7 @@ if (isset($_SESSION['message'])) {
                 cancelButtonText: 'Cancel'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    window.location.href = '?delete_student=' + studentId;
+                    submitDangerAction('delete_student', studentId);
                 }
             });
         }
@@ -2090,7 +2245,7 @@ if (isset($_SESSION['message'])) {
                 cancelButtonText: 'Cancel'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    window.location.href = '?delete_staff=' + staffId;
+                    submitDangerAction('delete_staff', staffId);
                 }
             });
         }
@@ -2130,7 +2285,7 @@ if (isset($_SESSION['message'])) {
                 cancelButtonText: 'Cancel'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    window.location.href = '?demote_staff=' + staffId;
+                    submitDangerAction('demote_staff', staffId);
                 }
             });
         }
@@ -2298,6 +2453,13 @@ if (isset($_SESSION['message'])) {
             }
         });
     </script>
+
+    <!-- Hidden form for POST-based danger actions (delete/reject/demote) -->
+    <form id="dangerActionForm" method="POST" action="user_management.php" style="display:none;">
+        <?= csrf_field() ?>
+        <input type="hidden" name="danger_action" id="dangerActionName" value="">
+        <input type="hidden" name="danger_id" id="dangerActionId" value="">
+    </form>
 </body>
 
 </html>

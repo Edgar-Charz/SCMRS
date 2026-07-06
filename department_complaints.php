@@ -121,7 +121,7 @@ function deptStatusBadge($status)
                 <!-- Department Stats -->
                 <div class="row g-3 mb-4">
                     <div class="col-12 col-md-6 col-lg">
-                        <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                             <div style="width:48px;height:48px;border-radius:12px;background:rgba(79,70,229,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                 <i class="fas fa-folder-open fa-lg" style="color:#4f46e5;"></i>
                             </div>
@@ -133,7 +133,7 @@ function deptStatusBadge($status)
                     </div>
 
                     <div class="col-12 col-md-6 col-lg">
-                        <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                             <div style="width:48px;height:48px;border-radius:12px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                 <i class="fas fa-clock fa-lg" style="color:#f59e0b;"></i>
                             </div>
@@ -145,7 +145,7 @@ function deptStatusBadge($status)
                     </div>
 
                     <div class="col-12 col-md-6 col-lg">
-                        <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                             <div style="width:48px;height:48px;border-radius:12px;background:rgba(2,132,199,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                 <i class="fas fa-spinner fa-spin fa-lg" style="color:#0284c7;"></i>
                             </div>
@@ -157,7 +157,7 @@ function deptStatusBadge($status)
                     </div>
 
                     <div class="col-12 col-md-6 col-lg">
-                        <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                             <div style="width:48px;height:48px;border-radius:12px;background:rgba(108,117,125,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                 <i class="fas fa-pause-circle fa-lg" style="color:#6c757d;"></i>
                             </div>
@@ -169,7 +169,7 @@ function deptStatusBadge($status)
                     </div>
 
                     <div class="col-12 col-md-6 col-lg">
-                        <div class="stat-card bg-stat p-4 d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
                             <div style="width:48px;height:48px;border-radius:12px;background:rgba(22,163,74,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                                 <i class="fas fa-check-circle fa-lg" style="color:#16a34a;"></i>
                             </div>
@@ -181,7 +181,7 @@ function deptStatusBadge($status)
                     </div>
                 </div>
 
-                <!-- ── Filter Card ──────────────────────────────────────── -->
+                <!-- Filter Card -->
                 <div class="container-card shadow-sm">
                     <div class="row g-2 align-items-end">
                         <div class="col-12 col-sm-6 col-md-4 col-lg-2">
@@ -224,12 +224,12 @@ function deptStatusBadge($status)
                     </div>
                 </div>
 
-                <!-- ── Table Card ───────────────────────────────────────── -->
+                <!-- Table Card -->
                 <div class="container-card shadow-sm">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <h4 class="mb-0 fw-bold">
+                        <h5 class="mb-0 fw-bold">
                             <i class="fas fa-list me-2"></i>All Department Complaints
-                        </h4>
+                        </h5>
                         <div class="search-input"></div>
                     </div>
                     <p class="text-muted small mb-3">
@@ -239,7 +239,7 @@ function deptStatusBadge($status)
                     </p>
 
                     <div class="table-responsive">
-                        <table class="table table-stripped" id="deptComplaintsTable">
+                        <table class="table table-striped" id="deptComplaintsTable">
                             <thead class="table-light">
                                 <tr>
                                     <th>#</th>

@@ -25,6 +25,19 @@ if (!$department) {
 
 $tiers = $admin->getDepartmentStaffHierarchy($departmentId);
 $totalStaff = array_sum(array_map(fn($t) => count($t['staff']), $tiers));
+
+// Skip common honorifics so avatars aren't all the same letter (e.g. "Mr.", "Ms." both -> "M")
+function staffInitial(string $username): string
+{
+    $honorifics = ['dr', 'mr', 'mrs', 'ms', 'miss', 'prof', 'professor', 'eng', 'rev'];
+    foreach (preg_split('/\s+/', trim($username)) as $word) {
+        $clean = strtolower(rtrim($word, '.'));
+        if ($clean !== '' && !in_array($clean, $honorifics, true)) {
+            return strtoupper($word[0]);
+        }
+    }
+    return strtoupper(substr($username, 0, 1) ?: '?');
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -168,7 +181,7 @@ $totalStaff = array_sum(array_map(fn($t) => count($t['staff']), $tiers));
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                         <div>
                             <h5 class="mb-1 fw-bold">
-                                <i class="fas fa-sitemap me-2"></i><?= htmlspecialchars($department['department_name']) ?> — Staff Hierarchy
+                                <i class="fas fa-sitemap me-2"></i><?= htmlspecialchars($department['department_name']) ?> - Staff Hierarchy
                             </h5>
                             <span class="flow-hint"><i class="fas fa-arrow-up me-1"></i>Complaints escalate upward: staff at the bottom forward unresolved complaints to staff above them.</span>
                         </div>
@@ -189,9 +202,9 @@ $totalStaff = array_sum(array_map(fn($t) => count($t['staff']), $tiers));
                                             <?= $tier['role_rank'] !== null ? htmlspecialchars($tier['role_rank']) : '?' ?>
                                         </span>
                                         <div class="text-start">
-                                            <p class="tier-title"><?= htmlspecialchars($tier['role_name']) ?></p>
+                                            <p class="tier-title"><?= htmlspecialchars(implode(' / ', $tier['role_names'])) ?></p>
                                             <p class="tier-sub mb-0">
-                                                <?= $tier['role_rank'] !== null ? 'Escalation rank ' . htmlspecialchars($tier['role_rank']) : 'Not part of the escalation chain until a role is assigned' ?>
+                                                <?= $tier['role_rank'] !== null ? 'Escalation rank ' . htmlspecialchars($tier['role_rank']) . (count($tier['role_names']) > 1 ? ' &middot; peer roles' : '') : 'Not part of the escalation chain until a role is assigned' ?>
                                             </p>
                                         </div>
                                     </div>
@@ -199,10 +212,13 @@ $totalStaff = array_sum(array_map(fn($t) => count($t['staff']), $tiers));
                                         <?php foreach ($tier['staff'] as $person): ?>
                                             <div class="staff-card">
                                                 <div class="staff-avatar">
-                                                    <?= strtoupper(substr($person['username'], 0, 1)) ?>
+                                                    <?= staffInitial($person['username']) ?>
                                                 </div>
                                                 <div class="text-start">
                                                     <p class="staff-name"><?= htmlspecialchars($person['username']) ?></p>
+                                                    <?php if (count($tier['role_names']) > 1): ?>
+                                                        <span class="badge bg-light text-dark border d-block mb-1" style="font-weight:500;"><?= htmlspecialchars($person['role_name'] ?? 'No Role') ?></span>
+                                                    <?php endif; ?>
                                                     <span class="staff-email"><?= htmlspecialchars($person['user_email']) ?></span>
                                                 </div>
                                             </div>

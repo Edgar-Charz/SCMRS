@@ -50,8 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_department'])) {
 }
 
 // Handle Delete
-if (isset($_GET['delete_department']) && is_numeric($_GET['delete_department'])) {
-    $id = (int)$_GET['delete_department'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_department'])) {
+    $id = (int)$_POST['delete_department'];
     try {
         $admin->deleteDepartment($id);
         $admin->logActivity($adminId, 'department_deleted', 'department', $id, "Department #$id", "Department #$id deleted");
@@ -128,7 +128,7 @@ $departments = $admin->getAllDepartmentsWithStats();
                     </div>
 
                     <div class="table-responsive">
-                        <table class="table table-stripped" id="departmentsTable">
+                        <table class="table table-striped" id="departmentsTable">
                             <thead class="table-light">
                                 <tr>
                                     <th>#</th>
@@ -262,7 +262,8 @@ $departments = $admin->getAllDepartmentsWithStats();
                 cancelButtonText: 'Cancel'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    window.location.href = 'manage_departments.php?delete_department=' + id;
+                    document.getElementById('deleteDeptId').value = id;
+                    document.getElementById('deleteDeptForm').submit();
                 }
             });
         }
@@ -302,5 +303,10 @@ $departments = $admin->getAllDepartmentsWithStats();
             }
         });
     </script>
+
+    <form id="deleteDeptForm" method="POST" action="manage_departments.php" style="display:none;">
+        <?= csrf_field() ?>
+        <input type="hidden" name="delete_department" id="deleteDeptId" value="">
+    </form>
 </body>
 </html>
