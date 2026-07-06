@@ -152,29 +152,35 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
+                        <a href="manage_departments.php" class="text-decoration-none">
                             <div
-                                style="width:48px;height:48px;border-radius:12px;background:rgba(124,58,237,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                                <i class="fas fa-sitemap fa-lg" style="color:#7c3aed;"></i>
+                                class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
+                                <div
+                                    style="width:48px;height:48px;border-radius:12px;background:rgba(124,58,237,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <i class="fas fa-sitemap fa-lg" style="color:#7c3aed;"></i>
+                                </div>
+                                <div class="text-end">
+                                    <h2 class="mb-0 fw-bold" style="color:#7c3aed;"><?= $total_departments ?></h2>
+                                    <p class="mb-0 fw-bold small">Departments</p>
+                                </div>
                             </div>
-                            <div class="text-end">
-                                <h2 class="mb-0 fw-bold" style="color:#7c3aed;"><?= $total_departments ?></h2>
-                                <p class="mb-0 fw-bold small">Departments</p>
-                            </div>
-                        </div>
+                        </a>
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
+                        <a href="manage_categories.php" class="text-decoration-none">
                             <div
-                                style="width:48px;height:48px;border-radius:12px;background:rgba(8,145,178,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                                <i class="fas fa-tags fa-lg" style="color:#0891b2;"></i>
+                                class="stat-card bg-stat p-3 d-flex align-items-center justify-content-between shadow-sm">
+                                <div
+                                    style="width:48px;height:48px;border-radius:12px;background:rgba(8,145,178,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <i class="fas fa-tags fa-lg" style="color:#0891b2;"></i>
+                                </div>
+                                <div class="text-end">
+                                    <h2 class="mb-0 fw-bold" style="color:#0891b2;"><?= $total_categories ?></h2>
+                                    <p class="mb-0 fw-bold small">Categories</p>
+                                </div>
                             </div>
-                            <div class="text-end">
-                                <h2 class="mb-0 fw-bold" style="color:#0891b2;"><?= $total_categories ?></h2>
-                                <p class="mb-0 fw-bold small">Categories</p>
-                            </div>
-                        </div>
+                        </a>
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
@@ -295,7 +301,7 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                             <a href="manage_departments.php" class="action-card action-card--amber">
                                 <i class="fas fa-sitemap action-icon"></i>
                                 <h5>Manage Departments</h5>
-                                <small>Add or update departments</small>
+                                <small>Vieew, add or update departments</small>
                             </a>
                         </div>
                         <div class="col-12 col-md-6 col-lg">
@@ -309,14 +315,14 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                             <a href="reports.php" class="action-card action-card--blue">
                                 <i class="fas fa-chart-bar action-icon"></i>
                                 <h5>Reports &amp; Analytics</h5>
-                                <small>View statistics &amp; reports</small>
+                                <small>View or filter statistics &amp; reports</small>
                             </a>
                         </div>
                         <div class="col-12 col-md-6 col-lg">
                             <a href="audit_log.php" class="action-card action-card--amber">
                                 <i class="fas fa-clipboard-list action-icon"></i>
-                                <h5>Audit Log</h5>
-                                <small>Track all system activity</small>
+                                <h5>System Admins' Audit Log</h5>
+                                <small>Track all system administrators' activity</small>
                             </a>
                         </div>
                     </div>
@@ -416,7 +422,7 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                             $(".dataTables_filter").appendTo(".search-input");
                         }
                     });
-                    $('#complaintsTable tbody').on('click', 'tr[data-href]', function(e) {
+                    $('#complaintsTable tbody').on('click', 'tr[data-href]', function (e) {
                         if ($(e.target).closest('a, button, input, label').length) return;
                         window.location.href = $(this).data('href');
                     });

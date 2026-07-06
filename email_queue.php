@@ -80,12 +80,12 @@ if (isset($_SESSION['message'])) {
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item">
-                            <a href="admin_dashboard.php"><i class="fas fa-home" style="color:black;"></i></a>
+                            <a href="admin_dashboard.php"><i class="fas fa-envelope-open-text" style="color:black;"></i></a>
                         </li>
                         <li class="breadcrumb-item"><a href="admin_dashboard.php" style="color:black;">Admin</a></li>
                         <li class="breadcrumb-item active">Email Queue</li>
                     </ol>
-                </nav>
+                </nav> 
 
                 <?php if (!empty($message)): ?>
                     <div class="alert alert-success alert-dismissible fade show">
@@ -218,7 +218,7 @@ if (isset($_SESSION['message'])) {
                                                 <td class="small text-muted">
                                                     <?= $row['last_attempted_at']
                                                         ? date('d M H:i', strtotime($row['last_attempted_at']))
-                                                        : '—' ?>
+                                                        : '-' ?>
                                                 </td>
                                                 <td class="small text-muted">
                                                     <?= date('d M H:i', strtotime($row['created_at'])) ?>

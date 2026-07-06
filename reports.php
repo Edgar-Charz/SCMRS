@@ -83,7 +83,7 @@ $resolutionRate = $total > 0 ? round(($stats['resolved'] / $total) * 100, 1) : 0
 
 function fmtHours($val): string
 {
-    if ($val === null || $val === '') return '<span class="text-muted">—</span>';
+    if ($val === null || $val === '') return '<span class="text-muted">-</span>';
     return number_format((float)$val, 1) . ' hrs';
 }
 ?>
@@ -131,7 +131,7 @@ function fmtHours($val): string
                 <nav aria-label="breadcrumb" class="mb-3">
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item">
-                            <a href="admin_dashboard.php"><i class="fas fa-home" style="color:black;"></i></a>
+                            <a href="admin_dashboard.php"><i class="fas fa-chart-pie" style="color:black;"></i></a>
                         </li>
                         <li class="breadcrumb-item"><a href="admin_dashboard.php" style="color:black;">Admin</a></li>
                         <li class="breadcrumb-item active">Reports &amp; Analytics</li>
@@ -543,7 +543,7 @@ function fmtHours($val): string
                             <h5 class="mb-0 fw-bold"><i class="fas fa-hourglass-end me-2 text-danger"></i>Oldest Pending Complaints</h5>
                             <div class="search-input" id="si-oldest"></div>
                         </div>
-                        <p class="text-muted small mb-3">Top 10 complaints waiting the longest — requires immediate attention</p>
+                        <p class="text-muted small mb-3">Top 10 complaints waiting the longest - requires immediate attention</p>
                         <div class="table-responsive">
                             <table id="tbl_oldest" class="table table-striped">
                                 <thead class="table-light">
@@ -562,7 +562,7 @@ function fmtHours($val): string
                                     <?php if (empty($oldestPending)): ?>
                                         <tr>
                                             <td colspan="8" class="text-center text-muted py-4">
-                                                <i class="fas fa-check-circle text-success me-2"></i>No pending complaints — all caught up!
+                                                <i class="fas fa-check-circle text-success me-2"></i>No pending complaints - all caught up!
                                             </td>
                                         </tr>
                                     <?php else: ?>
@@ -633,7 +633,7 @@ function fmtHours($val): string
                             <div class="container-card shadow-sm text-center flex-fill d-flex flex-column justify-content-center">
                                 <p class="text-muted small mb-1 fw-semibold">AVG RESOLUTION</p>
                                 <h2 class="fw-bold mb-0" style="color:var(--udsm-blue);">
-                                    <?= $stats['avg_resolution_hours'] !== null ? number_format((float)$stats['avg_resolution_hours'], 1) : '—' ?>
+                                    <?= $stats['avg_resolution_hours'] !== null ? number_format((float)$stats['avg_resolution_hours'], 1) : '-' ?>
                                 </h2>
                                 <p class="text-muted small mb-0">hours</p>
                             </div>
@@ -697,7 +697,7 @@ function fmtHours($val): string
                     <!-- Row 4: Staff performance bar -->
                     <?php if (!empty($byStaff)): ?>
                     <div class="container-card shadow-sm mb-4">
-                        <h6 class="fw-bold mb-3"><i class="fas fa-user-tie me-2"></i>Staff Performance — Resolved vs Total (top 10)</h6>
+                        <h6 class="fw-bold mb-3"><i class="fas fa-user-tie me-2"></i>Staff Performance - Resolved vs Total (top 10)</h6>
                         <canvas id="chartStaff" style="max-height:300px;"></canvas>
                     </div>
                     <?php endif; ?>
@@ -924,7 +924,7 @@ function fmtHours($val): string
 
     // Export helpers 
 
-    var _REPORT_TITLE   = 'SCMRS — Complaints Report';
+    var _REPORT_TITLE   = 'SCMRS - Complaints Report';
     var _HEAD_COLOR     = [30, 58, 95];
     var _ALT_ROW        = [245, 248, 252];
     var _FILTER_LABEL   = <?= json_encode(

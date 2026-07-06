@@ -8,6 +8,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'staff') {
 
 require_once 'config/Database.php';
 require_once 'classes/Staff.php';
+require_once 'classes/StudentLeader.php';
 require_once 'includes/csrf.php';
 
 $db   = new Database();
@@ -214,6 +215,10 @@ if (!empty($_SESSION['message_error'])) {
 
 $attachments        = $staff->getComplaintAttachments($complaintId);
 $collabNotes        = $staff->getCollaborationNotes($complaintId);
+$leaderNotes        = array_filter(
+    (new StudentLeader($conn))->getEndorsementsForComplaint($complaintId),
+    fn($e) => !empty($e['note'])
+);
 $infoRequests       = $staff->getInformationRequests($complaintId);
 $statusLogs         = $staff->getComplaintStatusLogs($complaintId);
 $escalationHistory  = $staff->getEscalationHistoryForComplaint($complaintId);
@@ -510,6 +515,24 @@ function statusBadge($status)
                     <?php endif; ?>
                 </div>
 
+                <!-- Leader Endorsements (read-only; only shown when a leader has written a note) -->
+                <?php if (!empty($leaderNotes)): ?>
+                    <div class="container-card shadow-sm">
+                        <h4 class="mb-3 fw-bold"><i class="fas fa-thumbs-up me-2"></i>Leader Endorsements (<?= count($leaderNotes) ?>)</h4>
+                        <?php foreach ($leaderNotes as $ln): ?>
+                            <div class="mb-2 p-3 rounded" style="background:#f8f7fd; border-left:4px solid #6f42c1;">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <strong><?= htmlspecialchars($ln['leader_name']) ?></strong>
+                                    <small class="text-muted">
+                                        <?= date('d M Y, g:i A', strtotime($ln['created_at'])) ?>
+                                    </small>
+                                </div>
+                                <div><?= nl2br(htmlspecialchars($ln['note'])) ?></div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+
                 <!-- Collaboration Notes -->
                 <div class="container-card shadow-sm">
                     <h4 class="mb-3 fw-bold"><i class="fas fa-sticky-note me-2"></i>Collaboration Notes</h4>
@@ -720,8 +743,8 @@ function statusBadge($status)
                                     placeholder="Explain what you need the staff member to handle..."
                                     required></textarea>
                             </div>
-                            <button type="button" class="btn btn-info fw-bold w-100 p-3 text-white"
-                                style="border-radius:10px;"
+                            <button type="button" class="btn btn-primary fw-bold w-100 p-3 text-white"
+                                style="border-radius:10px; background-color:var(--udsm-blue);"
                                 onclick="confirmDelegate()">
                                 <i class="fas fa-level-down-alt me-1"></i>Delegate
                             </button>
