@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/Mailer.php';
+require_once __DIR__ . '/Settings.php';
 
 class EmailQueue
 {
@@ -34,11 +35,11 @@ class EmailQueue
     public static function processPending(int $limit = 10): void
     {
         try {
-            $cfg = require __DIR__ . '/../config/email.php';
             $conn = self::getConnection();
+            $cfg = (new Settings($conn))->get();
 
-            $max = (int) ($cfg['max_attempts'] ?? 3);
-            $batchSize = min($limit, (int) ($cfg['batch_size'] ?? 10));
+            $max = (int) ($cfg['email_max_attempts'] ?? 3);
+            $batchSize = min($limit, (int) ($cfg['email_batch_size'] ?? 10));
 
             $stmt = $conn->prepare(
                 "SELECT id, to_email, to_name, subject, body, attempts
@@ -58,7 +59,7 @@ class EmailQueue
 
             $conn->close();
         } catch (Throwable $e) {
-            // Shutdown context — log silently, never throw
+            // Shutdown context - log silently, never throw
             error_log('[EmailQueue] processPending error: ' . $e->getMessage());
         }
     }
@@ -67,11 +68,11 @@ class EmailQueue
     {
         $id = (int) $row['id'];
         $attempts = (int) $row['attempts'] + 1;
-        $cfg = require __DIR__ . '/../config/email.php';
-        $maxAttempts = (int) ($cfg['max_attempts'] ?? 3);
+        $cfg = (new Settings($conn))->get();
+        $maxAttempts = (int) ($cfg['email_max_attempts'] ?? 3);
 
         try {
-            Mailer::send($row['to_email'], $row['to_name'], $row['subject'], $row['body']);
+            Mailer::send($conn, $row['to_email'], $row['to_name'], $row['subject'], $row['body']);
 
             // Success
             $stmt = $conn->prepare(

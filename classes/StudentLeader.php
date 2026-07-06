@@ -71,14 +71,27 @@ class StudentLeader
         return $rows;
     }
 
-    // Get all complaints from leader's departments
-    public function getComplaints(int $limit = 0): array
+    // Complaints are only ever visible to leaders when their category (and, if set, subcategory)
+    // has been flagged endorsable by an admin. A subcategory can only narrow this, never widen it.
+    private const ENDORSABLE_CLAUSE = "cat.leader_endorsable = 1
+               AND (c.subcategory_id IS NULL OR sub.leader_endorsable = 1)";
+
+    // Department scope: senior leaders (no rows in student_rep_departments) see every department;
+    // department-scoped leaders only see complaints in the departments they represent.
+    private function departmentScopeClause(): string
     {
         $depts = $this->getDepartments();
-        if (empty($depts))
-            return [];
-
+        if (empty($depts)) {
+            return '1=1';
+        }
         $deptIds = implode(',', array_column($depts, 'department_id'));
+        return "c.department_id IN ($deptIds)";
+    }
+
+    // Get all complaints visible to this leader (rank + endorsable-category scoped)
+    public function getComplaints(int $limit = 0): array
+    {
+        $deptClause = $this->departmentScopeClause();
         $uid = (int) $this->userId;
         $limitClause = $limit > 0 ? "LIMIT $limit" : '';
 
@@ -94,65 +107,63 @@ class StudentLeader
                              AND ce2.leader_id = $uid) AS i_endorsed
              FROM complaints c
              JOIN complaint_categories cat ON cat.category_id = c.category_id
-             JOIN departments d            ON d.department_id = c.department_id
+             LEFT JOIN complaint_subcategories sub ON sub.subcategory_id = c.subcategory_id
+             LEFT JOIN departments d       ON d.department_id = c.department_id
              JOIN students st              ON st.student_id = c.student_id
              JOIN users u                  ON u.user_id = st.student_user_id
-             WHERE c.department_id IN ($deptIds)
+             WHERE $deptClause
+               AND " . self::ENDORSABLE_CLAUSE . "
              ORDER BY c.created_at DESC
              $limitClause"
         );
         return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
     }
 
-    // Get a single complaint by ID (scope-checked against leader's departments)
+    // Get a single complaint by ID (scope-checked against leader's rank/departments and endorsable categories)
     public function getComplaintById(int $complaintId): ?array
     {
-        $depts = $this->getDepartments();
-        if (empty($depts))
-            return null;
-
-        $deptIds = implode(',', array_column($depts, 'department_id'));
+        $deptClause = $this->departmentScopeClause();
         $uid = (int) $this->userId;
         $cid = (int) $complaintId;
 
         $result = $this->conn->query(
             "SELECT c.complaint_id, c.complaint_title, c.complaint_description,
                     c.complaint_status, c.priority, c.is_anonymous, c.created_at,
-                    cat.category_name, d.department_name,
+                    cat.category_name, sub.subcategory_name, d.department_name,
                     CASE WHEN c.is_anonymous = 1 THEN 'Anonymous' ELSE u.username END AS student_name,
                     EXISTS(SELECT 1 FROM complaint_endorsements ce
                            WHERE ce.complaint_id = c.complaint_id
                              AND ce.leader_id = $uid) AS i_endorsed
              FROM complaints c
              JOIN complaint_categories cat ON cat.category_id = c.category_id
-             JOIN departments d            ON d.department_id = c.department_id
+             LEFT JOIN complaint_subcategories sub ON sub.subcategory_id = c.subcategory_id
+             LEFT JOIN departments d       ON d.department_id = c.department_id
              JOIN students st              ON st.student_id = c.student_id
              JOIN users u                  ON u.user_id = st.student_user_id
              WHERE c.complaint_id = $cid
-               AND c.department_id IN ($deptIds)
+               AND $deptClause
+               AND " . self::ENDORSABLE_CLAUSE . "
              LIMIT 1"
         );
         return $result ? ($result->fetch_assoc() ?: null) : null;
     }
 
-    // Get complaint count statistics for the leader's departments
+    // Get complaint count statistics for the leader's scope (rank + endorsable categories)
     public function getStats(): array
     {
-        $depts = $this->getDepartments();
-        if (empty($depts)) {
-            return ['total' => 0, 'pending' => 0, 'in_progress' => 0, 'resolved' => 0, 'endorsed' => 0];
-        }
-
-        $deptIds = implode(',', array_column($depts, 'department_id'));
+        $deptClause = $this->departmentScopeClause();
         $uid = (int) $this->userId;
 
         $row = $this->conn->query(
             "SELECT COUNT(*) AS total,
-                    SUM(complaint_status = 'pending')     AS pending,
-                    SUM(complaint_status = 'in_progress') AS in_progress,
-                    SUM(complaint_status = 'resolved')    AS resolved
-             FROM complaints
-             WHERE department_id IN ($deptIds)"
+                    SUM(c.complaint_status = 'pending')     AS pending,
+                    SUM(c.complaint_status = 'in_progress') AS in_progress,
+                    SUM(c.complaint_status = 'resolved')    AS resolved
+             FROM complaints c
+             JOIN complaint_categories cat ON cat.category_id = c.category_id
+             LEFT JOIN complaint_subcategories sub ON sub.subcategory_id = c.subcategory_id
+             WHERE $deptClause
+               AND " . self::ENDORSABLE_CLAUSE
         )->fetch_assoc();
 
         $endorsed = (int) $this->conn->query(
@@ -183,9 +194,25 @@ class StudentLeader
         return $row !== null;
     }
 
+    // Whether a complaint has reached a final state where endorsements should be frozen
+    public function isComplaintFinalized(int $complaintId): bool
+    {
+        $stmt = $this->conn->prepare("SELECT complaint_status FROM complaints WHERE complaint_id = ? LIMIT 1");
+        if (!$stmt)
+            return false;
+        $stmt->bind_param('i', $complaintId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return in_array($row['complaint_status'] ?? '', [STATUS_RESOLVED, STATUS_REJECTED], true);
+    }
+
     // Endorse a complaint with an optional note
     public function endorse(int $complaintId, string $note = ''): bool
     {
+        if ($this->isComplaintFinalized($complaintId))
+            return false;
+
         $stmt = $this->conn->prepare(
             "INSERT IGNORE INTO complaint_endorsements (complaint_id, leader_id, note) VALUES (?, ?, ?)"
         );
@@ -201,6 +228,9 @@ class StudentLeader
     // Remove this leader's endorsement from a complaint
     public function removeEndorsement(int $complaintId): bool
     {
+        if ($this->isComplaintFinalized($complaintId))
+            return false;
+
         $stmt = $this->conn->prepare(
             "DELETE FROM complaint_endorsements WHERE complaint_id = ? AND leader_id = ?"
         );
@@ -305,7 +335,8 @@ class StudentLeader
         return $ok;
     }
 
-    // Get all current student reps with their departments and endorsement counts
+    // Get all current student reps with their departments and endorsement counts.
+    // Reps with no department rows are "senior leaders" who oversee every department.
     public function getAllReps(): array
     {
         $result = $this->conn->query(
@@ -315,19 +346,20 @@ class StudentLeader
                     GROUP_CONCAT(s.department_id   ORDER BY d.department_name SEPARATOR ',') AS department_ids,
                     (SELECT COUNT(*) FROM complaint_endorsements ce WHERE ce.leader_id = u.user_id) AS endorsement_count
              FROM users u
-             JOIN student_rep_departments s ON s.user_id = u.user_id
-             JOIN departments d             ON d.department_id = s.department_id
-             LEFT JOIN students st          ON st.student_user_id = u.user_id
+             LEFT JOIN student_rep_departments s ON s.user_id = u.user_id
+             LEFT JOIN departments d             ON d.department_id = s.department_id
+             LEFT JOIN students st               ON st.student_user_id = u.user_id
+             WHERE u.user_role = 'student_leader'
              GROUP BY u.user_id, u.username, u.user_email, u.user_status, st.student_registration_number
              ORDER BY u.username"
         );
         return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
     }
 
-    // Check if this user is an active student rep
+    // Check if this user is an active student rep (department-scoped or senior)
     public function isLeader(): bool
     {
-        $stmt = $this->conn->prepare("SELECT id FROM student_rep_departments WHERE user_id = ? LIMIT 1");
+        $stmt = $this->conn->prepare("SELECT user_id FROM users WHERE user_id = ? AND user_role = 'student_leader' LIMIT 1");
         if (!$stmt)
             return false;
         $stmt->bind_param('i', $this->userId);
@@ -335,6 +367,36 @@ class StudentLeader
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
         return $row !== null;
+    }
+
+    // Whether this leader has no department rows, i.e. a senior leader who sees every department
+    public function isSenior(): bool
+    {
+        return empty($this->getDepartments());
+    }
+
+    // Promote a student straight to a senior (all-department) leader, with no department rows
+    public function promoteAsSeniorLeader(): bool
+    {
+        $upd = $this->conn->prepare("UPDATE users SET user_role = 'student_leader' WHERE user_id = ?");
+        if (!$upd)
+            return false;
+        $upd->bind_param('i', $this->userId);
+        $ok = $upd->execute();
+        $upd->close();
+        return $ok;
+    }
+
+    // Demote a senior leader (no departments) back to a plain student
+    public function demoteToStudent(): bool
+    {
+        $upd = $this->conn->prepare("UPDATE users SET user_role = 'student' WHERE user_id = ?");
+        if (!$upd)
+            return false;
+        $upd->bind_param('i', $this->userId);
+        $ok = $upd->execute();
+        $upd->close();
+        return $ok;
     }
 
     // Get the student_id for this leader (leaders are also students)
@@ -426,18 +488,19 @@ class StudentLeader
         ];
     }
 
-    // Count pending complaints in the leader's departments that the leader has NOT yet endorsed
+    // Count pending complaints in the leader's scope that the leader has NOT yet endorsed
     public function getUnendorsedPendingCount(): int
     {
-        $depts = $this->getDepartments();
-        if (empty($depts)) return 0;
-        $deptIds = implode(',', array_column($depts, 'department_id'));
+        $deptClause = $this->departmentScopeClause();
         $uid = (int)$this->userId;
         $row = $this->conn->query(
             "SELECT COUNT(*) AS cnt
              FROM complaints c
-             WHERE c.department_id IN ($deptIds)
+             JOIN complaint_categories cat ON cat.category_id = c.category_id
+             LEFT JOIN complaint_subcategories sub ON sub.subcategory_id = c.subcategory_id
+             WHERE $deptClause
                AND c.complaint_status = 'pending'
+               AND " . self::ENDORSABLE_CLAUSE . "
                AND NOT EXISTS (
                    SELECT 1 FROM complaint_endorsements ce
                    WHERE ce.complaint_id = c.complaint_id

@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../vendor/phpmailer/Exception.php';
 require_once __DIR__ . '/../vendor/phpmailer/PHPMailer.php';
 require_once __DIR__ . '/../vendor/phpmailer/SMTP.php';
+require_once __DIR__ . '/Settings.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
@@ -10,26 +11,26 @@ use PHPMailer\PHPMailer\Exception as MailException;
 class Mailer
 {
     // Send a single HTML email. Returns true on success, throws on failure.
-    public static function send(string $toEmail, string $toName, string $subject, string $htmlBody): bool
+    public static function send(mysqli $conn, string $toEmail, string $toName, string $subject, string $htmlBody): bool
     {
-        $cfg = require __DIR__ . '/../config/email.php';
+        $cfg = (new Settings($conn))->get();
 
         $mail = new PHPMailer(true); // true = throw exceptions on error
 
         // Server settings
         $mail->isSMTP();
-        $mail->Host = $cfg['host'];
-        $mail->Port = $cfg['port'];
+        $mail->Host = $cfg['smtp_host'];
+        $mail->Port = $cfg['smtp_port'];
         $mail->SMTPDebug = SMTP::DEBUG_OFF;
 
-        if (!empty($cfg['username'])) {
+        if (!empty($cfg['smtp_username'])) {
             $mail->SMTPAuth = true;
-            $mail->Username = $cfg['username'];
-            $mail->Password = $cfg['password'];
+            $mail->Username = $cfg['smtp_username'];
+            $mail->Password = $cfg['smtp_password'];
         }
 
-        if (!empty($cfg['encryption'])) {
-            $mail->SMTPSecure = $cfg['encryption'];
+        if (!empty($cfg['smtp_encryption'])) {
+            $mail->SMTPSecure = $cfg['smtp_encryption'];
         } else {
             $mail->SMTPAutoTLS = false;
         }
@@ -52,14 +53,16 @@ class Mailer
 
     // Build the standard HTML email body used for all notification emails.
     public static function buildBody(
+        mysqli $conn,
         string $recipientName,
         string $message,
         ?string $link = null,
         string $linkText = 'View Details'
     ): string {
-        $cfg = require __DIR__ . '/../config/email.php';
+        $cfg = (new Settings($conn))->get();
         $fullUrl = $link ? rtrim($cfg['app_url'], '/') . '/' . ltrim($link, '/') : null;
         $year = date('Y');
+        $institutionName = htmlspecialchars($cfg['institution_name']);
 
         $buttonHtml = $fullUrl
             ? '<a href="' . htmlspecialchars($fullUrl) . '"
@@ -86,7 +89,7 @@ class Mailer
                         <tr>
                             <td style="background:#001a52;padding:28px 32px;text-align:center;">
                                 <h1 style="margin:0;color:#fff;font-size:22px;letter-spacing:.5px;">
-                                    UDSM SCMRS
+                                    {$institutionName} SCMRS
                                 </h1>
                                 <p style="margin:4px 0 0;color:rgba(255,255,255,.7);font-size:12px;">
                                     Student Complaint Management &amp; Reporting System
@@ -116,11 +119,11 @@ class Mailer
                         <tr>
                             <td style="padding:20px 40px;text-align:center;">
                                 <p style="margin:0;font-size:12px;color:#999;">
-                                    This is an automated message from the UDSM Student Complaint
+                                    This is an automated message from the {$institutionName} Student Complaint
                                     Management &amp; Reporting System. Please do not reply to this email.
                                 </p>
                                 <p style="margin:8px 0 0;font-size:12px;color:#bbb;">
-                                    &copy; {$year} University of Dar es Salaam
+                                    &copy; {$year} {$institutionName}
                                 </p>
                             </td>
                         </tr>
