@@ -370,7 +370,7 @@ function formatStatusLabel($status)
                         <p class="text-muted small mb-3">Your latest complaint assignments</p>
 
                         <div class="table-responsive">
-                            <table id="complaintsTable" class="table table-stripped">
+                            <table id="complaintsTable" class="table table-striped">
                                 <thead class="table-light">
                                     <tr>
                                         <th>ID</th>
@@ -463,7 +463,6 @@ function formatStatusLabel($status)
     <!-- <script src="assets/js/dataTables.bootstrap4.min.js"></script> -->
     <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
-    <!-- CDN fallback (removed - JS local file works on shared hosting): -->
     <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/10.16.7/sweetalert2.all.min.js"></script> -->
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>

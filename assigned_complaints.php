@@ -186,7 +186,7 @@ function formatStatusLabel($status)
                     </div>
                 </div>
 
-                <!-- ── Filter Card ──────────────────────────────────────── -->
+                <!-- Filter Card -->
                 <div class="container-card shadow-sm">
                     <div class="row g-2 align-items-end">
                         <div class="col-12 col-sm-6 col-md-4 col-lg-2">
@@ -195,7 +195,7 @@ function formatStatusLabel($status)
                                 <option value="">All Statuses</option>
                                 <option value="pending">Pending</option>
                                 <option value="in_progress">In Progress</option>
-                                <option value="awaiting_response">Awaiting Response</option>
+                                <option value="awaiting_student_response">Awaiting Response</option>
                                 <option value="resolved">Resolved</option>
                                 <option value="rejected">Rejected</option>
                                 <option value="overdue">Overdue</option>
@@ -229,7 +229,7 @@ function formatStatusLabel($status)
                     </div>
                 </div>
 
-                <!-- ── Table Card ───────────────────────────────────────── -->
+                <!-- Table Card -->
                 <div class="container-card shadow-sm">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <h4 class="mb-0 fw-bold"><i class="fas fa-file-invoice me-2"></i>Assigned Complaints</h4>
@@ -238,7 +238,7 @@ function formatStatusLabel($status)
                     <p class="text-muted small mb-3">Complaints currently assigned to you.</p>
 
                     <div class="table-responsive">
-                        <table class="table table-stripped" id="complaintsTable">
+                        <table class="table table-striped" id="complaintsTable">
                             <thead class="table-light">
                                 <tr>
                                     <th>#</th>
@@ -284,16 +284,16 @@ function formatStatusLabel($status)
                                                         <small class="text-muted"><?= $deadline->format('d M Y') ?></small>
                                                     <?php endif; ?>
                                                 <?php else: ?>
-                                                    <small class="text-muted">—</small>
+                                                    <small class="text-muted">-</small>
                                                 <?php endif; ?>
                                             </td>
                                             <td class="text-center">
                                                 <div class="d-flex justify-content-center gap-1">
-                                                    <a href="assigned_complaint_details.php?id=<?= urlencode($complaint['complaint_id']) ?>" class="btn btn-status btn-outline-secondary" title="View Details">
+                                                    <a href="assigned_complaint_details.php?id=<?= (int)$complaint['complaint_id'] ?>" class="btn btn-status btn-outline-secondary" title="View Details">
                                                         <i class="fas fa-eye text-dark"></i>
                                                     </a>
                                                     <?php if ($isOpen): ?>
-                                                        <a href="assigned_complaint_details.php?id=<?= urlencode($complaint['complaint_id']) ?>#respond" class="btn btn-status btn-outline-primary" title="Respond">
+                                                        <a href="assigned_complaint_details.php?id=<?= (int)$complaint['complaint_id'] ?>#respond" class="btn btn-status btn-outline-primary" title="Respond">
                                                             <i class="fas fa-reply"></i>
                                                         </a>
                                                     <?php endif; ?>
