@@ -279,7 +279,7 @@ class Staff
 
             $this->conn->commit();
 
-            // Notify the receiving staff (outside transaction — non-critical)
+            // Notify the receiving staff (outside transaction - non-critical)
             $toUserStmt = $this->conn->prepare(
                 "SELECT staff_user_id FROM staffs WHERE staff_id = ? LIMIT 1"
             );
@@ -475,6 +475,11 @@ class Staff
             $oldStmt->close();
             $oldStatus = $old['complaint_status'] ?? STATUS_IN_PROGRESS;
 
+            // Guard: do not allow info requests on closed complaints
+            if (in_array($oldStatus, [STATUS_RESOLVED, STATUS_REJECTED], true)) {
+                throw new Exception("Cannot request information on a closed complaint.");
+            }
+
             $insStmt = $this->conn->prepare(
                 "INSERT INTO information_requests (complaint_id, requested_by, request_message) VALUES (?, ?, ?)"
             );
@@ -638,6 +643,26 @@ class Staff
                 }
             }
 
+            // Notify leaders who endorsed this complaint (status only - they never see the resolution text)
+            if (in_array($newStatus, [STATUS_RESOLVED, STATUS_REJECTED], true)) {
+                $endStmt = $this->conn->prepare("SELECT DISTINCT leader_id FROM complaint_endorsements WHERE complaint_id = ?");
+                $endStmt->bind_param('i', $complaintId);
+                $endStmt->execute();
+                $endorsers = $endStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                $endStmt->close();
+                $statusLabel = $newStatus === STATUS_RESOLVED ? 'Resolved' : 'Rejected';
+                $notifLeader = new Notification($this->conn);
+                foreach ($endorsers as $row) {
+                    $notifLeader->create(
+                        (int) $row['leader_id'],
+                        "A complaint you endorsed (#$complaintId) has been marked as $statusLabel.",
+                        'endorsed_complaint_updated',
+                        "leader_complaint_details.php?id=$complaintId",
+                        $complaintId
+                    );
+                }
+            }
+
             return true;
         } catch (Exception $e) {
             $this->conn->rollback();
@@ -758,7 +783,7 @@ class Staff
 
             $this->conn->commit();
 
-            // Notify the receiving staff (outside transaction — non-critical)
+            // Notify the receiving staff (outside transaction - non-critical)
             $toUserStmt = $this->conn->prepare(
                 "SELECT staff_user_id FROM staffs WHERE staff_id = ? LIMIT 1"
             );

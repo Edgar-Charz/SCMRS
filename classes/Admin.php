@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/User.php';
 require_once __DIR__ . '/Notification.php';
+require_once __DIR__ . '/Settings.php';
 
 class Admin extends User
 {
@@ -161,8 +162,9 @@ class Admin extends User
     public function getAllStudents()
     {
         $stmt = $this->conn->prepare(
-            "SELECT users.user_id, users.username, users.user_email, users.user_phone_number, users.user_status,
-                    students.student_registration_number, students.student_program, colleges.college_name
+            "SELECT users.user_id, users.username, users.user_email, users.user_phone_number, users.user_status, users.user_role,
+                    students.student_registration_number, students.student_program, colleges.college_name,
+                    (SELECT COUNT(*) FROM student_rep_departments srd WHERE srd.user_id = users.user_id) AS rep_department_count
                  FROM users
                  JOIN students ON users.user_id = students.student_user_id
                  LEFT JOIN colleges ON students.student_college_id = colleges.college_id
@@ -327,6 +329,7 @@ class Admin extends User
                 try {
                     require_once __DIR__ . '/Mailer.php';
                     $body = Mailer::buildBody(
+                        $this->conn,
                         $uRow['username'],
                         "Unfortunately, your staff account registration has not been approved. Please contact the administrator for more information.",
                         null
@@ -470,6 +473,7 @@ class Admin extends User
     {
         $stmt = $this->conn->prepare(
             "SELECT c.*, cc.category_name,
+                    csc.subcategory_name,
                     u.username AS student_name,
                     u.user_email AS student_email,
                     u.user_phone_number AS student_phone,
@@ -478,6 +482,7 @@ class Admin extends User
                     su.username AS assigned_staff_name
              FROM complaints c
              JOIN complaint_categories cc ON c.category_id = cc.category_id
+             LEFT JOIN complaint_subcategories csc ON c.category_id = csc.category_id
              JOIN students s ON c.student_id = s.student_id
              JOIN users u ON s.student_user_id = u.user_id
              LEFT JOIN departments d ON c.department_id = d.department_id
@@ -557,7 +562,7 @@ class Admin extends User
     }
 
     // Assign complaint to a staff member
-    public function assignComplaint($complaintId, $staffId, $priority, $note = '', $assignedByUserId = null)
+    public function assignComplaint($complaintId, $staffId, $priority, $note = '', $assignedByUserId = null, $isAutoRouted = false)
     {
         try {
             $this->conn->begin_transaction();
@@ -596,7 +601,8 @@ class Admin extends User
             $stmt->close();
 
             // Record in complaint_assignments table
-            $adminId = $assignedByUserId ?? $_SESSION['user_id'];
+            // NULL = auto-routed by the system, no human assigner
+            $adminId = $isAutoRouted ? null : ($assignedByUserId ?? $_SESSION['user_id']);
             $assignStmt = $this->conn->prepare(
                 "INSERT INTO complaint_assignments (complaint_id, staff_id, assigned_by, is_lead, status, notes)
                  VALUES (?, ?, ?, 1, 'active', ?)"
@@ -606,8 +612,13 @@ class Admin extends User
             $assignStmt->execute();
             $assignStmt->close();
 
-            // Auto-set SLA deadline: high=2 days, medium=5, low=10
-            $slaDays = ['high' => 2, 'medium' => 5, 'low' => 10][$priority] ?? 5;
+            // Auto-set SLA deadline from configured routing defaults
+            $routingSettings = (new Settings($this->conn))->get();
+            $slaDays = [
+                'high'   => (int) $routingSettings['sla_high_days'],
+                'medium' => (int) $routingSettings['sla_medium_days'],
+                'low'    => (int) $routingSettings['sla_low_days'],
+            ][$priority] ?? (int) $routingSettings['sla_medium_days'];
             $slaStmt = $this->conn->prepare(
                 "UPDATE complaint_assignments SET target_resolution_date = DATE_ADD(NOW(), INTERVAL ? DAY)
                  WHERE complaint_id = ? AND status = 'active' AND is_lead = 1"
@@ -682,7 +693,7 @@ class Admin extends User
              JOIN staffs s ON ca.staff_id = s.staff_id
              JOIN users u ON s.staff_user_id = u.user_id
              LEFT JOIN staff_roles sr ON s.staff_role_id = sr.role_id
-             JOIN users ab ON ca.assigned_by = ab.user_id
+             LEFT JOIN users ab ON ca.assigned_by = ab.user_id
              WHERE ca.complaint_id = ?
              ORDER BY ca.assigned_at DESC"
         );
@@ -746,6 +757,24 @@ class Admin extends User
                 (new Notification($this->conn))->create($studRow['user_id'], $msg, $type, "student_complaint_details.php?id=$complaintId", $complaintId);
             }
 
+            // Notify leaders who endorsed this complaint (status only - they never see the resolution text)
+            $endStmt = $this->conn->prepare("SELECT DISTINCT leader_id FROM complaint_endorsements WHERE complaint_id = ?");
+            $endStmt->bind_param('i', $complaintId);
+            $endStmt->execute();
+            $endorsers = $endStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $endStmt->close();
+            $statusLabel = $newStatus === STATUS_RESOLVED ? 'Resolved' : 'Rejected';
+            $notifLeader = new Notification($this->conn);
+            foreach ($endorsers as $row) {
+                $notifLeader->create(
+                    (int) $row['leader_id'],
+                    "A complaint you endorsed (#$complaintId) has been marked as $statusLabel.",
+                    'endorsed_complaint_updated',
+                    "leader_complaint_details.php?id=$complaintId",
+                    $complaintId
+                );
+            }
+
             return true;
         } catch (Exception $e) {
             $this->conn->rollback();
@@ -792,12 +821,14 @@ class Admin extends User
         $stmt->close();
 
         if ($ok) {
+            $webRoot = dirname(__DIR__);
             foreach ($filePaths as $path) {
-                if (file_exists($path)) {
-                    unlink($path);
+                $abs = $webRoot . '/' . ltrim($path, '/\\');
+                if (file_exists($abs)) {
+                    unlink($abs);
                 }
             }
-            $dir = "uploads/complaints/$complaintId";
+            $dir = $webRoot . "/uploads/complaints/$complaintId";
             if (is_dir($dir) && count(scandir($dir)) === 2) {
                 rmdir($dir);
             }
@@ -966,8 +997,8 @@ class Admin extends User
 
         $sql = "SELECT
                     u.username AS staff_name,
-                    COALESCE(d.department_name, '—') AS department_name,
-                    COALESCE(sr.role_name, '—') AS role_name,
+                    COALESCE(d.department_name, '-') AS department_name,
+                    COALESCE(sr.role_name, '-') AS role_name,
                     COUNT(c.complaint_id) AS total,
                     SUM(c.complaint_status = 'pending')     AS pending,
                     SUM(c.complaint_status = 'in_progress') AS in_progress,
@@ -1093,14 +1124,19 @@ class Admin extends User
         return $data;
     }
 
+    // Ranks intentionally are not unique: multiple role names can share a rank
+    // to represent peers at the same escalation tier (e.g. "Registrar Officer"
+    // and "Academic Officer" who both report to the same Head, but neither
+    // escalates to the other). Only the exact same name+rank pair is rejected
+    // as a redundant duplicate.
     public function addStaffRole($name, $rank)
     {
-        $chk = $this->conn->prepare("SELECT role_id FROM staff_roles WHERE role_rank = ?");
-        $chk->bind_param("i", $rank);
+        $chk = $this->conn->prepare("SELECT role_id FROM staff_roles WHERE role_rank = ? AND LOWER(role_name) = LOWER(?)");
+        $chk->bind_param("is", $rank, $name);
         $chk->execute();
         if ($chk->get_result()->num_rows > 0) {
             $chk->close();
-            throw new Exception("A role with rank {$rank} already exists.");
+            throw new Exception("A role named '{$name}' at rank {$rank} already exists.");
         }
         $chk->close();
         $stmt = $this->conn->prepare("INSERT INTO staff_roles (role_name, role_rank) VALUES (?, ?)");
@@ -1112,12 +1148,12 @@ class Admin extends User
 
     public function updateStaffRole($id, $name, $rank)
     {
-        $chk = $this->conn->prepare("SELECT role_id FROM staff_roles WHERE role_rank = ? AND role_id != ?");
-        $chk->bind_param("ii", $rank, $id);
+        $chk = $this->conn->prepare("SELECT role_id FROM staff_roles WHERE role_rank = ? AND LOWER(role_name) = LOWER(?) AND role_id != ?");
+        $chk->bind_param("isi", $rank, $name, $id);
         $chk->execute();
         if ($chk->get_result()->num_rows > 0) {
             $chk->close();
-            throw new Exception("A role with rank {$rank} already exists.");
+            throw new Exception("A role named '{$name}' at rank {$rank} already exists.");
         }
         $chk->close();
         $stmt = $this->conn->prepare("UPDATE staff_roles SET role_name = ?, role_rank = ? WHERE role_id = ?");
@@ -1239,16 +1275,23 @@ class Admin extends User
         $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
 
-        // Group into tiers by rank so equal-rank staff render side by side
+        // Group into tiers by rank (not role_id) so peer roles that share a rank -
+        // e.g. "Registrar Officer" and "Academic Officer" who both report to the
+        // same Head but don't escalate to each other - land in the same tier
+        // instead of rendering as fake, separately-stacked levels.
         $tiers = [];
         foreach ($data as $row) {
-            $key = $row['staff_role_id'] ?? 'unassigned';
+            $key = $row['role_rank'] ?? 'unassigned';
             if (!isset($tiers[$key])) {
                 $tiers[$key] = [
-                    'role_name' => $row['role_name'] ?? 'No Role Assigned',
+                    'role_names' => [],
                     'role_rank' => $row['role_rank'] ?? null,
                     'staff' => [],
                 ];
+            }
+            $roleName = $row['role_name'] ?? 'No Role Assigned';
+            if (!in_array($roleName, $tiers[$key]['role_names'], true)) {
+                $tiers[$key]['role_names'][] = $roleName;
             }
             $tiers[$key]['staff'][] = $row;
         }
@@ -1262,7 +1305,7 @@ class Admin extends User
     {
         $stmt = $this->conn->prepare(
             "SELECT cc.category_id, cc.category_name, cc.category_description, cc.status,
-                    cc.requires_department_selection, cc.auto_assign_department_id, cc.default_role_id,
+                    cc.requires_department_selection, cc.leader_endorsable, cc.auto_assign_department_id, cc.default_role_id,
                     d.department_name AS default_dept_name,
                     sr.role_name AS default_role_name,
                     COUNT(c.complaint_id) AS complaint_count
@@ -1279,36 +1322,55 @@ class Admin extends User
         return $data;
     }
 
-    public function addCategory($name, $description, $createdBy, $departmentId = null, $requiresDeptSelection = 0, $defaultRoleId = null)
+    public function addCategory($name, $description, $createdBy, $departmentId = null, $requiresDeptSelection = 0, $defaultRoleId = null, $leaderEndorsable = 0)
     {
         $deptId = ($departmentId > 0) ? (int) $departmentId : null;
         $roleId = ($defaultRoleId > 0) ? (int) $defaultRoleId : null;
         $reqDept = $requiresDeptSelection ? 1 : 0;
+        $endorsable = $leaderEndorsable ? 1 : 0;
         $stmt = $this->conn->prepare(
             "INSERT INTO complaint_categories
-                (category_name, category_description, requires_department_selection, auto_assign_department_id, default_role_id, created_by)
-             VALUES (?, ?, ?, ?, ?, ?)"
+                (category_name, category_description, requires_department_selection, leader_endorsable, auto_assign_department_id, default_role_id, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?)"
         );
-        $stmt->bind_param("ssiiii", $name, $description, $reqDept, $deptId, $roleId, $createdBy);
+        $stmt->bind_param("ssiiiii", $name, $description, $reqDept, $endorsable, $deptId, $roleId, $createdBy);
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;
     }
 
-    public function updateCategory($id, $name, $description, $status, $departmentId = null, $requiresDeptSelection = 0, $defaultRoleId = null)
+    public function updateCategory($id, $name, $description, $status, $departmentId = null, $requiresDeptSelection = 0, $defaultRoleId = null, $leaderEndorsable = 0)
     {
         $deptId = ($departmentId > 0) ? (int) $departmentId : null;
         $roleId = ($defaultRoleId > 0) ? (int) $defaultRoleId : null;
         $reqDept = $requiresDeptSelection ? 1 : 0;
+        $endorsable = $leaderEndorsable ? 1 : 0;
+
+        $wasStmt = $this->conn->prepare("SELECT leader_endorsable FROM complaint_categories WHERE category_id = ?");
+        $wasStmt->bind_param("i", $id);
+        $wasStmt->execute();
+        $wasEndorsable = (int) ($wasStmt->get_result()->fetch_assoc()['leader_endorsable'] ?? 0);
+        $wasStmt->close();
+
         $stmt = $this->conn->prepare(
             "UPDATE complaint_categories
              SET category_name = ?, category_description = ?, status = ?,
-                 requires_department_selection = ?, auto_assign_department_id = ?, default_role_id = ?
+                 requires_department_selection = ?, leader_endorsable = ?, auto_assign_department_id = ?, default_role_id = ?
              WHERE category_id = ?"
         );
-        $stmt->bind_param("sssiiii", $name, $description, $status, $reqDept, $deptId, $roleId, $id);
+        $stmt->bind_param("sssiiiii", $name, $description, $status, $reqDept, $endorsable, $deptId, $roleId, $id);
         $ok = $stmt->execute();
         $stmt->close();
+
+        // Newly turning a category endorsable also enables its existing subcategories,
+        // so admins aren't tripped up by the category-on/subcategory-off AND rule.
+        if ($endorsable && !$wasEndorsable) {
+            $cascade = $this->conn->prepare("UPDATE complaint_subcategories SET leader_endorsable = 1 WHERE category_id = ?");
+            $cascade->bind_param("i", $id);
+            $cascade->execute();
+            $cascade->close();
+        }
+
         return $ok;
     }
 
@@ -1335,14 +1397,14 @@ class Admin extends User
     {
         $stmt = $this->conn->prepare(
             "SELECT cs.subcategory_id, cs.category_id, cs.subcategory_name,
-                    cs.subcategory_description, cs.status, cs.default_role_id,
+                    cs.subcategory_description, cs.leader_endorsable, cs.status, cs.default_role_id,
                     sr.role_name AS default_role_name,
                     COUNT(c.complaint_id) AS complaint_count
                  FROM complaint_subcategories cs
                  LEFT JOIN complaints c ON cs.subcategory_id = c.subcategory_id
                  LEFT JOIN staff_roles sr ON cs.default_role_id = sr.role_id
                  GROUP BY cs.subcategory_id, cs.category_id, cs.subcategory_name,
-                          cs.subcategory_description, cs.status, cs.default_role_id, sr.role_name
+                          cs.subcategory_description, cs.leader_endorsable, cs.status, cs.default_role_id, sr.role_name
                  ORDER BY cs.category_id ASC, cs.subcategory_name ASC"
         );
         $stmt->execute();
@@ -1355,30 +1417,32 @@ class Admin extends User
         return $grouped;
     }
 
-    public function addSubcategory($categoryId, $name, $description, $createdBy, $defaultRoleId = null)
+    public function addSubcategory($categoryId, $name, $description, $createdBy, $defaultRoleId = null, $leaderEndorsable = 0)
     {
         $roleId = ($defaultRoleId > 0) ? (int) $defaultRoleId : null;
+        $endorsable = $leaderEndorsable ? 1 : 0;
         $stmt = $this->conn->prepare(
-            "INSERT INTO complaint_subcategories (category_id, subcategory_name, subcategory_description, default_role_id, created_by)
-             VALUES (?, ?, ?, ?, ?)"
+            "INSERT INTO complaint_subcategories (category_id, subcategory_name, subcategory_description, leader_endorsable, default_role_id, created_by)
+             VALUES (?, ?, ?, ?, ?, ?)"
         );
         $desc = $description ?: null;
-        $stmt->bind_param("issii", $categoryId, $name, $desc, $roleId, $createdBy);
+        $stmt->bind_param("issiii", $categoryId, $name, $desc, $endorsable, $roleId, $createdBy);
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;
     }
 
-    public function updateSubcategory($id, $name, $description, $status, $defaultRoleId = null)
+    public function updateSubcategory($id, $name, $description, $status, $defaultRoleId = null, $leaderEndorsable = 0)
     {
         $roleId = ($defaultRoleId > 0) ? (int) $defaultRoleId : null;
+        $endorsable = $leaderEndorsable ? 1 : 0;
         $stmt = $this->conn->prepare(
             "UPDATE complaint_subcategories
-             SET subcategory_name = ?, subcategory_description = ?, status = ?, default_role_id = ?
+             SET subcategory_name = ?, subcategory_description = ?, status = ?, leader_endorsable = ?, default_role_id = ?
              WHERE subcategory_id = ?"
         );
         $desc = $description ?: null;
-        $stmt->bind_param("sssii", $name, $desc, $status, $roleId, $id);
+        $stmt->bind_param("sssiii", $name, $desc, $status, $endorsable, $roleId, $id);
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;
@@ -1466,6 +1530,47 @@ class Admin extends User
             $this->conn->rollback();
             throw new Exception("Add staff error: " . $e->getMessage());
         }
+    }
+
+    // Add another admin account. No child table (unlike staff/students) - a users row is all that's needed.
+    public function addAdminAccount($username, $email, $password, $phone = null)
+    {
+        try {
+            $hash = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $this->conn->prepare(
+                "INSERT INTO users (username, user_email, user_phone_number, user_password, user_role, user_status)
+                 VALUES (?, ?, ?, ?, 'admin', 'active')"
+            );
+            $stmt->bind_param("ssss", $username, $email, $phone, $hash);
+            $stmt->execute();
+            $stmt->close();
+            return true;
+        } catch (Exception $e) {
+            throw new Exception("Add admin error: " . $e->getMessage());
+        }
+    }
+
+    // List all admin accounts for the settings page
+    public function getAdmins()
+    {
+        $result = $this->conn->query(
+            "SELECT user_id, username, user_email, user_phone_number, user_status, created_at
+             FROM users WHERE user_role = 'admin' ORDER BY created_at ASC"
+        );
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+
+    // Activate/deactivate an admin account. The role guard means this can never touch a non-admin row.
+    public function setAdminStatus($userId, $status)
+    {
+        $stmt = $this->conn->prepare(
+            "UPDATE users SET user_status = ? WHERE user_id = ? AND user_role = 'admin'"
+        );
+        $stmt->bind_param("si", $status, $userId);
+        $stmt->execute();
+        $ok = $stmt->affected_rows > 0;
+        $stmt->close();
+        return $ok;
     }
 
     // Get student feedback for a resolved complaint
@@ -1621,6 +1726,16 @@ class Admin extends User
         try {
             $this->conn->begin_transaction();
 
+            // Guard: do not allow info requests on closed complaints
+            $guardStmt = $this->conn->prepare("SELECT complaint_status FROM complaints WHERE complaint_id = ? LIMIT 1");
+            $guardStmt->bind_param('i', $complaintId);
+            $guardStmt->execute();
+            $guardRow = $guardStmt->get_result()->fetch_assoc();
+            $guardStmt->close();
+            if (in_array($guardRow['complaint_status'] ?? '', [STATUS_RESOLVED, STATUS_REJECTED], true)) {
+                throw new Exception("Cannot request information on a closed complaint.");
+            }
+
             $irStmt = $this->conn->prepare(
                 "INSERT INTO information_requests (complaint_id, requested_by, request_message)
                  VALUES (?, ?, ?)"
@@ -1652,6 +1767,32 @@ class Admin extends User
             $logStmt->close();
 
             $this->conn->commit();
+
+            // Notify the student that information has been requested
+            try {
+                $studStmt = $this->conn->prepare(
+                    "SELECT u.user_id FROM complaints c
+                     JOIN students s ON c.student_id = s.student_id
+                     JOIN users u ON s.student_user_id = u.user_id
+                     WHERE c.complaint_id = ? LIMIT 1"
+                );
+                $studStmt->bind_param('i', $complaintId);
+                $studStmt->execute();
+                $studRow = $studStmt->get_result()->fetch_assoc();
+                $studStmt->close();
+                if ($studRow) {
+                    (new Notification($this->conn))->create(
+                        $studRow['user_id'],
+                        "Additional information has been requested for your complaint #$complaintId. Please respond as soon as possible.",
+                        'request_info',
+                        "student_complaint_details.php?id=$complaintId#info-requests",
+                        $complaintId
+                    );
+                }
+            } catch (Throwable $e) {
+                error_log('[Admin::requestInformation] Notification failed: ' . $e->getMessage());
+            }
+
             return true;
         } catch (Exception $e) {
             $this->conn->rollback();
@@ -1712,5 +1853,61 @@ class Admin extends User
         }
 
         return count($rows);
+    }
+
+    public function updateStudent($userId, $username, $email, $regNumber, $program, $collegeId)
+    {
+        $this->conn->begin_transaction();
+        try {
+            $uStmt = $this->conn->prepare(
+                "UPDATE users SET username = ?, user_email = ? WHERE user_id = ?"
+            );
+            $uStmt->bind_param('ssi', $username, $email, $userId);
+            $uStmt->execute();
+            $uStmt->close();
+
+            $cId = ($collegeId > 0) ? (int) $collegeId : null;
+            $sStmt = $this->conn->prepare(
+                "UPDATE students SET student_registration_number = ?, student_program = ?, student_college_id = ?
+                 WHERE student_user_id = ?"
+            );
+            $sStmt->bind_param('ssii', $regNumber, $program, $cId, $userId);
+            $sStmt->execute();
+            $sStmt->close();
+
+            $this->conn->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->conn->rollback();
+            throw new Exception("Failed to update student: " . $e->getMessage());
+        }
+    }
+
+    public function updateStaff($userId, $username, $email, $departmentId, $roleId)
+    {
+        $this->conn->begin_transaction();
+        try {
+            $uStmt = $this->conn->prepare(
+                "UPDATE users SET username = ?, user_email = ? WHERE user_id = ?"
+            );
+            $uStmt->bind_param('ssi', $username, $email, $userId);
+            $uStmt->execute();
+            $uStmt->close();
+
+            $dId = ($departmentId > 0) ? (int) $departmentId : null;
+            $rId = ($roleId > 0) ? (int) $roleId : null;
+            $sStmt = $this->conn->prepare(
+                "UPDATE staffs SET staff_department_id = ?, staff_role_id = ? WHERE staff_user_id = ?"
+            );
+            $sStmt->bind_param('iii', $dId, $rId, $userId);
+            $sStmt->execute();
+            $sStmt->close();
+
+            $this->conn->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->conn->rollback();
+            throw new Exception("Failed to update staff: " . $e->getMessage());
+        }
     }
 }

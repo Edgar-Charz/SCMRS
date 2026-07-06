@@ -75,12 +75,13 @@ class Student extends User
     public function readStudentComplaint($complaintId)
     {
         $stmt = $this->conn->prepare(
-            "SELECT c.*, u.username, d.department_name, cc.category_name
+            "SELECT c.*, u.username, d.department_name, cc.category_name, csc.subcategory_name
              FROM complaints c
              LEFT JOIN students s ON c.student_id = s.student_id
              JOIN users u ON u.user_id = s.student_user_id
              LEFT JOIN departments d ON c.department_id = d.department_id
              LEFT JOIN complaint_categories cc ON c.category_id = cc.category_id
+             LEFT JOIN complaint_subcategories csc ON c.category_id = csc.category_id
              WHERE c.complaint_id = ?"
         );
         $stmt->bind_param("i", $complaintId);
@@ -90,7 +91,7 @@ class Student extends User
         return $data;
     }
 
-    // Complaint status history — all actors (admin, staff, student)
+    // Complaint status history for all actors (admin, staff, student)
     public function readStudentComplaintHistory($complaintId)
     {
         $stmt = $this->conn->prepare(
@@ -184,6 +185,33 @@ class Student extends User
             }
 
             $this->conn->commit();
+
+            // Notify the assigned lead staff member that the student has responded
+            try {
+                require_once __DIR__ . '/Notification.php';
+                $staffStmt = $this->conn->prepare(
+                    "SELECT sf.staff_user_id FROM complaint_assignments ca
+                     JOIN staffs sf ON ca.staff_id = sf.staff_id
+                     WHERE ca.complaint_id = ? AND ca.status = 'active' AND ca.is_lead = 1
+                     LIMIT 1"
+                );
+                $staffStmt->bind_param('i', $complaintId);
+                $staffStmt->execute();
+                $staffRow = $staffStmt->get_result()->fetch_assoc();
+                $staffStmt->close();
+                if ($staffRow) {
+                    (new Notification($this->conn))->create(
+                        $staffRow['staff_user_id'],
+                        "The student has responded to your information request on complaint #$complaintId. Please review their response.",
+                        'info_responded',
+                        "assigned_complaint_details.php?id=$complaintId#info-requests",
+                        $complaintId
+                    );
+                }
+            } catch (Throwable $e) {
+                error_log('[Student::respondToInfoRequest] Notification failed: ' . $e->getMessage());
+            }
+
             return true;
         } catch (Exception $e) {
             $this->conn->rollback();
@@ -243,7 +271,7 @@ class Student extends User
     {
         // Verify ownership, status and 7-day window
         $stmt = $this->conn->prepare(
-            "SELECT complaint_status, updated_at, assigned_staff_id
+            "SELECT complaint_status, updated_at
              FROM complaints
              WHERE complaint_id = ? AND student_id = ?"
         );
@@ -270,7 +298,7 @@ class Student extends User
 
         // Log the change
         $old = 'resolved'; $new = 'reopened';
-        $remarks = 'Student requested reopening — resolution was unsatisfactory.';
+        $remarks = 'Student requested reopening - resolution was unsatisfactory.';
         $stmt = $this->conn->prepare(
             "INSERT INTO complaint_status_logs (complaint_id, performed_by, action, old_status, new_status, remarks)
              VALUES (?, ?, 'complaint_reopened', ?, ?, ?)"
@@ -329,20 +357,24 @@ class Student extends User
     // Count complaints per status for tab badges
     public function getComplaintCounts($studentId)
     {
-        $counts   = [];
-        $statuses = ['all', 'awaiting_student_response', 'pending', 'in_progress', 'resolved', 'rejected'];
+        $stmt = $this->conn->prepare(
+            "SELECT complaint_status, COUNT(*) AS cnt
+             FROM complaints
+             WHERE student_id = ? AND complaint_status != 'deleted'
+             GROUP BY complaint_status"
+        );
+        $stmt->bind_param("i", $studentId);
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
 
-        foreach ($statuses as $status) {
-            if ($status === 'all') {
-                $stmt = $this->conn->prepare("SELECT COUNT(*) AS cnt FROM complaints WHERE student_id = ? AND complaint_status != 'deleted'");
-                $stmt->bind_param("i", $studentId);
-            } else {
-                $stmt = $this->conn->prepare("SELECT COUNT(*) AS cnt FROM complaints WHERE student_id = ? AND complaint_status = ? AND complaint_status != 'deleted'");
-                $stmt->bind_param("is", $studentId, $status);
-            }
-            $stmt->execute();
-            $counts[$status] = (int)$stmt->get_result()->fetch_assoc()['cnt'];
-            $stmt->close();
+        $counts = ['all' => 0];
+        foreach ($rows as $row) {
+            $counts[$row['complaint_status']] = (int) $row['cnt'];
+            $counts['all'] += (int) $row['cnt'];
+        }
+        foreach (['awaiting_student_response', 'pending', 'in_progress', 'resolved', 'rejected'] as $s) {
+            $counts[$s] = $counts[$s] ?? 0;
         }
 
         return $counts;
@@ -365,7 +397,7 @@ class Student extends User
     }
 
     // Edit a pending complaint (only allowed while status is pending)
-    public function updateComplaint($complaintId, $studentId, $title, $description, $categoryId, $subcategoryId, $isAnonymous = 0)
+    public function updateComplaint($complaintId, $studentId, $title, $description, $categoryId, $subcategoryId, $isAnonymous = 0, $departmentId = null)
     {
         $checkStmt = $this->conn->prepare(
             "SELECT complaint_id FROM complaints WHERE complaint_id = ? AND student_id = ? AND complaint_status = 'pending' LIMIT 1"
@@ -380,27 +412,21 @@ class Student extends User
         }
 
         $anon = $isAnonymous ? 1 : 0;
+        $subcatVal = $subcategoryId ?: null;
+        $deptVal = $departmentId ?: null;
 
-        if ($subcategoryId) {
-            $stmt = $this->conn->prepare(
-                "UPDATE complaints SET complaint_title = ?, complaint_description = ?, category_id = ?, subcategory_id = ?, is_anonymous = ?, updated_at = NOW()
-                 WHERE complaint_id = ? AND student_id = ?"
-            );
-            $stmt->bind_param("ssiiiii", $title, $description, $categoryId, $subcategoryId, $anon, $complaintId, $studentId);
-        } else {
-            $stmt = $this->conn->prepare(
-                "UPDATE complaints SET complaint_title = ?, complaint_description = ?, category_id = ?, subcategory_id = NULL, is_anonymous = ?, updated_at = NOW()
-                 WHERE complaint_id = ? AND student_id = ?"
-            );
-            $stmt->bind_param("ssiiii", $title, $description, $categoryId, $anon, $complaintId, $studentId);
-        }
+        $stmt = $this->conn->prepare(
+            "UPDATE complaints SET complaint_title = ?, complaint_description = ?, category_id = ?, subcategory_id = ?, department_id = ?, is_anonymous = ?, updated_at = NOW()
+             WHERE complaint_id = ? AND student_id = ?"
+        );
+        $stmt->bind_param("ssiiiiii", $title, $description, $categoryId, $subcatVal, $deptVal, $anon, $complaintId, $studentId);
 
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;
     }
 
-    // Delete a single attachment — verifies it belongs to a pending complaint owned by this student
+    // Delete a single attachment - verifies it belongs to a pending complaint owned by this student
     public function deleteAttachment($attachmentId, $complaintId, $studentId)
     {
         $stmt = $this->conn->prepare(
@@ -449,7 +475,7 @@ class Student extends User
             return false;
         }
 
-        // Soft delete: Update status to 'deleted' instead of hard delete
+        // Update status to 'deleted' instead of hard delete
         $stmt = $this->conn->prepare(
             "UPDATE complaints SET complaint_status = 'deleted', updated_at = NOW() WHERE complaint_id = ?"
         );
@@ -473,5 +499,20 @@ class Student extends User
         }
 
         return $ok;
+    }
+
+    public function getProgressUpdates($complaintId)
+    {
+        $stmt = $this->conn->prepare(
+            "SELECT pu.message, pu.created_at, u.username AS sent_by_name
+             FROM complaint_progress_updates pu
+             LEFT JOIN users u ON pu.sent_by = u.user_id
+             WHERE pu.complaint_id = ?
+             ORDER BY pu.created_at ASC"
+        );
+        if (!$stmt) return [];
+        $stmt->bind_param('i', $complaintId);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     }
 }

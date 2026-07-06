@@ -258,11 +258,11 @@ class User
 
                 if ($currentTime - $lockTime < 900) { // 15 mins
                     $remaining = 900 - ($currentTime - $lockTime);
-                    $minutes = ceil($remaining / 60);
 
                     return [
-                        "status" => false,
-                        "message" => "Account is locked. Try again in {$minutes} minute(s)"
+                        "status"         => false,
+                        "message"        => "Account is locked. Please wait before trying again.",
+                        "lock_remaining" => (int) $remaining,
                     ];
                 } else {
                     // Unlock automatically
@@ -320,8 +320,9 @@ class User
                     $lock->close();
 
                     return [
-                        "status" => false,
-                        "message" => "Account locked after 3 failed attempts"
+                        "status"         => false,
+                        "message"        => "Account locked after 3 failed attempts.",
+                        "lock_remaining" => 900,
                     ];
                 } else {
 
@@ -545,6 +546,7 @@ class User
                 }
                 break;
             case 'student':
+            case 'student_leader':
                 if (!empty($attachment['student_user_id']) && (int) $attachment['student_user_id'] === $userId) {
                     return $attachment;
                 }

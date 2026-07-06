@@ -11,8 +11,7 @@ class ComplaintRouter
     }
 
     // Auto-route a freshly submitted complaint to the staff member responsible
-    // for its category/subcategory. Returns ['routed' => bool, 'staff_id' => ?string, 'role_id' => ?int].
-    public function routeComplaint($complaintId, $categoryId, $subcategoryId, $departmentId, $priority, $triggeredByUserId)
+    public function routeComplaint($complaintId, $categoryId, $subcategoryId, $departmentId, $priority)
     {
         $roleId = $this->resolveRoleId($categoryId, $subcategoryId);
         if (!$roleId) {
@@ -25,7 +24,7 @@ class ComplaintRouter
         }
 
         $admin = new Admin($this->conn);
-        $admin->assignComplaint($complaintId, $staffId, $priority, '', $triggeredByUserId);
+        $admin->assignComplaint($complaintId, $staffId, $priority, '', null, true);
 
         return ['routed' => true, 'staff_id' => $staffId, 'role_id' => $roleId];
     }

@@ -17,6 +17,8 @@ class Notification
         'complaint_deleted'          => 'Complaint Deleted',
         'request_info'               => 'Information Requested on Your Complaint',
         'info_responded'             => 'Student Responded to Information Request',
+        'system'                     => 'Important Account Notice',
+        'password_reset_admin'       => 'Your Password Has Been Reset',
         'staff_approved'             => 'Your Staff Account Has Been Approved',
         'staff_rejected'             => 'Your Staff Account Was Not Approved',
         'new_registration'           => 'New Staff Registration Pending Approval',
@@ -71,7 +73,7 @@ class Notification
             }
 
             $subject = self::$subjects[$type] ?? 'SCMRS Notification';
-            $body    = Mailer::buildBody($user['username'], $message, $link);
+            $body    = Mailer::buildBody($this->conn, $user['username'], $message, $link);
 
             EmailQueue::enqueue($this->conn, $user['user_email'], $user['username'], $subject, $body);
         } catch (Throwable $e) {
@@ -211,6 +213,8 @@ class Notification
             'complaint_overdue'            => 'fa-exclamation-triangle text-danger',
             'new_complaint_in_rep_scope'   => 'fa-building text-primary',
             'endorsed_complaint_updated'   => 'fa-thumbs-up text-success',
+            'system'                       => 'fa-shield-alt text-secondary',
+            'password_reset_admin'         => 'fa-key text-warning',
         ];
         return $map[$type] ?? 'fa-bell text-secondary';
     }

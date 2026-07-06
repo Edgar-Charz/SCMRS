@@ -20,7 +20,7 @@ class Complaint
                 throw new Exception("Fill all the required fields");
             }
 
-            // Length validation (cannot be bypassed via direct POST)
+            // Length validation
             if (mb_strlen($title) < 10) {
                 throw new Exception("Complaint title must be at least 10 characters.");
             }
@@ -68,7 +68,7 @@ class Complaint
                     $file_size = $_FILES['attachments']['size'][$key];
                     $file_name = basename($_FILES['attachments']['name'][$key]);
                     if (!in_array($file_type, $allowed_types)) {
-                        $rejected[] = $file_name . ' (unsupported type — only JPEG, PNG, PDF allowed)';
+                        $rejected[] = $file_name . ' (unsupported type - only JPEG, PNG, PDF allowed)';
                     } elseif ($file_size > $max_size) {
                         $rejected[] = $file_name . ' (exceeds 5 MB limit)';
                     }
@@ -152,12 +152,34 @@ class Complaint
     public function getCategoryRoutingMeta($categoryId)
     {
         $stmt = $this->conn->prepare(
-            "SELECT requires_department_selection, auto_assign_department_id, default_role_id
+            "SELECT requires_department_selection, leader_endorsable, auto_assign_department_id, default_role_id
              FROM complaint_categories
              WHERE category_id = ?"
         );
         $stmt->bind_param("i", $categoryId);
         $stmt->execute();
         return $stmt->get_result()->fetch_assoc();
+    }
+
+    // Whether a complaint in this category/subcategory is visible to leaders (subcategory can only narrow, never widen)
+    public function isLeaderEndorsable($categoryId, $subcategoryId = null): bool
+    {
+        $stmt = $this->conn->prepare("SELECT leader_endorsable FROM complaint_categories WHERE category_id = ?");
+        $stmt->bind_param("i", $categoryId);
+        $stmt->execute();
+        $catRow = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if (empty($catRow['leader_endorsable'])) {
+            return false;
+        }
+        if (empty($subcategoryId)) {
+            return true;
+        }
+        $stmt = $this->conn->prepare("SELECT leader_endorsable FROM complaint_subcategories WHERE subcategory_id = ?");
+        $stmt->bind_param("i", $subcategoryId);
+        $stmt->execute();
+        $subRow = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return !empty($subRow['leader_endorsable']);
     }
 }
