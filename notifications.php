@@ -76,7 +76,7 @@ $roleLabel = match ($role) {
                 <nav aria-label="breadcrumb" class="d-flex justify-content-between align-items-center mb-3">
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item">
-                            <a href="<?= $dashboardLink ?>"><i class="fas fa-home" style="color:black;"></i></a>
+                            <a href="<?= $dashboardLink ?>"><i class="fas fa-bell" style="color:black;"></i></a>
                         </li>
                         <li class="breadcrumb-item"><a href="<?= $dashboardLink ?>" style="color:black;"><?= $roleLabel ?></a></li>
                         <li class="breadcrumb-item active">Notifications</li>

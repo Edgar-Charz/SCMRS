@@ -24,7 +24,6 @@ if (isset($_POST['submitBtn'])) {
         $token = $user->createPasswordResetToken($email);
 
         if ($token) {
-            $cfg       = require 'config/email.php';
             $scheme    = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
             $resetLink = "{$scheme}://{$_SERVER['SERVER_NAME']}/scmrs/reset_password.php?token=" . urlencode($token);
 
@@ -33,6 +32,7 @@ if (isset($_POST['submitBtn'])) {
                 . "If you did not request this, you can safely ignore this email.";
 
             $htmlBody = Mailer::buildBody(
+                $conn,
                 'SCMRS User',
                 $message_body,
                 "reset_password.php?token=" . urlencode($token),
@@ -40,7 +40,7 @@ if (isset($_POST['submitBtn'])) {
             );
 
             try {
-                Mailer::send($email, '', "UDSM SCMRS — Password Reset Request", $htmlBody);
+                Mailer::send($conn, $email, '', "UDSM SCMRS - Password Reset Request", $htmlBody);
             } catch (Throwable $e) {
                 error_log('[ForgotPassword] Mail error: ' . $e->getMessage());
             }

@@ -3,14 +3,17 @@ require_once 'config/session.php';
 
 require_once "config/Database.php";
 require_once "classes/User.php";
+require_once "classes/Settings.php";
 require_once "includes/csrf.php";
 
 $db = new Database();
 $conn = $db->connect();
 
 $user = new User($conn);
+$branding = (new Settings($conn))->get();
 
 $message = $error = "";
+$lockRemaining = 0;
 
 if (isset($_SESSION['message'])) {
     $message = $_SESSION['message'];
@@ -72,6 +75,7 @@ if (isset($_POST["loginBTN"])) {
         } else {
             $user->recordFailedIpAttempt($clientIp);
             $error = $result['message'];
+            $lockRemaining = (int)($result['lock_remaining'] ?? 0);
         }
     }
 }
@@ -213,7 +217,7 @@ if (isset($_POST["loginBTN"])) {
 
     <div id="loader" class="loader-branded">
         <div class="loader-content">
-            <img src="assets/img/logo.png" alt="UDSM" class="loader-logo">
+            <img src="<?= htmlspecialchars($branding['institution_logo_path']) ?>" alt="<?= htmlspecialchars($branding['institution_name']) ?>" class="loader-logo">
             <div class="spinner"></div>
             <p class="loader-text">Please wait...</p>
         </div>
@@ -227,7 +231,7 @@ if (isset($_POST["loginBTN"])) {
     <div class="slide-bg"></div>
 
     <div class="auth-wrap">
-        <img src="assets/img/logo.png" alt="UDSM Logo" class="rounded-circle brand-logo">
+        <img src="<?= htmlspecialchars($branding['institution_logo_path']) ?>" alt="<?= htmlspecialchars($branding['institution_name']) ?> Logo" class="rounded-circle brand-logo">
         <div class="auth-card text-center">
             <h4 class="fw-bold mb-1">Welcome Back</h4>
             <p class="text-muted small mb-2">Login to manage your complaints</p>
@@ -240,7 +244,11 @@ if (isset($_POST["loginBTN"])) {
                 <div class="alert alert-<?php echo $type; ?> text-start mb-2" id="loginAlert">
                     <span style="display: flex; align-items: center; gap: 0.5rem; font-size: 15px;">
                         <i class="fas <?php echo $type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'; ?>"></i>
-                        <?php echo htmlspecialchars($text); ?>
+                        <?php if ($lockRemaining > 0): ?>
+                            Account locked. Try again in <strong id="lockCountdown" style="font-variant-numeric:tabular-nums;letter-spacing:0.03em;"></strong>
+                        <?php else: ?>
+                            <?php echo htmlspecialchars($text); ?>
+                        <?php endif; ?>
                         <button onclick="document.getElementById('loginAlert').style.display='none'"
                             style="background: none; border: none; color: inherit; cursor: pointer; opacity: 0.7; transition: opacity 0.2s; margin-left: auto;"
                             onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
@@ -288,6 +296,39 @@ if (isset($_POST["loginBTN"])) {
     <script src="assets/js/auth-script.js"></script>
     <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+
+    <?php if ($lockRemaining > 0): ?>
+    <script>
+    (function () {
+        var secs = <?= (int)$lockRemaining ?>;
+        var el   = document.getElementById('lockCountdown');
+        if (!el) return;
+
+        function fmt(s) {
+            var m = Math.floor(s / 60);
+            var r = s % 60;
+            return m + ':' + (r < 10 ? '0' : '') + r;
+        }
+
+        function tick() {
+            if (secs <= 0) {
+                var alert = document.getElementById('loginAlert');
+                if (alert) {
+                    alert.className = 'alert alert-success text-start mb-2';
+                    alert.innerHTML = '<span style="display:flex;align-items:center;gap:0.5rem;font-size:15px;">'
+                        + '<i class="fas fa-check-circle"></i> Account unlocked. You may try again.</span>';
+                }
+                return;
+            }
+            el.textContent = fmt(secs);
+            secs--;
+            setTimeout(tick, 1000);
+        }
+
+        tick();
+    })();
+    </script>
+    <?php endif; ?>
 </body>
 
 </html>

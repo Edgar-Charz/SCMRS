@@ -1,14 +1,18 @@
-<?php $sidebarRole = $_SESSION['user_role'] ?? 'student'; ?>
+<?php
+$sidebarRole = $_SESSION['user_role'] ?? 'student';
+require_once __DIR__ . '/../classes/Settings.php';
+$_sidebarBranding = (new Settings($conn))->get();
+?>
 
 <!-- Sidebar -->
 <nav id="sidebar">
     <div class="sidebar-header d-flex align-items-center">
         <div class="logo-container me-2">
-            <img src="assets/img/logo.png" alt="UDSM Logo" class="img-fluid rounded circle"
+            <img src="<?= htmlspecialchars($_sidebarBranding['institution_logo_path']) ?>" alt="<?= htmlspecialchars($_sidebarBranding['institution_name']) ?> Logo" class="img-fluid rounded circle"
                 style="width:45px; height:45px; object-fit:cover; border:2px solid var(--udsm-yellow);">
         </div>
         <div class="header-text">
-            <h6 class="mb-0 text-white fw-bold">UDSM</h6>
+            <h6 class="mb-0 text-white fw-bold"><?= htmlspecialchars($_sidebarBranding['institution_name']) ?></h6>
             <small class="text-warning" style="font-size:.7rem;">Complaints System</small>
         </div>
     </div>
@@ -77,6 +81,12 @@
                 <a href="email_queue.php">
                     <i class="fas fa-envelope-open-text me-2"></i>
                     <span class="link-text">Email Queue</span>
+                </a>
+            </li>
+            <li>
+                <a href="settings.php">
+                    <i class="fas fa-cog me-2"></i>
+                    <span class="link-text">Settings</span>
                 </a>
             </li>
 

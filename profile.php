@@ -119,7 +119,7 @@ $homeLink = match ($role) {
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item">
-                            <a href="<?= ['admin' => 'admin_dashboard.php', 'staff' => 'staff_dashboard.php', 'student_leader' => 'leader_dashboard.php'][$role] ?? 'student_dashboard.php' ?>"><i class="fas fa-home" style="color: black;"></i></a>
+                            <a href="<?= ['admin' => 'admin_dashboard.php', 'staff' => 'staff_dashboard.php', 'student_leader' => 'leader_dashboard.php'][$role] ?? 'student_dashboard.php' ?>"><i class="fas fa-user" style="color: black;"></i></a>
                         </li>
                         <li class="breadcrumb-item"><a href="<?= ['admin' => 'admin_dashboard.php', 'staff' => 'staff_dashboard.php', 'student_leader' => 'leader_dashboard.php'][$role] ?? 'student_dashboard.php' ?>" style="color:black;"><?= ['admin' => 'Admin', 'staff' => 'Staff', 'student_leader' => 'Student Rep'][$role] ?? 'Student' ?></a></li>
                         <li class="breadcrumb-item active">Profile</li>
