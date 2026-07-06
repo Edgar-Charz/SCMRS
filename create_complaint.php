@@ -18,7 +18,7 @@ require_once "classes/Notification.php";
 require_once "includes/csrf.php";
 
 $db = new Database();
-$conn = $db->connect();
+$conn = $db->connect(); 
 
 $student = new Student($conn);
 $complaint = new Complaint($conn);
@@ -66,8 +66,7 @@ if (isset($_POST["submitComplaintBTN"])) {
                 $category_id,
                 $subcategory_id,
                 $effectiveDepartmentId,
-                'medium',
-                $user_id
+                'medium'
             );
 
             $notifMsg = $is_anonymous
@@ -75,14 +74,14 @@ if (isset($_POST["submitComplaintBTN"])) {
                 : "New complaint from " . htmlspecialchars($_SESSION['username']) . ": \"$title\"";
             $notifMsg .= $routeResult['routed']
                 ? " (auto-assigned to staff)"
-                : " — requires manual assignment.";
+                : " - requires manual assignment.";
             (new Notification($conn))->notifyAllAdmins(
                 $notifMsg,
                 'new_complaint',
                 "complaint_details.php?id=$newComplaintId",
                 $newComplaintId
             );
-            if ($requiresDeptSelection && $effectiveDepartmentId) {
+            if ($effectiveDepartmentId && $complaint->isLeaderEndorsable($category_id, $subcategory_id)) {
                 require_once 'classes/StudentLeader.php';
                 $leaderMsg = $is_anonymous
                     ? "A new anonymous complaint has been submitted in your department."
@@ -327,11 +326,11 @@ if (isset($_SESSION['message'])) {
 
                     <div class="d-rigid gap-2 text-center">
                         <button type="submit" name="submitComplaintBTN" class="btn btn-primary p-3 fw-bold mb-2"
-                            style="border-radius: 10px; background-color: var(--udsm-blue); width: 70%;">
+                            style="border-radius: 10px; background-color: var(--udsm-blue); width: 60%;">
                             Submit Complaint
                         </button>
                         <button type="reset" class="btn btn-danger p-3 fw-bold mb-2"
-                            style="border-radius: 10px; width: 20%;">
+                            style="border-radius: 10px; width: 35%;">
                             Cancel
                         </button>
                     </div>
@@ -497,11 +496,11 @@ if (isset($_SESSION['message'])) {
                 Array.from(this.files).forEach(file => {
                     const ext = '.' + file.name.split('.').pop().toLowerCase();
                     if (!ALLOWED_EXT.includes(ext) || !ALLOWED.includes(file.type)) {
-                        errors.push(`"${file.name}" — invalid format. Only PDF, JPG, JPEG, PNG are allowed.`);
+                        errors.push(`"${file.name}" - invalid format. Only PDF, JPG, JPEG, PNG are allowed.`);
                         return;
                     }
                     if (file.size > MAX_SIZE) {
-                        errors.push(`"${file.name}" — exceeds the 5 MB limit (${formatBytes(file.size)}).`);
+                        errors.push(`"${file.name}" - exceeds the 5 MB limit (${formatBytes(file.size)}).`);
                         return;
                     }
                     const isDuplicate = selectedFiles.some(f => f.name === file.name && f.size === file.size);
@@ -526,7 +525,7 @@ if (isset($_SESSION['message'])) {
         }
     </script>
     <script>
-    // ── Complaint draft autosave (localStorage) ───────────────────────────────
+    // Complaint draft autosave (localStorage) 
     (function () {
         var DRAFT_KEY = 'complaint_draft';
         var DRAFT_TTL = 24 * 60 * 60 * 1000; // discard drafts older than 24 h

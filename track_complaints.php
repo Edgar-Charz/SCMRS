@@ -11,6 +11,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'student') {
 require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/Student.php";
+require_once "includes/csrf.php";
 
 $db = new Database();
 $conn = $db->connect();
@@ -20,8 +21,9 @@ $message = $error = "";
 
 $studentId = $student->getStudentId($userId);
 
-// Handle Delete 
+// Handle Delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_complaint') {
+    csrf_verify();
     $comp_id = (int) ($_POST['complaint_id'] ?? 0);
     $reason = trim($_POST['delete_reason'] ?? '');
     if ($comp_id > 0 && $student->deleteComplaint($comp_id, $studentId, $reason)) {
@@ -43,7 +45,7 @@ if (isset($_SESSION['message_error'])) {
     unset($_SESSION['message_error']);
 }
 
-// Get filter parameter (used only for initial active tab — all complaints are always loaded)
+// Get filter parameter (used only for initial active tab - all complaints are always loaded)
 $filter = isset($_GET['filter']) ? $_GET['filter'] : 'all';
 
 // Always load ALL complaints; JS handles client-side filtering
@@ -103,9 +105,11 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item">
-                            <a href="student_dashboard.php"><i class="fas fa-search-location" style="color: black;"></i></a>
+                            <a href="student_dashboard.php"><i class="fas fa-search-location"
+                                    style="color: black;"></i></a>
                         </li>
-                        <li class="breadcrumb-item"><a href="student_dashboard.php" style="color:black;">Student</a></li>
+                        <li class="breadcrumb-item"><a href="student_dashboard.php" style="color:black;">Student</a>
+                        </li>
                         <li class="breadcrumb-item active">Track Complaints</li>
                     </ol>
                 </nav>
@@ -308,6 +312,7 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
 
     <!-- Hidden form for POST-based delete -->
     <form id="deleteForm" method="POST" action="track_complaints.php" style="display:none;">
+        <?= csrf_field() ?>
         <input type="hidden" name="action" value="delete_complaint">
         <input type="hidden" name="complaint_id" id="deleteComplaintId" value="">
         <input type="hidden" name="delete_reason" id="deleteReason" value="">
@@ -426,31 +431,6 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
     <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/10.16.7/sweetalert2.all.min.js"></script> -->
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
-    <script>
-        $(document).ready(function () {
-            if ($("#complaintsTable").length > 0) {
-                if (!$.fn.DataTable.isDataTable("#complaintsTable")) {
-                    $("#complaintsTable").DataTable({
-                        destroy: true,
-                        bFilter: true,
-                        sDom: "fBtlpi",
-                        pagingType: "numbers",
-                        ordering: true,
-                        language: {
-                            search: " ",
-                            sLengthMenu: "_MENU_",
-                            searchPlaceholder: "Search Complaints...",
-                            info: "_START_ - _END_ of _TOTAL_ items"
-                        },
-                        initComplete: function (settings, json) {
-                            $(".dataTables_filter").appendTo("#tableSearch");
-                            $(".dataTables_filter").appendTo(".search-input");
-                        }
-                    });
-                }
-            }
-        });
-    </script>
 
 </body>
 

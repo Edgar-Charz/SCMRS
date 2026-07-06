@@ -72,7 +72,7 @@ if (isset($_POST["registerStaffBTN"])) {
 $colleges = $college->getColleges();
 $departments = $department->getDepartments();
 
-// Which form was submitted? Used to sticky-fill non-password fields on error.
+// Which form was submitted?
 $studentPost = isset($_POST['registerStudentBTN']);
 $staffPost   = isset($_POST['registerStaffBTN']);
 ?>
@@ -195,7 +195,7 @@ $staffPost   = isset($_POST['registerStaffBTN']);
             /* hidden till next */
         }
 
-        /* Dark blue overlay — sits above photos, below text (z-index 1) */
+        /* Dark blue overlay - sits above photos, below text (z-index 1) */
         .split-left::before {
             content: '';
             position: absolute;
@@ -221,7 +221,7 @@ $staffPost   = isset($_POST['registerStaffBTN']);
             pointer-events: none;
         }
 
-        /* Text content sits above overlays (z-index 2) — exclude slide-bg divs */
+        /* Text content sits above overlays (z-index 2) - exclude slide-bg divs */
         .split-left>*:not(.slide-bg) {
             position: relative;
             z-index: 2;
@@ -978,13 +978,13 @@ $staffPost   = isset($_POST['registerStaffBTN']);
                 else if (this.value !== pwd.value) fieldError(this, 'Passwords do not match.');
                 else fieldOk(this);
             });
-            // re-check confirm when primary password changes
+            // Re-check confirm when primary password changes
             pwd.addEventListener('input', function() {
                 if (cpwd.classList.contains('is-invalid') && cpwd.value === this.value) fieldOk(cpwd);
             });
         }
 
-        // ── Student form ──────────────────────────────────────────────────────
+        // Student form 
         wireText('s_name', function(el) {
             var v = el.value.trim();
             if (!v) fieldError(el, 'Full name is required.');
@@ -1015,7 +1015,7 @@ $staffPost   = isset($_POST['registerStaffBTN']);
         });
         wireConfirmPwd('s_pwd', 's_cpwd');
 
-        // ── Staff form ────────────────────────────────────────────────────────
+        // Staff form 
         wireText('st_name', function(el) {
             var v = el.value.trim();
             if (!v) fieldError(el, 'Full name is required.');

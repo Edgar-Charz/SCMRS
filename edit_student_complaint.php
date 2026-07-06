@@ -15,13 +15,16 @@ $userId = (int)$_SESSION['user_id'];
 require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/Student.php";
-require_once "classes/Category.php";
+require_once "classes/Complaint.php";
+require_once "classes/ComplaintRouter.php";
+require_once "classes/Department.php";
 require_once "includes/csrf.php";
 
-$db       = new Database();
-$conn     = $db->connect();
-$student  = new Student($conn);
-$category = new Category($conn);
+$db             = new Database();
+$conn           = $db->connect();
+$student        = new Student($conn);
+$complaintModel = new Complaint($conn);
+$department     = new Department($conn);
 
 $leaderDepts = [];
 if ($_isLeader) {
@@ -38,7 +41,7 @@ if ($complaintId <= 0) {
     exit;
 }
 
-// Load complaint — verify ownership and pending status
+// Load complaint, verify ownership and pending status
 $complaint = $student->readStudentComplaint($complaintId);
 if (!$complaint || (int)$complaint['student_id'] !== (int)$studentId || $complaint['complaint_status'] !== STATUS_PENDING) {
     $_SESSION['message_error'] = "Complaint not found or cannot be edited.";
@@ -57,9 +60,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $subcategoryId = (int)($_POST['subcategory_id'] ?? 0) ?: null;
     $isAnonymous   = isset($_POST['is_anonymous']) ? 1 : 0;
     $deleteIds     = array_map('intval', $_POST['delete_attachments'] ?? []);
+    $postedDeptId  = isset($_POST['department_id']) ? (int)$_POST['department_id'] : null;
+
+    $categoryMeta = $categoryId > 0 ? $complaintModel->getCategoryRoutingMeta($categoryId) : null;
+    $requiresDeptSelection = $categoryMeta && (int)$categoryMeta['requires_department_selection'] === 1;
 
     if (empty($title) || empty($description) || $categoryId <= 0) {
         $error = "Title, category, and description are required.";
+    } elseif (!$categoryMeta) {
+        $error = "Please select a valid category.";
     } elseif (mb_strlen($title) < 10) {
         $error = "Complaint title must be at least 10 characters.";
     } elseif (mb_strlen($title) > 200) {
@@ -68,10 +77,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "Description must be at least 30 characters.";
     } elseif (mb_strlen($description) > 5000) {
         $error = "Description must not exceed 5,000 characters.";
+    } elseif (!$_isLeader && $requiresDeptSelection && empty($postedDeptId)) {
+        $error = "Please select your department for this category.";
     } else {
         try {
+            // Resolve the effective department for non-leader students; leaders manage
+            // their own department/preferred-staff fields separately below.
+            $effectiveDepartmentId = null;
+            if (!$_isLeader) {
+                $effectiveDepartmentId = $requiresDeptSelection ? $postedDeptId : $categoryMeta['auto_assign_department_id'];
+            }
+
             // Update core complaint fields
-            $student->updateComplaint($complaintId, $studentId, $title, $description, $categoryId, $subcategoryId, $isAnonymous);
+            $student->updateComplaint($complaintId, $studentId, $title, $description, $categoryId, $subcategoryId, $isAnonymous, $effectiveDepartmentId);
 
             // Leader-only: update department and preferred staff
             if ($_isLeader) {
@@ -87,6 +105,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $updStmt->bind_param('isi', $newDeptId, $newPrefStaff, $complaintId);
                 $updStmt->execute();
                 $updStmt->close();
+            } else {
+                // Category/subcategory/department may have changed enough to now match
+                // a routing rule that didn't apply before - give auto-routing another shot.
+                (new ComplaintRouter($conn))->routeComplaint(
+                    $complaintId,
+                    $categoryId,
+                    $subcategoryId,
+                    $effectiveDepartmentId,
+                    'medium'
+                );
             }
 
             // Delete selected attachments
@@ -149,7 +177,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Reload fresh data after any POST
 $complaint   = $student->readStudentComplaint($complaintId);
 $attachments = $student->readStudentComplaintAttachments($complaintId);
-$categories  = $category->getCategories();
+$categories  = $complaintModel->getComplaintCategories();
+$departments = $department->getDepartments();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -194,7 +223,7 @@ $categories  = $category->getCategories();
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item">
-                            <a href="<?= $_dashUrl ?>"><i class="fas fa-home" style="color:black;"></i></a>
+                            <a href="<?= $_dashUrl ?>"><i class="fas fa-search-location" style="color:black;"></i></a>
                         </li>
                         <li class="breadcrumb-item">
                             <a href="<?= $_dashUrl ?>" style="color:black;"><?= $_isLeader ? 'Student Rep' : 'Student' ?></a>
@@ -245,7 +274,8 @@ $categories  = $category->getCategories();
                                     if ($categories) {
                                         while ($cat = $categories->fetch_assoc()) {
                                             $sel = ((int)$cat['category_id'] === $currentCatId) ? 'selected' : '';
-                                            echo '<option value="' . (int)$cat['category_id'] . '" ' . $sel . '>'
+                                            echo '<option value="' . (int)$cat['category_id'] . '" ' . $sel
+                                                . ' data-requires-dept="' . (int)$cat['requires_department_selection'] . '">'
                                                 . htmlspecialchars($cat['category_name']) . '</option>';
                                         }
                                     }
@@ -301,7 +331,7 @@ $categories  = $category->getCategories();
                                     <option value="">--- No preference ---</option>
                                 </select>
                                 <small class="form-hint">
-                                    <i class="fas fa-info-circle"></i> Suggestion only — final assignment is made by an administrator.
+                                    <i class="fas fa-info-circle"></i> Suggestion only - final assignment is made by an administrator.
                                 </small>
                                 <?php
                                 // Pass current values to JS for pre-selection
@@ -309,6 +339,26 @@ $categories  = $category->getCategories();
                                 $jsCurrentStaff = htmlspecialchars($complaint['preferred_staff_id'] ?? '', ENT_QUOTES);
                                 ?>
                                 <input type="hidden" id="currentPreferredStaff" value="<?= $jsCurrentStaff ?>">
+                            </div>
+                            <?php else: ?>
+                            <div class="col-12 col-md-6 mb-3" id="departmentFieldWrap" style="display:none;">
+                                <label class="form-label fw-bold">Your Department <span class="text-danger">*</span></label>
+                                <select name="department_id" id="department_id" class="form-select p-3 shadow-sm"
+                                    style="border-radius:10px;border:1px solid #e0e6ed;">
+                                    <option value="" selected disabled>--- Choose Department ---</option>
+                                    <?php if ($departments): ?>
+                                        <?php while ($dept_row = $departments->fetch_assoc()): ?>
+                                            <option value="<?= $dept_row['department_id']; ?>"
+                                                <?= (int)$dept_row['department_id'] === (int)($complaint['department_id'] ?? 0) ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($dept_row['department_name']); ?>
+                                            </option>
+                                        <?php endwhile; ?>
+                                    <?php endif; ?>
+                                </select>
+                                <small class="form-hint">
+                                    <i class="fas fa-info-circle"></i> This category requires your department to route
+                                    the complaint to the right staff member.
+                                </small>
                             </div>
                             <?php endif; ?>
 
@@ -396,7 +446,7 @@ $categories  = $category->getCategories();
                             accept=".pdf,.jpg,.jpeg,.png" class="form-control p-3 shadow-sm"
                             style="border-radius:10px;border:1px solid #e0e6ed;">
                         <small class="form-hint">
-                            <i class="fas fa-info-circle"></i> PDF, JPG, JPEG, PNG — max 5 MB per file.
+                            <i class="fas fa-info-circle"></i> PDF, JPG, JPEG, PNG - max 5 MB per file.
                         </small>
                         <div id="fileList" style="margin-top:10px;"></div>
                     </div>
@@ -426,6 +476,7 @@ $categories  = $category->getCategories();
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
+    <script>window._activeSidebarLink = '<?= $_isLeader ? 'leader_my_complaints.php' : 'track_complaints.php' ?>';</script>
     <script src="assets/js/script.js"></script>
 
     <script>
@@ -522,11 +573,11 @@ $categories  = $category->getCategories();
                 Array.from(this.files).forEach(function (file) {
                     const ext = '.' + file.name.split('.').pop().toLowerCase();
                     if (!ALLOWED_EXT.includes(ext) || !ALLOWED_MIME.includes(file.type)) {
-                        errors.push('"' + file.name + '" — invalid format.');
+                        errors.push('"' + file.name + '" - invalid format.');
                         return;
                     }
                     if (file.size > MAX_SIZE) {
-                        errors.push('"' + file.name + '" — exceeds 5 MB (' + formatBytes(file.size) + ').');
+                        errors.push('"' + file.name + '" - exceeds 5 MB (' + formatBytes(file.size) + ').');
                         return;
                     }
                     if (!selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
@@ -618,11 +669,30 @@ $categories  = $category->getCategories();
                     });
             }
 
+            <?php if (!$_isLeader): ?>
+            var $deptWrap   = $('#departmentFieldWrap');
+            var $deptSelect = $('#department_id');
+
+            function toggleDepartmentField(selectEl) {
+                var selectedOpt = selectEl.options[selectEl.selectedIndex];
+                var requiresDept = !!(selectedOpt && selectedOpt.dataset.requiresDept === '1');
+                $deptWrap.toggle(requiresDept);
+                $deptSelect.prop('required', requiresDept);
+                if (!requiresDept) $deptSelect.val('');
+            }
+
+            // Reflect the currently-selected category's requirement on page load
+            if ($cat.length) toggleDepartmentField($cat.get(0));
+            <?php endif; ?>
+
             var initialCat = parseInt($cat.val());
             if (initialCat) loadSubcategories(initialCat, currentSubcatId);
 
             $cat.on('change', function () {
                 var id = parseInt($(this).val());
+                <?php if (!$_isLeader): ?>
+                toggleDepartmentField(this);
+                <?php endif; ?>
                 if (id) {
                     loadSubcategories(id, 0);
                 } else {

@@ -21,6 +21,7 @@ require_once "classes/User.php";
 require_once "classes/Student.php";
 require_once "classes/Category.php";
 require_once "classes/Notification.php";
+require_once "includes/csrf.php";
 
 $db       = new Database();
 $conn     = $db->connect();
@@ -29,7 +30,7 @@ $category = new Category($conn);
 
 $studentId = $student->getStudentId($userId);
 
-// Ownership check — load complaint and verify it belongs to this student
+// Ownership check, load complaint and verify it belongs to this student
 $complaint_details = $student->readStudentComplaint($complaintId);
 if (!$complaint_details || (int)$complaint_details['student_id'] !== (int)$studentId) {
     header("Location: $_backUrl");
@@ -38,7 +39,11 @@ if (!$complaint_details || (int)$complaint_details['student_id'] !== (int)$stude
 
 $message = $error = "";
 
-// Edit complaint 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify();
+}
+
+// Edit complaint
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit_complaint') {
     $editTitle    = trim($_POST['edit_title'] ?? '');
     $editDesc     = trim($_POST['edit_description'] ?? '');
@@ -59,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// ── Handle: respond to an information request ────────────────────────────
+// Respond to an information request 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'respond_info_request') {
     $requestId = (int)($_POST['request_id'] ?? 0);
     $response  = trim($_POST['response'] ?? '');
@@ -133,6 +138,7 @@ $complaint_history    = $student->readStudentComplaintHistory($complaintId);
 $complaint_attachment = $student->readStudentComplaintAttachments($complaintId);
 $complaint_info_req   = $student->readStudentComplaintInfoRequests($complaintId);
 $existing_feedback    = $student->getComplaintFeedback($complaintId, $studentId);
+$progress_updates     = $student->getProgressUpdates($complaintId);
 $all_categories       = $category->getCategories();
 
 $has_pending_request = false;
@@ -152,6 +158,7 @@ function statusBadge($status): string
         STATUS_RESOLVED => ['bg-success text-white','Resolved'],
         STATUS_REJECTED => ['bg-danger text-white', 'Rejected'],
         STATUS_REOPENED => ['bg-warning text-dark', 'Reopened'],
+        'on_hold'       => ['bg-secondary text-white', 'On Hold'],
     ];
     [$cls, $label] = $map[$status] ?? ['bg-secondary text-white', ucfirst(str_replace('_', ' ', $status))];
     return "<span class=\"badge $cls\">$label</span>";
@@ -231,7 +238,7 @@ function statusBadge($status): string
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item">
                             <a href="<?= $_SESSION['user_role'] === 'student_leader' ? 'leader_dashboard.php' : 'student_dashboard.php' ?>">
-                                <i class="fas fa-home" style="color:black;"></i>
+                                <i class="fas fa-search-location" style="color:black;"></i>
                             </a>
                         </li>
                         <li class="breadcrumb-item">
@@ -268,6 +275,11 @@ function statusBadge($status): string
                     <div class="detail-row">
                         <div class="detail-label fw-bold">Category:</div>
                         <div class="detail-value"><?= htmlspecialchars($complaint_details['category_name']) ?></div>
+                    </div>
+
+                    <div class="detail-row">
+                        <div class="detail-label fw-bold">Sub-Category:</div>
+                        <div class="detail-value"><?= htmlspecialchars($complaint_details['subcategory_name']) ?></div>
                     </div>
 
                     <?php if ($complaint_details['department_name']): ?>
@@ -406,6 +418,7 @@ function statusBadge($status): string
                                 <?php elseif ($req['status'] === STATUS_PENDING): ?>
                                     <form method="POST"
                                         action="student_complaint_details.php?id=<?= $complaintId ?>#info-requests">
+                                        <?= csrf_field() ?>
                                         <input type="hidden" name="action" value="respond_info_request">
                                         <input type="hidden" name="request_id" value="<?= $req['request_id'] ?>">
                                         <div class="mb-2 mt-2">
@@ -429,6 +442,26 @@ function statusBadge($status): string
                     </div>
                 <?php endif; ?>
 
+                <!-- Progress Updates from Staff -->
+                <?php if (!empty($progress_updates)): ?>
+                    <div class="container-card shadow-sm mb-4">
+                        <h5 class="fw-bold mb-3">
+                            <i class="fas fa-tasks me-2"></i>Progress Updates
+                        </h5>
+                        <?php foreach ($progress_updates as $update): ?>
+                            <div class="mb-3 p-3 rounded" style="background:#f0f9ff;border-left:4px solid #0ea5e9;">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <strong class="small text-primary">
+                                        <i class="fas fa-user-tie me-1"></i><?= htmlspecialchars($update['sent_by_name'] ?? 'Staff') ?>
+                                    </strong>
+                                    <small class="text-muted"><?= date('M d, Y g:i A', strtotime($update['created_at'])) ?></small>
+                                </div>
+                                <p class="mb-0"><?= nl2br(htmlspecialchars($update['message'])) ?></p>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+
                 <!-- Feedback -->
                 <?php if ($complaint_details['complaint_status'] === STATUS_RESOLVED): ?>
                     <div class="container-card shadow-sm mb-4">
@@ -446,6 +479,7 @@ function statusBadge($status): string
                             </div>
                         <?php else: ?>
                             <form method="POST" action="student_complaint_details.php?id=<?= $complaintId ?>">
+                                <?= csrf_field() ?>
                                 <input type="hidden" name="action" value="submit_feedback">
 
                                 <div class="mb-3">
@@ -504,6 +538,7 @@ function statusBadge($status): string
                     </div>
                     <form id="reopenForm" method="POST"
                         action="student_complaint_details.php?id=<?= $complaintId ?>">
+                        <?= csrf_field() ?>
                         <input type="hidden" name="action" value="reopen_complaint">
                     </form>
                 </div>
@@ -553,6 +588,7 @@ function statusBadge($status): string
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
     <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/10.16.7/sweetalert2.all.min.js"></script> -->
+    <script>window._activeSidebarLink = '<?= $_SESSION['user_role'] === 'student_leader' ? 'leader_my_complaints.php' : 'track_complaints.php' ?>';</script>
     <script src="assets/js/script.js"></script>
 
     <script>

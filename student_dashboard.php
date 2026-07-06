@@ -240,7 +240,7 @@ if (isset($_SESSION['message'])) {
                         <p class="text-muted small mb-3">Your latest submissions and their current status</p>
 
                         <div class="table-responsive">
-                            <table id="complaintsTable" class="table table-stripped">
+                            <table id="complaintsTable" class="table table-striped">
                                 <thead class="table-light">
                                     <tr>
                                         <th>ID</th>
