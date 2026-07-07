@@ -92,20 +92,8 @@ function fmtHours($val): string
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reports &amp; Analytics | Admin</title>
-    <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
-    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
-    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
-    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
-    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
-    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <title>Admin | Reports &amp; Analytics</title>
+    <?php include 'includes/head_assets.php'; ?>
 </head>
 
 <body>
@@ -708,15 +696,7 @@ function fmtHours($val): string
         </div><!-- /content -->
     </div><!-- /d-flex -->
 
-    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
-    <!-- <script src="assets/js/jquery.dataTables.min.js"></script> -->
-    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
-    <!-- <script src="assets/js/dataTables.bootstrap4.min.js"></script> -->
-    <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
-    <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
+    <?php $useDataTablesJs = true; include 'includes/foot_scripts.php'; ?>
     <script src="assets/js/script.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>

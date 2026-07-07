@@ -9,20 +9,38 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/Admin.php";
+require_once "includes/csrf.php";
 
 $db = new Database();
 $conn = $db->connect();
 $admin = new Admin($conn);
 
-$perPage     = 100;
-$currentPage = max(1, (int)($_GET['page'] ?? 1));
-$filterAction = $_GET['filter_action'] ?? null;
-$filterFrom   = $_GET['filter_from'] ?? null;
-$filterTo     = $_GET['filter_to'] ?? null;
+$message = $error = '';
 
-$logs  = $admin->getActivityLogs($currentPage, $perPage, $filterAction ?: null, $filterFrom ?: null, $filterTo ?: null);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'purge_logs') {
+    csrf_verify();
+    $allowedPeriods = ['30', '60', '90', '180', '365', 'all'];
+    $period = $_POST['period'] ?? '';
+    if (!in_array($period, $allowedPeriods, true)) {
+        $error = "Invalid time period selected.";
+    } else {
+        $days = $period === 'all' ? null : (int) $period;
+        $count = $admin->purgeActivityLogs($days, (int) $_SESSION['user_id']);
+        $message = $count > 0
+            ? "{$count} audit log record(s) cleared."
+            : "No matching audit log records to clear.";
+    }
+}
+
+$perPage = 100;
+$currentPage = max(1, (int) ($_GET['page'] ?? 1));
+$filterAction = $_GET['filter_action'] ?? null;
+$filterFrom = $_GET['filter_from'] ?? null;
+$filterTo = $_GET['filter_to'] ?? null;
+
+$logs = $admin->getActivityLogs($currentPage, $perPage, $filterAction ?: null, $filterFrom ?: null, $filterTo ?: null);
 $total = $admin->getActivityLogsCount($filterAction ?: null, $filterFrom ?: null, $filterTo ?: null);
-$totalPages = max(1, (int)ceil($total / $perPage));
+$totalPages = max(1, (int) ceil($total / $perPage));
 
 // Human-readable labels and badge colours for each action type
 $actionMeta = [
@@ -33,18 +51,20 @@ $actionMeta = [
     'password_reset' => ['label' => 'Password Reset', 'class' => 'bg-secondary'],
     'staff_approved' => ['label' => 'Staff Approved', 'class' => 'bg-success'],
     'staff_rejected' => ['label' => 'Staff Rejected', 'class' => 'bg-danger'],
-    'staff_demoted'        => ['label' => 'Staff Approval Revoked', 'class' => 'bg-warning text-dark'],
-    'complaint_assigned'   => ['label' => 'Complaint Assigned',     'class' => 'bg-info text-dark'],
-    'complaint_deleted'    => ['label' => 'Complaint Deleted',      'class' => 'bg-danger'],
-    'department_added'     => ['label' => 'Department Added',       'class' => 'bg-success'],
-    'department_updated'   => ['label' => 'Department Updated',     'class' => 'bg-info text-dark'],
-    'department_deleted'   => ['label' => 'Department Deleted',     'class' => 'bg-danger'],
-    'category_added'       => ['label' => 'Category Added',         'class' => 'bg-success'],
-    'category_updated'     => ['label' => 'Category Updated',       'class' => 'bg-info text-dark'],
-    'category_deleted'     => ['label' => 'Category Deleted',       'class' => 'bg-danger'],
-    'subcategory_added'    => ['label' => 'Subcategory Added',      'class' => 'bg-success'],
-    'subcategory_updated'  => ['label' => 'Subcategory Updated',    'class' => 'bg-info text-dark'],
-    'subcategory_deleted'  => ['label' => 'Subcategory Deleted',    'class' => 'bg-danger'],
+    'staff_demoted' => ['label' => 'Staff Approval Revoked', 'class' => 'bg-warning text-dark'],
+    'complaint_assigned' => ['label' => 'Complaint Assigned', 'class' => 'bg-info text-dark'],
+    'complaint_deleted' => ['label' => 'Complaint Deleted', 'class' => 'bg-danger'],
+    'department_added' => ['label' => 'Department Added', 'class' => 'bg-success'],
+    'department_updated' => ['label' => 'Department Updated', 'class' => 'bg-info text-dark'],
+    'department_deleted' => ['label' => 'Department Deleted', 'class' => 'bg-danger'],
+    'category_added' => ['label' => 'Category Added', 'class' => 'bg-success'],
+    'category_updated' => ['label' => 'Category Updated', 'class' => 'bg-info text-dark'],
+    'category_deleted' => ['label' => 'Category Deleted', 'class' => 'bg-danger'],
+    'subcategory_added' => ['label' => 'Subcategory Added', 'class' => 'bg-success'],
+    'subcategory_updated' => ['label' => 'Subcategory Updated', 'class' => 'bg-info text-dark'],
+    'subcategory_deleted' => ['label' => 'Subcategory Deleted', 'class' => 'bg-danger'],
+    'logs_purged' => ['label' => 'Audit Log Cleared', 'class' => 'bg-dark'],
+    'email_queue_purged' => ['label' => 'Email Queue Cleared', 'class' => 'bg-dark'],
 ];
 
 function actionBadge(string $action, array $meta): string
@@ -60,7 +80,7 @@ function actionBadge(string $action, array $meta): string
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audit Log | Admin</title>
+    <title>Admin | Audit Log</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
     <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
@@ -110,9 +130,20 @@ function actionBadge(string $action, array $meta): string
                         </h4>
                         <small class="text-muted">All administrator actions are recorded here</small>
                     </div>
-                    <span id="recordsBadge" class="badge bg-primary fs-6"><?= number_format($total) ?>
-                        record<?= $total !== 1 ? 's' : '' ?></span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span id="recordsBadge" class="badge bg-primary fs-6"><?= number_format($total) ?>
+                            record<?= $total !== 1 ? 's' : '' ?></span>
+                        <button type="button" id="clearLogsBtn" class="btn btn-outline-danger btn-sm">
+                            <i class="fas fa-broom me-1"></i> Clear Old Logs
+                        </button>
+                    </div>
                 </div>
+
+                <form id="purgeLogsForm" method="POST" class="d-none">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="purge_logs">
+                    <input type="hidden" name="period" id="purgePeriodInput">
+                </form>
 
                 <!-- Filters -->
                 <div class="container-card border-0 shadow-sm p-4 mb-4">
@@ -135,7 +166,8 @@ function actionBadge(string $action, array $meta): string
                             <input type="date" id="filterDateTo" class="form-control">
                         </div>
                         <div class="col-12 col-md-2 d-flex align-items-end">
-                            <button type="button" id="clearFilters" class="btn btn-outline-secondary" title="Clear filters">
+                            <button type="button" id="clearFilters" class="btn btn-outline-secondary"
+                                title="Clear filters">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
@@ -175,14 +207,16 @@ function actionBadge(string $action, array $meta): string
                                             <td class="text-nowrap" style="font-size:.82rem; color:#555;">
                                                 <?= date('d M Y', strtotime($log['created_at'])) ?>
                                                 <br>
-                                                <span class="text-muted"><?= date('H:i:s', strtotime($log['created_at'])) ?></span>
+                                                <span
+                                                    class="text-muted"><?= date('H:i:s', strtotime($log['created_at'])) ?></span>
                                             </td>
                                             <td><?= actionBadge($log['action'], $actionMeta) ?></td>
                                             <td>
                                                 <span class="fw-semibold"><?= htmlspecialchars($log['admin_name']) ?></span>
                                             </td>
                                             <td>
-                                                <span class="fw-semibold"><?= htmlspecialchars($log['target_name'] ?? '-') ?></span>
+                                                <span
+                                                    class="fw-semibold"><?= htmlspecialchars($log['target_name'] ?? '-') ?></span>
                                                 <?php if ($log['target_id']): ?>
                                                     <small class="text-muted d-block">#<?= $log['target_id'] ?></small>
                                                 <?php endif; ?>
@@ -202,32 +236,32 @@ function actionBadge(string $action, array $meta): string
 
                     <!-- Pagination -->
                     <?php if ($totalPages > 1): ?>
-                    <nav class="mt-3">
-                        <ul class="pagination pagination-sm justify-content-center flex-wrap">
-                            <?php
-                            $qBase = http_build_query(array_filter([
-                                'filter_action' => $filterAction,
-                                'filter_from'   => $filterFrom,
-                                'filter_to'     => $filterTo,
-                            ]));
-                            $qBase = $qBase ? '&' . $qBase : '';
-                            ?>
-                            <li class="page-item <?= $currentPage <= 1 ? 'disabled' : '' ?>">
-                                <a class="page-link" href="?page=<?= $currentPage - 1 . $qBase ?>">‹ Prev</a>
-                            </li>
-                            <?php for ($p = max(1, $currentPage - 2); $p <= min($totalPages, $currentPage + 2); $p++): ?>
-                                <li class="page-item <?= $p === $currentPage ? 'active' : '' ?>">
-                                    <a class="page-link" href="?page=<?= $p . $qBase ?>"><?= $p ?></a>
+                        <nav class="mt-3">
+                            <ul class="pagination pagination-sm justify-content-center flex-wrap">
+                                <?php
+                                $qBase = http_build_query(array_filter([
+                                    'filter_action' => $filterAction,
+                                    'filter_from' => $filterFrom,
+                                    'filter_to' => $filterTo,
+                                ]));
+                                $qBase = $qBase ? '&' . $qBase : '';
+                                ?>
+                                <li class="page-item <?= $currentPage <= 1 ? 'disabled' : '' ?>">
+                                    <a class="page-link" href="?page=<?= $currentPage - 1 . $qBase ?>">‹ Prev</a>
                                 </li>
-                            <?php endfor; ?>
-                            <li class="page-item <?= $currentPage >= $totalPages ? 'disabled' : '' ?>">
-                                <a class="page-link" href="?page=<?= $currentPage + 1 . $qBase ?>">Next ›</a>
-                            </li>
-                        </ul>
-                        <p class="text-center text-muted small">
-                            Showing page <?= $currentPage ?> of <?= $totalPages ?> (<?= $total ?> total entries)
-                        </p>
-                    </nav>
+                                <?php for ($p = max(1, $currentPage - 2); $p <= min($totalPages, $currentPage + 2); $p++): ?>
+                                    <li class="page-item <?= $p === $currentPage ? 'active' : '' ?>">
+                                        <a class="page-link" href="?page=<?= $p . $qBase ?>"><?= $p ?></a>
+                                    </li>
+                                <?php endfor; ?>
+                                <li class="page-item <?= $currentPage >= $totalPages ? 'disabled' : '' ?>">
+                                    <a class="page-link" href="?page=<?= $currentPage + 1 . $qBase ?>">Next ›</a>
+                                </li>
+                            </ul>
+                            <p class="text-center text-muted small">
+                                Showing page <?= $currentPage ?> of <?= $totalPages ?> (<?= $total ?> total entries)
+                            </p>
+                        </nav>
                     <?php endif; ?>
                 </div>
 
@@ -241,52 +275,101 @@ function actionBadge(string $action, array $meta): string
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
+    <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
-        $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+        const purgePeriodLabels = {
+            '30': 'Older than 30 days', '60': 'Older than 60 days',
+            '90': 'Older than 90 days', '180': 'Older than 180 days',
+            '365': 'Older than 365 days', 'all': 'All records'
+        };
+
+        document.getElementById('clearLogsBtn').addEventListener('click', function () {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Clear Audit Log?',
+                html: `
+                    <p class="mb-2 text-start">Choose which records to permanently delete:</p>
+                    <select id="purgePeriodSelect" class="form-select mb-2">
+                        ${Object.entries(purgePeriodLabels).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+                    </select>
+                    <div id="purgeCountPreview" class="text-muted small">Checking matching records&hellip;</div>
+                `,
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, clear these logs',
+                cancelButtonText: 'Cancel',
+                didOpen: () => {
+                    const select = document.getElementById('purgePeriodSelect');
+                    const preview = document.getElementById('purgeCountPreview');
+                    const updateCount = () => {
+                        preview.textContent = 'Checking matching records…';
+                        fetch(`ajax/purge_count.php?target=audit&period=${select.value}`)
+                            .then(r => r.json())
+                            .then(d => {
+                                preview.textContent = d.success
+                                    ? `This will permanently delete ${d.count.toLocaleString()} record(s).`
+                                    : 'Could not check record count.';
+                            })
+                            .catch(() => { preview.textContent = 'Could not check record count.'; });
+                    };
+                    select.addEventListener('change', updateCount);
+                    updateCount();
+                },
+                preConfirm: () => document.getElementById('purgePeriodSelect').value
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('purgePeriodInput').value = result.value;
+                    document.getElementById('purgeLogsForm').submit();
+                }
+            });
+        });
+
+        $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
             if (settings.nTable.id !== 'auditTable') return true;
             var rowNode = settings.aoData[dataIndex] ? settings.aoData[dataIndex].nTr : null;
             if (!rowNode) return true;
-            var row    = $(rowNode);
+            var row = $(rowNode);
             var rAction = row.data('action') || '';
-            var rDate   = row.data('date')   || '';
-            var fAction = $('#filterAction').val()   || '';
-            var fFrom   = $('#filterDateFrom').val() || '';
-            var fTo     = $('#filterDateTo').val()   || '';
+            var rDate = row.data('date') || '';
+            var fAction = $('#filterAction').val() || '';
+            var fFrom = $('#filterDateFrom').val() || '';
+            var fTo = $('#filterDateTo').val() || '';
             if (fAction && rAction !== fAction) return false;
-            if (fFrom   && rDate   < fFrom)    return false;
-            if (fTo     && rDate   > fTo)      return false;
+            if (fFrom && rDate < fFrom) return false;
+            if (fTo && rDate > fTo) return false;
             return true;
         });
 
         var auditTable;
-        $(function() {
+        $(function () {
             auditTable = $('#auditTable').DataTable({
-                order:      [[0, 'desc']],
+                order: [[0, 'desc']],
                 pageLength: 25,
-                bFilter:    true,
-                sDom:       "fBtlpi",
+                bFilter: true,
+                sDom: "fBtlpi",
                 pagingType: "numbers",
                 language: {
-                    search:            " ",
-                    sLengthMenu:       "_MENU_",
+                    search: " ",
+                    sLengthMenu: "_MENU_",
                     searchPlaceholder: "Search logs...",
-                    info:              "_START_ - _END_ of _TOTAL_ entries"
+                    info: "_START_ - _END_ of _TOTAL_ entries"
                 },
-                initComplete: function() {
+                initComplete: function () {
                     $(".dataTables_filter").appendTo(".search-input");
                 }
             });
 
-            auditTable.on('draw.dt', function() {
-                var info  = auditTable.page.info();
+            auditTable.on('draw.dt', function () {
+                var info = auditTable.page.info();
                 var count = info.recordsDisplay;
                 $('#recordsBadge').text(count.toLocaleString() + ' record' + (count !== 1 ? 's' : ''));
             });
 
-            $('#filterAction').on('change', function() { auditTable.draw(); });
-            $('#filterDateFrom, #filterDateTo').on('change', function() { auditTable.draw(); });
-            $('#clearFilters').on('click', function() {
+            $('#filterAction').on('change', function () { auditTable.draw(); });
+            $('#filterDateFrom, #filterDateTo').on('change', function () { auditTable.draw(); });
+            $('#clearFilters').on('click', function () {
                 $('#filterAction').val('');
                 $('#filterDateFrom, #filterDateTo').val('');
                 auditTable.search('').draw();

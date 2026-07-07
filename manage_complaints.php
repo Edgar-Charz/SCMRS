@@ -21,13 +21,13 @@ $message = $error = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
-    $action      = $_POST['action'] ?? '';
+    $action = $_POST['action'] ?? '';
     $complaintId = isset($_POST['complaint_id']) ? (int) $_POST['complaint_id'] : 0;
 
     if ($action === 'assign' && $complaintId > 0) {
-        $staffId  = trim($_POST['staff_id'] ?? '');
+        $staffId = trim($_POST['staff_id'] ?? '');
         $priority = in_array($_POST['priority'] ?? '', ['low', 'medium', 'high']) ? $_POST['priority'] : 'medium';
-        $note     = trim($_POST['note'] ?? '');
+        $note = trim($_POST['note'] ?? '');
 
         $target = $admin->getComplaintById($complaintId);
         if ($target && in_array($target['complaint_status'], [STATUS_RESOLVED, STATUS_REJECTED], true)) {
@@ -59,10 +59,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
     } elseif ($action === 'bulk_assign') {
-        $ids      = array_values(array_unique(array_filter(array_map('intval', $_POST['complaint_ids'] ?? []))));
-        $staffId  = trim($_POST['staff_id'] ?? '');
+        $ids = array_values(array_unique(array_filter(array_map('intval', $_POST['complaint_ids'] ?? []))));
+        $staffId = trim($_POST['staff_id'] ?? '');
         $priority = in_array($_POST['priority'] ?? '', ['low', 'medium', 'high']) ? $_POST['priority'] : 'medium';
-        $note     = trim($_POST['note'] ?? '');
+        $note = trim($_POST['note'] ?? '');
 
         if (empty($ids)) {
             $error = "No complaints selected.";
@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = "Please select a staff member.";
         } else {
             $assigned = 0;
-            $skipped  = [];
+            $skipped = [];
             foreach ($ids as $id) {
                 try {
                     $admin->assignComplaint($id, $staffId, $priority, $note);
@@ -80,7 +80,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             $msg = "$assigned complaint(s) assigned successfully.";
-            if ($skipped) $msg .= " Skipped (already closed): " . implode(', ', $skipped) . ".";
+            if ($skipped)
+                $msg .= " Skipped (already closed): " . implode(', ', $skipped) . ".";
             $admin->logActivity($adminId, 'complaint_assigned', 'complaint', 0, "Bulk assign", "Assigned $assigned complaint(s) to staff ID $staffId (priority: $priority)");
             $_SESSION['message'] = $msg;
             header("Location: manage_complaints.php");
@@ -88,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
     } elseif ($action === 'bulk_delete') {
-        $ids    = array_values(array_unique(array_filter(array_map('intval', $_POST['complaint_ids'] ?? []))));
+        $ids = array_values(array_unique(array_filter(array_map('intval', $_POST['complaint_ids'] ?? []))));
         $reason = trim($_POST['delete_reason'] ?? '');
 
         if (empty($ids)) {
@@ -107,7 +108,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             $msg = "$deleted complaint(s) deleted.";
-            if ($skipped) $msg .= " Skipped (not pending): " . implode(', ', $skipped) . ".";
+            if ($skipped)
+                $msg .= " Skipped (not pending): " . implode(', ', $skipped) . ".";
             $admin->logActivity($adminId, 'complaint_deleted', 'complaint', 0, "Bulk delete", "Deleted $deleted complaint(s). Reason: $reason");
             $_SESSION['message'] = $msg;
             header("Location: manage_complaints.php");
@@ -160,13 +162,13 @@ sort($filterDepartments);
 function statusBadge($status)
 {
     $map = [
-        STATUS_PENDING => ['bg-warning text-dark',  'Pending'],
-        STATUS_IN_PROGRESS => ['bg-info text-white',    'In Progress'],
+        STATUS_PENDING => ['bg-warning text-dark', 'Pending'],
+        STATUS_IN_PROGRESS => ['bg-info text-white', 'In Progress'],
         STATUS_AWAITING_RESPONSE => ['bg-primary text-white', 'Awaiting Response'],
         STATUS_RESOLVED => ['bg-success text-white', 'Resolved'],
-        STATUS_REJECTED => ['bg-danger text-white',  'Rejected'],
-        STATUS_REOPENED => ['bg-warning text-white',  'Reopened'],
-        'on_hold'       => ['bg-secondary text-white', 'On Hold'],
+        STATUS_REJECTED => ['bg-danger text-white', 'Rejected'],
+        STATUS_REOPENED => ['bg-warning text-white', 'Reopened'],
+        'on_hold' => ['bg-secondary text-white', 'On Hold'],
     ];
     [$class, $label] = $map[$status] ?? ['bg-secondary text-white', ucfirst(str_replace('_', ' ', $status))];
     return "<span class=\"badge $class\">$label</span>";
@@ -178,25 +180,18 @@ function statusBadge($status)
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Complaints | Admin</title>
-    <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
-    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
-    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
-    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
-    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
-    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <title>Admin | Manage Complaints</title>
+    <?php include 'includes/head_assets.php'; ?>
     <style>
         #bulkToolbar {
             transition: opacity .15s;
         }
-        .row-check { cursor: pointer; width: 16px; height: 16px; }
+
+        .row-check {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        }
     </style>
 </head>
 
@@ -253,14 +248,15 @@ function statusBadge($status)
                 </nav>
 
                 <!-- Bulk action toolbar (hidden until ≥1 checkbox ticked) -->
-                <div id="bulkToolbar" class="d-none alert alert-secondary py-2 px-3 mb-3 d-flex align-items-center gap-2 flex-wrap">
+                <div id="bulkToolbar"
+                    class="d-none alert alert-secondary py-2 px-3 mb-3 d-flex align-items-center gap-2 flex-wrap">
                     <span class="fw-semibold me-2" id="selectedCount">0 selected</span>
-                    <button type="button" class="btn btn-sm btn-primary"
-                            data-bs-toggle="modal" data-bs-target="#bulkAssignModal">
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal"
+                        data-bs-target="#bulkAssignModal">
                         <i class="fas fa-user-tag me-1"></i> Assign Selected
                     </button>
-                    <button type="button" class="btn btn-sm btn-danger"
-                            data-bs-toggle="modal" data-bs-target="#bulkDeleteModal">
+                    <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal"
+                        data-bs-target="#bulkDeleteModal">
                         <i class="fas fa-trash me-1"></i> Delete Selected
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" id="clearSelectionBtn">
@@ -332,7 +328,7 @@ function statusBadge($status)
                 <div class="container-card shadow-sm">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="mb-0 fw-bold"><i class="fas fa-file-invoice me-2"></i>Student Complaints</h4>
-                        <div class="search-input"></div>
+                            <div class="search-input"></div>
                     </div>
 
                     <div class="table-responsive">
@@ -340,7 +336,8 @@ function statusBadge($status)
                             <thead class="table-light">
                                 <tr>
                                     <th style="width:36px;">
-                                        <input type="checkbox" id="selectAll" class="row-check" title="Select all visible">
+                                        <input type="checkbox" id="selectAll" class="row-check"
+                                            title="Select all visible">
                                     </th>
                                     <th>#</th>
                                     <th>TITLE</th>
@@ -365,9 +362,9 @@ function statusBadge($status)
                                             ? '<em class="text-muted">Anonymous</em>'
                                             : htmlspecialchars($c['student_name']);
                                         $priorityMap = [
-                                            'low'    => 'bg-success',
+                                            'low' => 'bg-success',
                                             'medium' => 'bg-warning text-dark',
-                                            'high'   => 'bg-danger',
+                                            'high' => 'bg-danger',
                                         ];
                                         $priClass = $priorityMap[$c['priority']] ?? 'bg-secondary';
 
@@ -385,8 +382,7 @@ function statusBadge($status)
                                             style="cursor:pointer;"
                                             onclick="window.location.href='complaint_details.php?id=<?= $c['complaint_id'] ?>'">
                                             <td onclick="event.stopPropagation()">
-                                                <input type="checkbox" class="row-check"
-                                                       value="<?= $c['complaint_id'] ?>">
+                                                <input type="checkbox" class="row-check" value="<?= $c['complaint_id'] ?>">
                                             </td>
                                             <td><?= $c['complaint_id'] ?></td>
                                             <td><?= htmlspecialchars($c['complaint_title']) ?></td>
@@ -406,13 +402,14 @@ function statusBadge($status)
                                                 <?php endif; ?>
                                                 <?php if (!empty($c['endorsement_count']) && $c['endorsement_count'] > 0): ?>
                                                     <br><span class="badge mt-1" style="background-color:#6f42c1;">
-                                                        <i class="fas fa-thumbs-up me-1"></i><?= (int)$c['endorsement_count'] ?> Rep
+                                                        <i class="fas fa-thumbs-up me-1"></i><?= (int) $c['endorsement_count'] ?> Rep
                                                     </span>
                                                 <?php endif; ?>
                                             </td>
                                             <td class="text-center">
                                                 <?php if (!empty($c['assigned_staff_name'])): ?>
-                                                    <span class="small fw-semibold"><?= htmlspecialchars($c['assigned_staff_name']) ?></span>
+                                                    <span
+                                                        class="small fw-semibold"><?= htmlspecialchars($c['assigned_staff_name']) ?></span>
                                                 <?php else: ?>
                                                     <span class="text-muted small">Unassigned</span>
                                                 <?php endif; ?>
@@ -437,11 +434,10 @@ function statusBadge($status)
                                                         <button type="button"
                                                             class="btn btn-status btn-outline-secondary btn-assign"
                                                             data-bs-toggle="modal" data-bs-target="#assignModal"
-                                                            data-complaint-id="<?= $c['complaint_id'] ?>"
-                                                            data-staff-name=""
+                                                            data-complaint-id="<?= $c['complaint_id'] ?>" data-staff-name=""
                                                             data-priority="<?= htmlspecialchars($c['priority']) ?>"
                                                             data-is-assigned="0"
-                                                            data-category-dept-id="<?= (int)($c['category_dept_id'] ?? 0) ?>"
+                                                            data-category-dept-id="<?= (int) ($c['category_dept_id'] ?? 0) ?>"
                                                             title="Assign to Staff">
                                                             <i class="fas fa-user-tag text-dark"></i>
                                                         </button>
@@ -453,14 +449,13 @@ function statusBadge($status)
                                                             </button>
                                                         <?php endif; ?>
                                                     <?php elseif (!$isClosed && $isAssigned): ?>
-                                                        <button type="button"
-                                                            class="btn btn-status btn-outline-warning btn-assign"
+                                                        <button type="button" class="btn btn-status btn-outline-warning btn-assign"
                                                             data-bs-toggle="modal" data-bs-target="#assignModal"
                                                             data-complaint-id="<?= $c['complaint_id'] ?>"
                                                             data-staff-name="<?= htmlspecialchars($c['assigned_staff_name'] ?? '', ENT_QUOTES) ?>"
                                                             data-priority="<?= htmlspecialchars($c['priority']) ?>"
                                                             data-is-assigned="1"
-                                                            data-category-dept-id="<?= (int)($c['category_dept_id'] ?? 0) ?>"
+                                                            data-category-dept-id="<?= (int) ($c['category_dept_id'] ?? 0) ?>"
                                                             title="Reassign to a different staff member">
                                                             <i class="fas fa-user-edit"></i>
                                                         </button>
@@ -485,7 +480,8 @@ function statusBadge($status)
     <div class="modal fade" id="assignModal" tabindex="-1" aria-labelledby="assignModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content shadow-lg rounded-3">
-                <div class="modal-header text-white" id="assignModalHeader" style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
+                <div class="modal-header text-white" id="assignModalHeader"
+                    style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
                     <h5 class="modal-title fw-bold text-white" id="assignModalLabel">
                         <i class="fas fa-user-tag me-2" id="assignModalIcon"></i>
                         <span id="assignModalTitleText">Assign Complaint to Staff</span>
@@ -500,13 +496,15 @@ function statusBadge($status)
                         <div id="currentAssigneeInfo" class="alert alert-warning py-2 px-3 mb-3 small d-none">
                             <i class="fas fa-user-check me-1"></i>
                             Currently assigned to: <strong id="currentAssigneeName"></strong>
-                            <br><span class="text-muted">Saving will transfer this complaint to the selected staff member.</span>
+                            <br><span class="text-muted">Saving will transfer this complaint to the selected staff
+                                member.</span>
                         </div>
 
                         <div class="mb-3">
                             <label class="form-label fw-bold">
                                 Filter by Department
-                                <span class="badge bg-info text-white ms-1" id="autoDeptBadge" style="display:none;font-size:0.7rem;">Auto-suggested</span>
+                                <span class="badge bg-info text-white ms-1" id="autoDeptBadge"
+                                    style="display:none;font-size:0.7rem;">Auto-suggested</span>
                             </label>
                             <select id="assignDeptFilter" class="form-select">
                                 <option value="0">- All Departments -</option>
@@ -517,7 +515,8 @@ function statusBadge($status)
                                 <?php endforeach; ?>
                             </select>
                             <small class="text-muted" id="deptFilterHint" style="display:none;">
-                                <i class="fas fa-info-circle me-1"></i>Pre-selected from the complaint's category. You can change it.
+                                <i class="fas fa-info-circle me-1"></i>Pre-selected from the complaint's category. You
+                                can change it.
                             </small>
                         </div>
 
@@ -527,14 +526,15 @@ function statusBadge($status)
                                 <option value="">-- Choose Staff --</option>
                                 <?php foreach ($staffList as $s): ?>
                                     <option value="<?= $s['staff_id'] ?>"
-                                        data-dept="<?= (int)($s['staff_department_id'] ?? 0) ?>">
+                                        data-dept="<?= (int) ($s['staff_department_id'] ?? 0) ?>">
                                         <?= htmlspecialchars($s['username']) ?>
                                         <?= $s['department_name'] ? ' - ' . htmlspecialchars($s['department_name']) : '' ?>
                                         <?= $s['role_name'] ? ' (' . htmlspecialchars($s['role_name']) . ')' : '' ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
-                            <small id="noStaffMsg" class="text-danger d-none">No staff in this department. Switch to "All Departments".</small>
+                            <small id="noStaffMsg" class="text-danger d-none">No staff in this department. Switch to
+                                "All Departments".</small>
                             <?php if (empty($staffList)): ?>
                                 <small class="text-danger">No approved staff available.</small>
                             <?php endif; ?>
@@ -569,7 +569,8 @@ function statusBadge($status)
     </div>
 
     <!-- Bulk Assign Modal -->
-    <div class="modal fade" id="bulkAssignModal" tabindex="-1" aria-labelledby="bulkAssignModalLabel" aria-hidden="true">
+    <div class="modal fade" id="bulkAssignModal" tabindex="-1" aria-labelledby="bulkAssignModalLabel"
+        aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content shadow-lg rounded-3">
                 <div class="modal-header text-white" style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
@@ -606,7 +607,7 @@ function statusBadge($status)
                                 <option value="">-- Choose Staff --</option>
                                 <?php foreach ($staffList as $s): ?>
                                     <option value="<?= $s['staff_id'] ?>"
-                                        data-dept="<?= (int)($s['staff_department_id'] ?? 0) ?>">
+                                        data-dept="<?= (int) ($s['staff_department_id'] ?? 0) ?>">
                                         <?= htmlspecialchars($s['username']) ?>
                                         <?= $s['department_name'] ? ' - ' . htmlspecialchars($s['department_name']) : '' ?>
                                         <?= $s['role_name'] ? ' (' . htmlspecialchars($s['role_name']) . ')' : '' ?>
@@ -625,7 +626,8 @@ function statusBadge($status)
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Note <span class="text-muted fw-normal">(optional)</span></label>
+                            <label class="form-label fw-bold">Note <span
+                                    class="text-muted fw-normal">(optional)</span></label>
                             <textarea name="note" class="form-control" rows="2"
                                 placeholder="Instructions for the staff member..."></textarea>
                         </div>
@@ -650,7 +652,8 @@ function statusBadge($status)
     </form>
 
     <!-- Delete Reason Modal -->
-    <div class="modal fade" id="deleteReasonModal" tabindex="-1" aria-labelledby="deleteReasonModalLabel" aria-hidden="true">
+    <div class="modal fade" id="deleteReasonModal" tabindex="-1" aria-labelledby="deleteReasonModalLabel"
+        aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg rounded-3">
                 <div class="modal-header text-white" style="background: linear-gradient(135deg, #dc3545, #c82333);">
@@ -660,9 +663,11 @@ function statusBadge($status)
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="text-muted mb-3">Please provide a reason for deleting this complaint. The student will be notified.</p>
+                    <p class="text-muted mb-3">Please provide a reason for deleting this complaint. The student will be
+                        notified.</p>
                     <div class="mb-0">
-                        <label for="deleteReasonText" class="form-label fw-semibold">Reason <span class="text-danger">*</span></label>
+                        <label for="deleteReasonText" class="form-label fw-semibold">Reason <span
+                                class="text-danger">*</span></label>
                         <textarea class="form-control" id="deleteReasonText" rows="3"
                             placeholder="Enter reason for deletion..." maxlength="500"></textarea>
                         <div class="invalid-feedback">Please provide a reason before deleting.</div>
@@ -679,7 +684,8 @@ function statusBadge($status)
     </div>
 
     <!-- Bulk Delete Modal -->
-    <div class="modal fade" id="bulkDeleteModal" tabindex="-1" aria-labelledby="bulkDeleteModalLabel" aria-hidden="true">
+    <div class="modal fade" id="bulkDeleteModal" tabindex="-1" aria-labelledby="bulkDeleteModalLabel"
+        aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg rounded-3">
                 <div class="modal-header text-white" style="background: linear-gradient(135deg, #dc3545, #c82333);">
@@ -712,15 +718,8 @@ function statusBadge($status)
         </div>
     </div>
 
-    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
-    <!-- <script src="assets/js/jquery.dataTables.min.js"></script> -->
-    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
-    <!-- <script src="assets/js/dataTables.bootstrap4.min.js"></script> -->
-    <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
-    <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
+    <?php $useDataTablesJs = true;
+    include 'includes/foot_scripts.php'; ?>
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
 
@@ -740,15 +739,15 @@ function statusBadge($status)
         }
 
         function updateSelectAll() {
-            var visible  = document.querySelectorAll('.row-check:not(#selectAll)');
-            var checked  = Array.from(visible).filter(function(cb) { return cb.checked; });
+            var visible = document.querySelectorAll('.row-check:not(#selectAll)');
+            var checked = Array.from(visible).filter(function (cb) { return cb.checked; });
             var selectAll = document.getElementById('selectAll');
             selectAll.indeterminate = checked.length > 0 && checked.length < visible.length;
-            selectAll.checked       = visible.length > 0 && checked.length === visible.length;
+            selectAll.checked = visible.length > 0 && checked.length === visible.length;
         }
 
         // Row checkbox change
-        document.getElementById('complaintsTable').addEventListener('change', function(e) {
+        document.getElementById('complaintsTable').addEventListener('change', function (e) {
             if (!e.target.classList.contains('row-check') || e.target.id === 'selectAll') return;
             var id = parseInt(e.target.value, 10);
             if (e.target.checked) selectedIds.add(id);
@@ -758,9 +757,9 @@ function statusBadge($status)
         });
 
         // Select-all checkbox
-        document.getElementById('selectAll').addEventListener('change', function() {
-            var checked  = this.checked;
-            document.querySelectorAll('.row-check:not(#selectAll)').forEach(function(cb) {
+        document.getElementById('selectAll').addEventListener('change', function () {
+            var checked = this.checked;
+            document.querySelectorAll('.row-check:not(#selectAll)').forEach(function (cb) {
                 cb.checked = checked;
                 var id = parseInt(cb.value, 10);
                 if (checked) selectedIds.add(id);
@@ -770,17 +769,17 @@ function statusBadge($status)
         });
 
         // Clear selection button
-        document.getElementById('clearSelectionBtn').addEventListener('click', function() {
+        document.getElementById('clearSelectionBtn').addEventListener('click', function () {
             selectedIds.clear();
-            document.querySelectorAll('.row-check').forEach(function(cb) { cb.checked = false; });
+            document.querySelectorAll('.row-check').forEach(function (cb) { cb.checked = false; });
             document.getElementById('selectAll').indeterminate = false;
             updateToolbar();
         });
 
         // Re-apply check state after DataTable redraws (pagination / search)
         function reapplyChecks(dt) {
-            dt.on('draw', function() {
-                document.querySelectorAll('.row-check:not(#selectAll)').forEach(function(cb) {
+            dt.on('draw', function () {
+                document.querySelectorAll('.row-check:not(#selectAll)').forEach(function (cb) {
                     cb.checked = selectedIds.has(parseInt(cb.value, 10));
                 });
                 updateSelectAll();
@@ -791,22 +790,22 @@ function statusBadge($status)
         function injectIds(containerId) {
             var container = document.getElementById(containerId);
             container.innerHTML = '';
-            selectedIds.forEach(function(id) {
+            selectedIds.forEach(function (id) {
                 var inp = document.createElement('input');
-                inp.type  = 'hidden';
-                inp.name  = 'complaint_ids[]';
+                inp.type = 'hidden';
+                inp.name = 'complaint_ids[]';
                 inp.value = id;
                 container.appendChild(inp);
             });
         }
 
         // ── Bulk modals ───────────────────────────────────────────────────────
-        document.getElementById('bulkAssignModal').addEventListener('show.bs.modal', function() {
+        document.getElementById('bulkAssignModal').addEventListener('show.bs.modal', function () {
             document.getElementById('bulkAssignCount').textContent = selectedIds.size;
             injectIds('bulkAssignIds');
         });
 
-        document.getElementById('bulkDeleteModal').addEventListener('show.bs.modal', function() {
+        document.getElementById('bulkDeleteModal').addEventListener('show.bs.modal', function () {
             document.getElementById('bulkDeleteCount').textContent = selectedIds.size;
             document.getElementById('bulkDeleteReason').value = '';
             injectIds('bulkDeleteIds');
@@ -816,10 +815,10 @@ function statusBadge($status)
         function filterStaffByDept(selectEl, noMsgEl, deptId) {
             var deptInt = parseInt(deptId, 10);
             var visible = 0;
-            Array.from(selectEl.options).forEach(function(opt) {
+            Array.from(selectEl.options).forEach(function (opt) {
                 if (!opt.value) { opt.style.display = ''; return; }
                 var optDept = parseInt(opt.getAttribute('data-dept') || '0', 10);
-                var show    = (deptInt === 0 || optDept === deptInt);
+                var show = (deptInt === 0 || optDept === deptInt);
                 opt.style.display = show ? '' : 'none';
                 if (show) visible++;
             });
@@ -828,7 +827,7 @@ function statusBadge($status)
             noMsgEl.classList.toggle('d-none', visible > 0 || deptInt === 0);
         }
 
-        document.getElementById('assignDeptFilter').addEventListener('change', function() {
+        document.getElementById('assignDeptFilter').addEventListener('change', function () {
             filterStaffByDept(
                 document.getElementById('assignStaffSelect'),
                 document.getElementById('noStaffMsg'),
@@ -836,7 +835,7 @@ function statusBadge($status)
             );
         });
 
-        document.getElementById('bulkDeptFilter').addEventListener('change', function() {
+        document.getElementById('bulkDeptFilter').addEventListener('change', function () {
             filterStaffByDept(
                 document.getElementById('bulkStaffSelect'),
                 document.getElementById('bulkNoStaffMsg'),
@@ -845,13 +844,13 @@ function statusBadge($status)
         });
 
         // ── Single assign modal ───────────────────────────────────────────────
-        document.getElementById('assignModal').addEventListener('show.bs.modal', function(event) {
-            var btn        = event.relatedTarget;
-            var id         = btn.getAttribute('data-complaint-id');
-            var staffName  = btn.getAttribute('data-staff-name') || '';
-            var priority   = btn.getAttribute('data-priority')   || 'medium';
+        document.getElementById('assignModal').addEventListener('show.bs.modal', function (event) {
+            var btn = event.relatedTarget;
+            var id = btn.getAttribute('data-complaint-id');
+            var staffName = btn.getAttribute('data-staff-name') || '';
+            var priority = btn.getAttribute('data-priority') || 'medium';
             var isAssigned = btn.getAttribute('data-is-assigned') === '1';
-            var catDeptId  = parseInt(btn.getAttribute('data-category-dept-id') || '0', 10);
+            var catDeptId = parseInt(btn.getAttribute('data-category-dept-id') || '0', 10);
 
             document.getElementById('assignComplaintId').value = id;
 
@@ -884,16 +883,16 @@ function statusBadge($status)
             }
 
             var deptFilter = document.getElementById('assignDeptFilter');
-            var badge      = document.getElementById('autoDeptBadge');
-            var hint       = document.getElementById('deptFilterHint');
+            var badge = document.getElementById('autoDeptBadge');
+            var hint = document.getElementById('deptFilterHint');
             if (catDeptId > 0) {
-                deptFilter.value    = catDeptId;
+                deptFilter.value = catDeptId;
                 badge.style.display = '';
-                hint.style.display  = '';
+                hint.style.display = '';
             } else {
-                deptFilter.value    = '0';
+                deptFilter.value = '0';
                 badge.style.display = 'none';
-                hint.style.display  = 'none';
+                hint.style.display = 'none';
             }
             filterStaffByDept(
                 document.getElementById('assignStaffSelect'),
@@ -910,12 +909,12 @@ function statusBadge($status)
         // ── Single delete modal ───────────────────────────────────────────────
         function confirmDelete(complaintId) {
             document.getElementById('deleteComplaintId').value = complaintId;
-            document.getElementById('deleteReasonText').value  = '';
+            document.getElementById('deleteReasonText').value = '';
             document.getElementById('deleteReasonText').classList.remove('is-invalid');
             new bootstrap.Modal(document.getElementById('deleteReasonModal')).show();
         }
 
-        document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+        document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
             var reason = document.getElementById('deleteReasonText').value.trim();
             if (!reason) {
                 document.getElementById('deleteReasonText').classList.add('is-invalid');
@@ -926,53 +925,53 @@ function statusBadge($status)
         });
 
         // ── Custom row filter (runs before DataTables draws) ─────────────────
-        $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+        $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
             if (settings.nTable.id !== 'complaintsTable') return true;
-            var rowNode  = settings.aoData[dataIndex] ? settings.aoData[dataIndex].nTr : null;
+            var rowNode = settings.aoData[dataIndex] ? settings.aoData[dataIndex].nTr : null;
             if (!rowNode) return true;
-            var row      = $(rowNode);
-            var rStatus  = row.data('status')   || '';
-            var rPri     = row.data('priority') || '';
-            var rCat     = row.data('category') || '';
-            var rDept    = row.data('dept')     || '';
-            var rOverdue = row.data('overdue')  === '1';
-            var rDate    = row.data('date')     || '';
+            var row = $(rowNode);
+            var rStatus = row.data('status') || '';
+            var rPri = row.data('priority') || '';
+            var rCat = row.data('category') || '';
+            var rDept = row.data('dept') || '';
+            var rOverdue = row.data('overdue') === '1';
+            var rDate = row.data('date') || '';
 
-            var fStatus   = $('#filterStatus').val()   || '';
+            var fStatus = $('#filterStatus').val() || '';
             var fPriority = $('#filterPriority').val() || '';
             var fCategory = $('#filterCategory').val() || '';
-            var fDept     = $('#filterDept').val()     || '';
-            var fFrom     = $('#filterDateFrom').val() || '';
-            var fTo       = $('#filterDateTo').val()   || '';
+            var fDept = $('#filterDept').val() || '';
+            var fFrom = $('#filterDateFrom').val() || '';
+            var fTo = $('#filterDateTo').val() || '';
 
-            if (fStatus === 'overdue'  && !rOverdue)          return false;
+            if (fStatus === 'overdue' && !rOverdue) return false;
             if (fStatus && fStatus !== 'overdue' && rStatus !== fStatus) return false;
-            if (fPriority && rPri  !== fPriority)             return false;
-            if (fCategory && rCat  !== fCategory)             return false;
-            if (fDept     && rDept !== fDept)                 return false;
-            if (fFrom     && rDate < fFrom)                   return false;
-            if (fTo       && rDate > fTo)                     return false;
+            if (fPriority && rPri !== fPriority) return false;
+            if (fCategory && rCat !== fCategory) return false;
+            if (fDept && rDept !== fDept) return false;
+            if (fFrom && rDate < fFrom) return false;
+            if (fTo && rDate > fTo) return false;
             return true;
         });
 
         // ── DataTable ─────────────────────────────────────────────────────────
         var complaintsTable;
-        $(document).ready(function() {
+        $(document).ready(function () {
             if ($("#complaintsTable").length > 0 && !$.fn.DataTable.isDataTable("#complaintsTable")) {
                 complaintsTable = $("#complaintsTable").DataTable({
-                    destroy:     true,
-                    bFilter:     true,
-                    sDom:        "fBtlpi",
-                    pagingType:  "numbers",
-                    ordering:    true,
-                    columnDefs:  [{ orderable: false, targets: [0, 9] }],
+                    destroy: true,
+                    bFilter: true,
+                    sDom: "fBtlpi",
+                    pagingType: "numbers",
+                    ordering: true,
+                    columnDefs: [{ orderable: false, targets: [0, 9] }],
                     language: {
-                        search:            " ",
-                        sLengthMenu:       "_MENU_",
+                        search: " ",
+                        sLengthMenu: "_MENU_",
                         searchPlaceholder: "Search complaints...",
-                        info:              "_START_ - _END_ of _TOTAL_ items"
+                        info: "_START_ - _END_ of _TOTAL_ items"
                     },
-                    initComplete: function() {
+                    initComplete: function () {
                         $(".dataTables_filter").appendTo(".search-input");
                     }
                 });
@@ -980,13 +979,13 @@ function statusBadge($status)
                 reapplyChecks(complaintsTable);
 
                 // Bind filter controls
-                $('#filterStatus, #filterPriority, #filterCategory, #filterDept').on('change', function() {
+                $('#filterStatus, #filterPriority, #filterCategory, #filterDept').on('change', function () {
                     complaintsTable.draw();
                 });
-                $('#filterDateFrom, #filterDateTo').on('change', function() {
+                $('#filterDateFrom, #filterDateTo').on('change', function () {
                     complaintsTable.draw();
                 });
-                $('#clearFilters').on('click', function() {
+                $('#clearFilters').on('click', function () {
                     $('#filterStatus, #filterPriority, #filterCategory, #filterDept').val('');
                     $('#filterDateFrom, #filterDateTo').val('');
                     complaintsTable.search('').draw();
@@ -996,4 +995,5 @@ function statusBadge($status)
     </script>
 
 </body>
+
 </html>

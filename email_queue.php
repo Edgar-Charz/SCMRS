@@ -8,10 +8,12 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 
 require_once 'config/Database.php';
 require_once 'classes/EmailQueue.php';
+require_once 'classes/Admin.php';
 require_once 'includes/csrf.php';
 
-$db   = new Database();
+$db = new Database();
 $conn = $db->connect();
+$admin = new Admin($conn);
 
 $message = $error = '';
 
@@ -21,18 +23,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
     if ($action === 'retry_failed') {
-        $count   = EmailQueue::retryFailed($conn);
+        $count = EmailQueue::retryFailed($conn);
         $message = "{$count} failed email(s) reset to pending and will be retried shortly.";
     } elseif ($action === 'process_now') {
         // Force-process synchronously (useful when debugging)
         require_once 'classes/Mailer.php';
         EmailQueue::processPending(20);
         $message = "Queue processed. Check status below.";
+    } elseif ($action === 'purge_emails') {
+        $allowedPeriods = ['30', '60', '90', '180', '365', 'all'];
+        $period = $_POST['period'] ?? '';
+        $scope = $_POST['scope'] ?? '';
+        if (!in_array($period, $allowedPeriods, true) || !in_array($scope, ['sent', 'sent_failed'], true)) {
+            $error = "Invalid selection.";
+        } else {
+            $days = $period === 'all' ? null : (int) $period;
+            $count = EmailQueue::purge($conn, $scope, $days);
+            $scopeLabel = $scope === 'sent_failed' ? 'sent/failed' : 'sent';
+            $admin->logActivity(
+                (int) $_SESSION['user_id'],
+                'email_queue_purged',
+                'email_queue',
+                null,
+                null,
+                "Cleared {$count} {$scopeLabel} email(s) from the queue."
+            );
+            $message = $count > 0
+                ? "{$count} email(s) cleared from the queue."
+                : "No matching emails to clear.";
+        }
     }
 }
 
 $stats = EmailQueue::getStats($conn);
-$rows  = EmailQueue::getRecent($conn, 100);
+$rows = EmailQueue::getRecent($conn, 100);
 
 if (isset($_SESSION['message'])) {
     $message = $_SESSION['message'];
@@ -45,7 +69,7 @@ if (isset($_SESSION['message'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Queue | SCMRS Admin</title>
+    <title>Admin | Email Queue</title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
     <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
@@ -60,7 +84,7 @@ if (isset($_SESSION['message'])) {
 </head>
 
 <body>
-<?php require_once 'includes/flash_toast.php'; ?>
+    <?php require_once 'includes/flash_toast.php'; ?>
 
     <div id="loader">
         <div class="loader-content">
@@ -80,12 +104,14 @@ if (isset($_SESSION['message'])) {
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item">
-                            <a href="admin_dashboard.php"><i class="fas fa-envelope-open-text" style="color:black;"></i></a>
+                            <a href="admin_dashboard.php">
+                                <i class="fas fa-envelope-open-text" style="color:black;"></i>
+                            </a>
                         </li>
                         <li class="breadcrumb-item"><a href="admin_dashboard.php" style="color:black;">Admin</a></li>
                         <li class="breadcrumb-item active">Email Queue</li>
                     </ol>
-                </nav> 
+                </nav>
 
                 <?php if (!empty($message)): ?>
                     <div class="alert alert-success alert-dismissible fade show">
@@ -108,7 +134,7 @@ if (isset($_SESSION['message'])) {
                         <div class="card border-0 shadow-sm">
                             <div class="card-body d-flex align-items-center gap-3">
                                 <div class="rounded-circle d-flex align-items-center justify-content-center"
-                                     style="width:48px;height:48px;background:#fff3cd;">
+                                    style="width:48px;height:48px;background:#fff3cd;">
                                     <i class="fas fa-clock text-warning"></i>
                                 </div>
                                 <div>
@@ -122,7 +148,7 @@ if (isset($_SESSION['message'])) {
                         <div class="card border-0 shadow-sm">
                             <div class="card-body d-flex align-items-center gap-3">
                                 <div class="rounded-circle d-flex align-items-center justify-content-center"
-                                     style="width:48px;height:48px;background:#d1fae5;">
+                                    style="width:48px;height:48px;background:#d1fae5;">
                                     <i class="fas fa-check-circle text-success"></i>
                                 </div>
                                 <div>
@@ -136,7 +162,7 @@ if (isset($_SESSION['message'])) {
                         <div class="card border-0 shadow-sm">
                             <div class="card-body d-flex align-items-center gap-3">
                                 <div class="rounded-circle d-flex align-items-center justify-content-center"
-                                     style="width:48px;height:48px;background:#fee2e2;">
+                                    style="width:48px;height:48px;background:#fee2e2;">
                                     <i class="fas fa-times-circle text-danger"></i>
                                 </div>
                                 <div>
@@ -166,7 +192,17 @@ if (isset($_SESSION['message'])) {
                             <i class="fas fa-paper-plane me-1"></i> Process Queue Now
                         </button>
                     </form>
+                    <button type="button" id="clearEmailsBtn" class="btn btn-outline-danger btn-sm">
+                        <i class="fas fa-broom me-1"></i> Clear Old Emails
+                    </button>
                 </div>
+
+                <form id="purgeEmailsForm" method="POST" class="d-none">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="purge_emails">
+                    <input type="hidden" name="scope" id="purgeScopeInput">
+                    <input type="hidden" name="period" id="purgeEmailPeriodInput">
+                </form>
 
                 <!-- Queue table -->
                 <div class="card border-0 shadow-sm">
@@ -201,8 +237,10 @@ if (isset($_SESSION['message'])) {
                                             <tr>
                                                 <td class="text-muted small"><?= $row['id'] ?></td>
                                                 <td>
-                                                    <div class="fw-semibold small"><?= htmlspecialchars($row['to_name']) ?></div>
-                                                    <div class="text-muted small"><?= htmlspecialchars($row['to_email']) ?></div>
+                                                    <div class="fw-semibold small"><?= htmlspecialchars($row['to_name']) ?>
+                                                    </div>
+                                                    <div class="text-muted small"><?= htmlspecialchars($row['to_email']) ?>
+                                                    </div>
                                                 </td>
                                                 <td class="small"><?= htmlspecialchars($row['subject']) ?></td>
                                                 <td class="text-center">
@@ -247,8 +285,67 @@ if (isset($_SESSION['message'])) {
     <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
     <!-- <script src="assets/js/dataTables.bootstrap4.min.js"></script> -->
     <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
+    <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
+        const purgeScopeLabels = { 'sent': 'Sent only', 'sent_failed': 'Sent & Failed' };
+        const purgePeriodLabels = {
+            '30': 'Older than 30 days', '60': 'Older than 60 days',
+            '90': 'Older than 90 days', '180': 'Older than 180 days',
+            '365': 'Older than 365 days', 'all': 'All records'
+        };
+
+        document.getElementById('clearEmailsBtn').addEventListener('click', function () {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Clear Email Queue?',
+                html: `
+                    <p class="mb-2 text-start">Pending emails are never removed. Choose what to clear:</p>
+                    <select id="purgeScopeSelect" class="form-select mb-2">
+                        ${Object.entries(purgeScopeLabels).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+                    </select>
+                    <select id="purgeEmailPeriodSelect" class="form-select mb-2">
+                        ${Object.entries(purgePeriodLabels).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+                    </select>
+                    <div id="purgeEmailCountPreview" class="text-muted small">Checking matching records&hellip;</div>
+                `,
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, clear these emails',
+                cancelButtonText: 'Cancel',
+                didOpen: () => {
+                    const scopeSelect = document.getElementById('purgeScopeSelect');
+                    const periodSelect = document.getElementById('purgeEmailPeriodSelect');
+                    const preview = document.getElementById('purgeEmailCountPreview');
+                    const updateCount = () => {
+                        preview.textContent = 'Checking matching records…';
+                        fetch(`ajax/purge_count.php?target=email&scope=${scopeSelect.value}&period=${periodSelect.value}`)
+                            .then(r => r.json())
+                            .then(d => {
+                                preview.textContent = d.success
+                                    ? `This will permanently delete ${d.count.toLocaleString()} email(s).`
+                                    : 'Could not check record count.';
+                            })
+                            .catch(() => { preview.textContent = 'Could not check record count.'; });
+                    };
+                    scopeSelect.addEventListener('change', updateCount);
+                    periodSelect.addEventListener('change', updateCount);
+                    updateCount();
+                },
+                preConfirm: () => ({
+                    scope: document.getElementById('purgeScopeSelect').value,
+                    period: document.getElementById('purgeEmailPeriodSelect').value
+                })
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('purgeScopeInput').value = result.value.scope;
+                    document.getElementById('purgeEmailPeriodInput').value = result.value.period;
+                    document.getElementById('purgeEmailsForm').submit();
+                }
+            });
+        });
+
         $(document).ready(function () {
             $('#emailTable').DataTable({
                 order: [[0, 'desc']],
@@ -271,4 +368,5 @@ if (isset($_SESSION['message'])) {
         });
     </script>
 </body>
+
 </html>

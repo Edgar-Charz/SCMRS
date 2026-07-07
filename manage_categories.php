@@ -14,7 +14,7 @@ require_once "includes/csrf.php";
 $db = new Database();
 $conn = $db->connect();
 $admin = new Admin($conn);
-$adminId = (int)$_SESSION['user_id'];
+$adminId = (int) $_SESSION['user_id'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
@@ -22,14 +22,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Handle Add
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
-    $name     = trim($_POST['category_name'] ?? '');
-    $desc     = trim($_POST['category_description'] ?? '');
-    $deptId   = (int) ($_POST['auto_assign_department_id'] ?? 0);
-    $roleId   = (int) ($_POST['default_role_id'] ?? 0);
-    $reqDept  = isset($_POST['requires_department_selection']) ? 1 : 0;
+    $name = trim($_POST['category_name'] ?? '');
+    $desc = trim($_POST['category_description'] ?? '');
+    $deptId = (int) ($_POST['auto_assign_department_id'] ?? 0);
+    $roleId = (int) ($_POST['default_role_id'] ?? 0);
+    $reqDept = isset($_POST['requires_department_selection']) ? 1 : 0;
     $endorsable = isset($_POST['leader_endorsable']) ? 1 : 0;
+    $priority = in_array($_POST['default_priority'] ?? '', ['low', 'medium', 'high'], true) ? $_POST['default_priority'] : 'medium';
     if ($name !== '') {
-        $admin->addCategory($name, $desc, $adminId, $deptId ?: null, $reqDept, $roleId ?: null, $endorsable);
+        $admin->addCategory($name, $desc, $adminId, $deptId ?: null, $reqDept, $roleId ?: null, $endorsable, $priority);
         $admin->logActivity($adminId, 'category_added', 'category', 0, $name, "Category '{$name}' added");
         $_SESSION['message'] = "Category '{$name}' added successfully.";
     } else {
@@ -41,16 +42,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
 
 // Handle Edit
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_category'])) {
-    $id      = (int) ($_POST['category_id'] ?? 0);
-    $name    = trim($_POST['category_name'] ?? '');
-    $desc    = trim($_POST['category_description'] ?? '');
-    $status  = in_array($_POST['status'] ?? '', ['active', 'inactive']) ? $_POST['status'] : 'active';
-    $deptId  = (int) ($_POST['auto_assign_department_id'] ?? 0);
-    $roleId  = (int) ($_POST['default_role_id'] ?? 0);
+    $id = (int) ($_POST['category_id'] ?? 0);
+    $name = trim($_POST['category_name'] ?? '');
+    $desc = trim($_POST['category_description'] ?? '');
+    $status = in_array($_POST['status'] ?? '', ['active', 'inactive']) ? $_POST['status'] : 'active';
+    $deptId = (int) ($_POST['auto_assign_department_id'] ?? 0);
+    $roleId = (int) ($_POST['default_role_id'] ?? 0);
     $reqDept = isset($_POST['requires_department_selection']) ? 1 : 0;
     $endorsable = isset($_POST['leader_endorsable']) ? 1 : 0;
+    $priority = in_array($_POST['default_priority'] ?? '', ['low', 'medium', 'high'], true) ? $_POST['default_priority'] : 'medium';
     if ($id && $name !== '') {
-        $admin->updateCategory($id, $name, $desc, $status, $deptId ?: null, $reqDept, $roleId ?: null, $endorsable);
+        $admin->updateCategory($id, $name, $desc, $status, $deptId ?: null, $reqDept, $roleId ?: null, $endorsable, $priority);
         $admin->logActivity($adminId, 'category_updated', 'category', $id, $name, "Category updated to '{$name}' (status: {$status})");
         $_SESSION['message'] = "Category updated successfully.";
     } else {
@@ -76,9 +78,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_category']) &&
 
 // Handle Add Subcategory
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subcategory'])) {
-    $catId  = (int) ($_POST['subcategory_category_id'] ?? 0);
-    $name   = trim($_POST['subcategory_name'] ?? '');
-    $desc   = trim($_POST['subcategory_description'] ?? '');
+    $catId = (int) ($_POST['subcategory_category_id'] ?? 0);
+    $name = trim($_POST['subcategory_name'] ?? '');
+    $desc = trim($_POST['subcategory_description'] ?? '');
     $roleId = (int) ($_POST['default_role_id'] ?? 0);
     $endorsable = isset($_POST['leader_endorsable']) ? 1 : 0;
     if ($catId && $name !== '') {
@@ -98,9 +100,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subcategory'])) {
 
 // Handle Edit Subcategory
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_subcategory'])) {
-    $id     = (int) ($_POST['subcategory_id'] ?? 0);
-    $name   = trim($_POST['subcategory_name'] ?? '');
-    $desc   = trim($_POST['subcategory_description'] ?? '');
+    $id = (int) ($_POST['subcategory_id'] ?? 0);
+    $name = trim($_POST['subcategory_name'] ?? '');
+    $desc = trim($_POST['subcategory_description'] ?? '');
     $status = in_array($_POST['subcategory_status'] ?? '', ['active', 'inactive']) ? $_POST['subcategory_status'] : 'active';
     $roleId = (int) ($_POST['default_role_id'] ?? 0);
     $endorsable = isset($_POST['leader_endorsable']) ? 1 : 0;
@@ -144,20 +146,8 @@ $staffRoles = $admin->getAllStaffRoles();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Categories</title>
-    <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
-    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
-    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
-    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
-    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
-    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <title>Admin | Manage Categories</title>
+    <?php include 'includes/head_assets.php'; ?>
 </head>
 
 <body>
@@ -207,6 +197,7 @@ $staffRoles = $admin->getAllStaffRoles();
                                     <th>CATEGORY NAME</th>
                                     <th>DESCRIPTION</th>
                                     <th class="text-center">DEFAULT DEPT</th>
+                                    <th class="text-center">DEFAULT PRIORITY</th>
                                     <th class="text-center">LEADER ENDORSABLE</th>
                                     <th class="text-center">COMPLAINTS</th>
                                     <th class="text-center">STATUS</th>
@@ -232,6 +223,17 @@ $staffRoles = $admin->getAllStaffRoles();
                                                 <?php else: ?>
                                                     <span class="text-muted small">-</span>
                                                 <?php endif; ?>
+                                            </td>
+                                            <td class="text-center">
+                                                <?php
+                                                $priorityMap = [
+                                                    'low' => 'bg-success',
+                                                    'medium' => 'bg-warning text-dark',
+                                                    'high' => 'bg-danger',
+                                                ];
+                                                $priClass = $priorityMap[$cat['default_priority']] ?? 'bg-secondary';
+                                                ?>
+                                                <span class="badge <?= $priClass ?>"><?= ucfirst($cat['default_priority']) ?></span>
                                             </td>
                                             <td class="text-center">
                                                 <?php if (!empty($cat['leader_endorsable'])): ?>
@@ -277,7 +279,7 @@ $staffRoles = $admin->getAllStaffRoles();
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="9" class="text-center py-4 text-muted">No categories found. Add one to
+                                        <td colspan="10" class="text-center py-4 text-muted">No categories found. Add one to
                                             get started.</td>
                                     </tr>
                                 <?php endif; ?>
@@ -317,9 +319,11 @@ $staffRoles = $admin->getAllStaffRoles();
                                 <div class="mb-3">
                                     <label class="form-label fw-bold small">
                                         Default Department
-                                        <span class="text-muted fw-normal">(optional - auto-filters staff when assigning)</span>
+                                        <span class="text-muted fw-normal">(optional - auto-filters staff when
+                                            assigning)</span>
                                     </label>
-                                    <select name="auto_assign_department_id" class="form-select" style="border-radius:10px;">
+                                    <select name="auto_assign_department_id" class="form-select"
+                                        style="border-radius:10px;">
                                         <option value="0">- No default department -</option>
                                         <?php foreach ($departments as $dept): ?>
                                             <option value="<?= $dept['department_id'] ?>">
@@ -334,10 +338,9 @@ $staffRoles = $admin->getAllStaffRoles();
                                     <label class="form-check-label fw-bold small" for="cat_requires_dept">
                                         Requires student to pick a department at submission
                                     </label>
-                                    <div class="form-text">Enable for academic categories (FYP, PT, Labs) where routing
-                                        depends on the student's own department. Leave off for fixed-office categories
-                                        (Finance, Records, SAO, Warden) - those use "Default Department" above as a
-                                        fixed office instead.</div>
+                                    <div class="form-text">Enable for academic categories where routing
+                                        depends on the student's own department
+                                    </div>
                                 </div>
                                 <div class="mb-3 form-check">
                                     <input type="checkbox" class="form-check-input" name="leader_endorsable"
@@ -361,6 +364,18 @@ $staffRoles = $admin->getAllStaffRoles();
                                                 <?= htmlspecialchars($role['role_name']) ?>
                                             </option>
                                         <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">
+                                        Default Priority
+                                        <span class="text-muted fw-normal">(used when a complaint in this category is
+                                            auto-routed)</span>
+                                    </label>
+                                    <select name="default_priority" class="form-select" style="border-radius:10px;">
+                                        <option value="low">Low</option>
+                                        <option value="medium" selected>Medium</option>
+                                        <option value="high">High</option>
                                     </select>
                                 </div>
                             </div>
@@ -407,7 +422,8 @@ $staffRoles = $admin->getAllStaffRoles();
                                         Default Department
                                         <span class="text-muted fw-normal">(optional)</span>
                                     </label>
-                                    <select name="auto_assign_department_id" id="edit_cat_dept" class="form-select" style="border-radius:10px;">
+                                    <select name="auto_assign_department_id" id="edit_cat_dept" class="form-select"
+                                        style="border-radius:10px;">
                                         <option value="0">- No default department -</option>
                                         <?php foreach ($departments as $dept): ?>
                                             <option value="<?= $dept['department_id'] ?>">
@@ -435,13 +451,27 @@ $staffRoles = $admin->getAllStaffRoles();
                                         Default Staff Role
                                         <span class="text-muted fw-normal">(optional - enables auto-routing)</span>
                                     </label>
-                                    <select name="default_role_id" id="edit_cat_role" class="form-select" style="border-radius:10px;">
+                                    <select name="default_role_id" id="edit_cat_role" class="form-select"
+                                        style="border-radius:10px;">
                                         <option value="0">- No auto-routing (admin assigns manually) -</option>
                                         <?php foreach ($staffRoles as $role): ?>
                                             <option value="<?= $role['role_id'] ?>">
                                                 <?= htmlspecialchars($role['role_name']) ?>
                                             </option>
                                         <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">
+                                        Default Priority
+                                        <span class="text-muted fw-normal">(used when a complaint in this category is
+                                            auto-routed)</span>
+                                    </label>
+                                    <select name="default_priority" id="edit_cat_priority" class="form-select"
+                                        style="border-radius:10px;">
+                                        <option value="low">Low</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="high">High</option>
                                     </select>
                                 </div>
                                 <div class="mb-3">
@@ -527,9 +557,11 @@ $staffRoles = $admin->getAllStaffRoles();
                                             <div class="mb-3">
                                                 <label class="form-label fw-bold small">
                                                     Default Staff Role
-                                                    <span class="text-muted fw-normal">(optional - overrides the category's role)</span>
+                                                    <span class="text-muted fw-normal">(optional - overrides the
+                                                        category's role)</span>
                                                 </label>
-                                                <select name="default_role_id" class="form-select" style="border-radius:8px;">
+                                                <select name="default_role_id" class="form-select"
+                                                    style="border-radius:8px;">
                                                     <option value="0">- Use category's default role -</option>
                                                     <?php foreach ($staffRoles as $role): ?>
                                                         <option value="<?= $role['role_id'] ?>">
@@ -541,7 +573,8 @@ $staffRoles = $admin->getAllStaffRoles();
                                             <div class="mb-3 form-check">
                                                 <input type="checkbox" class="form-check-input" name="leader_endorsable"
                                                     id="sub_leader_endorsable" value="1">
-                                                <label class="form-check-label fw-bold small" for="sub_leader_endorsable">
+                                                <label class="form-check-label fw-bold small"
+                                                    for="sub_leader_endorsable">
                                                     Can be endorsed by student leaders
                                                 </label>
                                                 <div class="form-text">Only takes effect if the parent category is also
@@ -594,9 +627,11 @@ $staffRoles = $admin->getAllStaffRoles();
                                 <div class="mb-3">
                                     <label class="form-label fw-bold small">
                                         Default Staff Role
-                                        <span class="text-muted fw-normal">(optional - overrides the category's role)</span>
+                                        <span class="text-muted fw-normal">(optional - overrides the category's
+                                            role)</span>
                                     </label>
-                                    <select name="default_role_id" id="edit_sub_role" class="form-select" style="border-radius:10px;">
+                                    <select name="default_role_id" id="edit_sub_role" class="form-select"
+                                        style="border-radius:10px;">
                                         <option value="0">- Use category's default role -</option>
                                         <?php foreach ($staffRoles as $role): ?>
                                             <option value="<?= $role['role_id'] ?>">
@@ -644,9 +679,10 @@ $staffRoles = $admin->getAllStaffRoles();
             document.getElementById('edit_cat_requires_dept').checked = !!parseInt(cat.requires_department_selection);
             document.getElementById('edit_cat_leader_endorsable').checked = !!parseInt(cat.leader_endorsable);
             document.getElementById('edit_cat_role').value = cat.default_role_id || '0';
+            document.getElementById('edit_cat_priority').value = cat.default_priority || 'medium';
         }
 
-        // ── Subcategory helpers ───────────────────────────────────────────────
+        // Subcategory helpers 
         const allSubcategories = <?= json_encode($subcategories_grouped) ?>;
         const subById = {};
         Object.values(allSubcategories).forEach(arr => arr.forEach(s => { subById[s.subcategory_id] = s; }));
@@ -739,7 +775,6 @@ $staffRoles = $admin->getAllStaffRoles();
                 }
             });
         }
-        // ─────────────────────────────────────────────────────────────────────
 
         function confirmDeleteCat(id, name) {
             Swal.fire({
@@ -760,16 +795,8 @@ $staffRoles = $admin->getAllStaffRoles();
         }
     </script>
 
-    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
-    <!-- <script src="assets/js/jquery.dataTables.min.js"></script> -->
-    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
-    <!-- <script src="assets/js/dataTables.bootstrap4.min.js"></script> -->
-    <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
-    <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
-    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/10.16.7/sweetalert2.all.min.js"></script> -->
+    <?php $useDataTablesJs = true;
+    include 'includes/foot_scripts.php'; ?>
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>

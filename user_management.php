@@ -192,6 +192,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['addStudentBTN'])) {
     try {
         if (!$username || !$email || !$regNum || !$password) {
             $_SESSION['message_error'] = "Name, email, registration number and password are required.";
+        } elseif (!preg_match('/^20\d{2}-04-\d{5}$/', $regNum)) {
+            $_SESSION['message_error'] = "Invalid registration number format. Must be in the format 20XX-04-XXXXX.";
         } elseif ($password !== $confirm) {
             $_SESSION['message_error'] = "Passwords do not match.";
         } else {
@@ -384,6 +386,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['updateStudentBTN'])) 
         if (!$editUserId || empty($editName) || empty($editEmail) || empty($editReg)) {
             throw new Exception("Name, email, and registration number are required.");
         }
+        if (!preg_match('/^20\d{2}-04-\d{5}$/', $editReg)) {
+            throw new Exception("Invalid registration number format. Must be in the format 20XX-04-XXXXX.");
+        }
         $admin->updateStudent($editUserId, $editName, $editEmail, $editReg, $editProgram, $editCollege);
         $admin->logActivity($adminId, 'user_updated', 'user', $editUserId, $editName, 'Student information updated by admin');
         $_SESSION['message'] = "Student '{$editName}' updated successfully.";
@@ -440,20 +445,8 @@ if (isset($_SESSION['message'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard | User Management</title>
-    <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
-    <!-- <link rel="stylesheet" href="assets/css/animate.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
-    <!-- <link rel="stylesheet" href="assets/plugins/select2/css/select2.min.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
-    <!-- <link rel="stylesheet" href="assets/css/dataTables.bootstrap4.min.css"> -->
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
-    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css"> -->
-    <!-- <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <title>Admin | User Management</title>
+    <?php include 'includes/head_assets.php'; ?>
 </head>
 
 <body>
@@ -760,7 +753,9 @@ if (isset($_SESSION['message'])) {
                                                                 </div>
                                                                 <div class="col-lg-6 col-sm-12 col-12">
                                                                     <label class="form-label fw-bold">Registration Number</label>
-                                                                    <input type="text" name="edit_student_reg" id="edit_student_reg" class="form-control" required>
+                                                                    <input type="text" name="edit_student_reg" id="edit_student_reg" class="form-control"
+                                                                        placeholder="20XX-04-XXXXX" pattern="^20[0-9]{2}-04-[0-9]{5}$"
+                                                                        title="Format: 20XX-04-XXXXX" maxlength="13" required>
                                                                 </div>
                                                                 <div class="col-lg-6 col-sm-12 col-12">
                                                                     <label class="form-label fw-bold">Email Address</label>
@@ -829,8 +824,8 @@ if (isset($_SESSION['message'])) {
                                                 <label class="form-label fw-bold small">Registration Number <span
                                                         class="text-danger">*</span></label>
                                                 <input type="text" name="student_reg_number" class="form-control"
-                                                    placeholder="202X-04-XXXXX" pattern="^202[0-9]-04-[0-9]{5}$"
-                                                    title="Format: 202X-04-XXXXX" maxlength="13" required
+                                                    placeholder="20XX-04-XXXXX" pattern="^20[0-9]{2}-04-[0-9]{5}$"
+                                                    title="Format: 20XX-04-XXXXX" maxlength="13" required
                                                     oninput="this.value=this.value.toUpperCase().replace(/[^0-9-]/g,'').slice(0,13)">
                                             </div>
                                             <div class="col-12 col-md-6">
@@ -2344,16 +2339,7 @@ if (isset($_SESSION['message'])) {
     </script>
 
 
-    <!-- <script src="assets/js/jquery-3.6.0.min.js"></script> -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <!-- <script src="assets/js/bootstrap.bundle.min.js"></script> -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
-    <!-- <script src="assets/js/jquery.dataTables.min.js"></script> -->
-    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
-    <!-- <script src="assets/js/dataTables.bootstrap4.min.js"></script> -->
-    <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
-    <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
-    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/10.16.7/sweetalert2.all.min.js"></script> -->
+    <?php $useDataTablesJs = true; include 'includes/foot_scripts.php'; ?>
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
