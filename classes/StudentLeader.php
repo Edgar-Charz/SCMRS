@@ -277,10 +277,7 @@ class StudentLeader
         if (empty($leaders))
             return;
 
-        $notif = new Notification($this->conn);
-        foreach ($leaders as $leader) {
-            $notif->create($leader['user_id'], $message, $type, $link, $complaintId);
-        }
+        (new Notification($this->conn))->createBulk(array_column($leaders, 'user_id'), $message, $type, $link, $complaintId);
     }
 
     // Assign this leader to a department and promote their role

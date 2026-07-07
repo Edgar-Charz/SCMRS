@@ -152,7 +152,7 @@ class Complaint
     public function getCategoryRoutingMeta($categoryId)
     {
         $stmt = $this->conn->prepare(
-            "SELECT requires_department_selection, leader_endorsable, auto_assign_department_id, default_role_id
+            "SELECT requires_department_selection, leader_endorsable, auto_assign_department_id, default_role_id, default_priority
              FROM complaint_categories
              WHERE category_id = ?"
         );

@@ -8,25 +8,25 @@ class Notification
 
     // Maps notification type → email subject prefix
     private static array $subjects = [
-        'new_complaint'              => 'New Complaint Submitted',
-        'new_assignment'             => 'Complaint Assigned to You',
-        'status_change'              => 'Complaint Status Updated',
-        'complaint_resolved'         => 'Your Complaint Has Been Resolved',
-        'complaint_rejected'         => 'Your Complaint Has Been Rejected',
-        'complaint_reopened'         => 'Complaint Reopened',
-        'complaint_deleted'          => 'Complaint Deleted',
-        'request_info'               => 'Information Requested on Your Complaint',
-        'info_responded'             => 'Student Responded to Information Request',
-        'system'                     => 'Important Account Notice',
-        'password_reset_admin'       => 'Your Password Has Been Reset',
-        'staff_approved'             => 'Your Staff Account Has Been Approved',
-        'staff_rejected'             => 'Your Staff Account Was Not Approved',
-        'new_registration'           => 'New Staff Registration Pending Approval',
-        'complaint_delegated'          => 'Complaint Delegated to You',
+        'new_complaint' => 'New Complaint Submitted',
+        'new_assignment' => 'Complaint Assigned to You',
+        'status_change' => 'Complaint Status Updated',
+        'complaint_resolved' => 'Your Complaint Has Been Resolved',
+        'complaint_rejected' => 'Your Complaint Has Been Rejected',
+        'complaint_reopened' => 'Complaint Reopened',
+        'complaint_deleted' => 'Complaint Deleted',
+        'request_info' => 'Information Requested on Your Complaint',
+        'info_responded' => 'Student Responded to Information Request',
+        'system' => 'Important Account Notice',
+        'password_reset_admin' => 'Your Password Has Been Reset',
+        'staff_approved' => 'Your Staff Account Has Been Approved',
+        'staff_rejected' => 'Your Staff Account Was Not Approved',
+        'new_registration' => 'New Staff Registration Pending Approval',
+        'complaint_delegated' => 'Complaint Delegated to You',
         'complaint_delegated_resolved' => 'Delegated Complaint Resolved',
-        'complaint_overdue'            => 'Complaint Past Resolution Deadline',
-        'new_complaint_in_rep_scope'   => 'New Complaint in Your Department',
-        'endorsed_complaint_updated'   => 'An Endorsed Complaint Has Been Updated',
+        'complaint_overdue' => 'Complaint Past Resolution Deadline',
+        'new_complaint_in_rep_scope' => 'New Complaint in Your Department',
+        'endorsed_complaint_updated' => 'An Endorsed Complaint Has Been Updated',
     ];
 
     public function __construct($db)
@@ -73,7 +73,7 @@ class Notification
             }
 
             $subject = self::$subjects[$type] ?? 'SCMRS Notification';
-            $body    = Mailer::buildBody($this->conn, $user['username'], $message, $link);
+            $body = Mailer::buildBody($this->conn, $user['username'], $message, $link);
 
             EmailQueue::enqueue($this->conn, $user['user_email'], $user['username'], $subject, $body);
         } catch (Throwable $e) {
@@ -82,13 +82,73 @@ class Notification
         }
     }
 
+    // Create the same notification for many users in one round-trip (to admins, delegators, endorsers.)
+    public function createBulk(array $userIds, $message, $type, $link = null, $complaintId = null): void
+    {
+        $userIds = array_values(array_unique(array_map('intval', $userIds)));
+        if (empty($userIds)) {
+            return;
+        }
+
+        $params = [];
+        if ($complaintId !== null) {
+            $placeholders = implode(', ', array_fill(0, count($userIds), '(?, ?, ?, ?, ?)'));
+            $sql = "INSERT INTO notifications (user_id, complaint_id, message, type, link) VALUES $placeholders";
+            $types = str_repeat('iisss', count($userIds));
+            foreach ($userIds as $uid) {
+                array_push($params, $uid, $complaintId, $message, $type, $link);
+            }
+        } else {
+            $placeholders = implode(', ', array_fill(0, count($userIds), '(?, ?, ?, ?)'));
+            $sql = "INSERT INTO notifications (user_id, message, type, link) VALUES $placeholders";
+            $types = str_repeat('isss', count($userIds));
+            foreach ($userIds as $uid) {
+                array_push($params, $uid, $message, $type, $link);
+            }
+        }
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $stmt->close();
+
+        $this->queueEmailForUsers($userIds, $message, $type, $link);
+    }
+
+    private function queueEmailForUsers(array $userIds, string $message, string $type, ?string $link): void
+    {
+        try {
+            $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+            $types = str_repeat('i', count($userIds));
+            $stmt = $this->conn->prepare(
+                "SELECT username, user_email FROM users WHERE user_id IN ($placeholders) AND user_email IS NOT NULL AND user_email <> ''"
+            );
+            $stmt->bind_param($types, ...$userIds);
+            $stmt->execute();
+            $users = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+
+            if (empty($users)) {
+                return;
+            }
+
+            $subject = self::$subjects[$type] ?? 'SCMRS Notification';
+            foreach ($users as $user) {
+                $body = Mailer::buildBody($this->conn, $user['username'], $message, $link);
+                EmailQueue::enqueue($this->conn, $user['user_email'], $user['username'], $subject, $body);
+            }
+        } catch (Throwable $e) {
+            // Never let email queuing break the main request
+            error_log('[Notification] queueEmailForUsers error: ' . $e->getMessage());
+        }
+    }
+
     // Notify every admin
     public function notifyAllAdmins($message, $type, $link = null, $complaintId = null)
     {
         $result = $this->conn->query("SELECT user_id FROM users WHERE user_role = 'admin'");
-        while ($row = $result->fetch_assoc()) {
-            $this->create($row['user_id'], $message, $type, $link, $complaintId);
-        }
+        $adminIds = array_column($result->fetch_all(MYSQLI_ASSOC), 'user_id');
+        $this->createBulk($adminIds, $message, $type, $link, $complaintId);
     }
 
     // Get recent notifications for a user (for dropdown)
@@ -207,14 +267,14 @@ class Notification
             'complaint_rejected' => 'fa-ban text-danger',
             'complaint_resolved' => 'fa-check-double text-success',
             'complaint_deleted' => 'fa-trash text-danger',
-            'complaint_reopened'           => 'fa-redo text-warning',
+            'complaint_reopened' => 'fa-redo text-warning',
             'complaint_delegated_resolved' => 'fa-check-double text-success',
-            'complaint_delegated'          => 'fa-level-down-alt text-info',
-            'complaint_overdue'            => 'fa-exclamation-triangle text-danger',
-            'new_complaint_in_rep_scope'   => 'fa-building text-primary',
-            'endorsed_complaint_updated'   => 'fa-thumbs-up text-success',
-            'system'                       => 'fa-shield-alt text-secondary',
-            'password_reset_admin'         => 'fa-key text-warning',
+            'complaint_delegated' => 'fa-level-down-alt text-info',
+            'complaint_overdue' => 'fa-exclamation-triangle text-danger',
+            'new_complaint_in_rep_scope' => 'fa-building text-primary',
+            'endorsed_complaint_updated' => 'fa-thumbs-up text-success',
+            'system' => 'fa-shield-alt text-secondary',
+            'password_reset_admin' => 'fa-key text-warning',
         ];
         return $map[$type] ?? 'fa-bell text-secondary';
     }

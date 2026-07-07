@@ -349,6 +349,19 @@ class Admin extends User
     // Delete student
     public function deleteStudent($userId)
     {
+        $chk = $this->conn->prepare(
+            "SELECT COUNT(*) AS cnt FROM complaints c
+             JOIN students s ON c.student_id = s.student_id
+             WHERE s.student_user_id = ?"
+        );
+        $chk->bind_param("i", $userId);
+        $chk->execute();
+        $count = (int) $chk->get_result()->fetch_assoc()['cnt'];
+        $chk->close();
+        if ($count > 0) {
+            throw new Exception("Cannot delete: this student has $count associated complaint(s). Suspend the account instead to preserve complaint history.");
+        }
+
         try {
             $this->conn->begin_transaction();
 
@@ -376,6 +389,19 @@ class Admin extends User
     // Delete staff
     public function deleteStaff($userId)
     {
+        $chk = $this->conn->prepare(
+            "SELECT
+                (SELECT COUNT(*) FROM complaint_assignments ca JOIN staffs st ON ca.staff_id = st.staff_id WHERE st.staff_user_id = ?) +
+                (SELECT COUNT(*) FROM complaints c JOIN staffs st ON c.preferred_staff_id = st.staff_id WHERE st.staff_user_id = ?) AS cnt"
+        );
+        $chk->bind_param("ii", $userId, $userId);
+        $chk->execute();
+        $count = (int) $chk->get_result()->fetch_assoc()['cnt'];
+        $chk->close();
+        if ($count > 0) {
+            throw new Exception("Cannot delete: this staff member has $count associated complaint(s)/assignment(s). Suspend the account instead to preserve complaint history.");
+        }
+
         try {
             $this->conn->begin_transaction();
 
@@ -764,16 +790,13 @@ class Admin extends User
             $endorsers = $endStmt->get_result()->fetch_all(MYSQLI_ASSOC);
             $endStmt->close();
             $statusLabel = $newStatus === STATUS_RESOLVED ? 'Resolved' : 'Rejected';
-            $notifLeader = new Notification($this->conn);
-            foreach ($endorsers as $row) {
-                $notifLeader->create(
-                    (int) $row['leader_id'],
-                    "A complaint you endorsed (#$complaintId) has been marked as $statusLabel.",
-                    'endorsed_complaint_updated',
-                    "leader_complaint_details.php?id=$complaintId",
-                    $complaintId
-                );
-            }
+            (new Notification($this->conn))->createBulk(
+                array_column($endorsers, 'leader_id'),
+                "A complaint you endorsed (#$complaintId) has been marked as $statusLabel.",
+                'endorsed_complaint_updated',
+                "leader_complaint_details.php?id=$complaintId",
+                $complaintId
+            );
 
             return true;
         } catch (Exception $e) {
@@ -1305,7 +1328,7 @@ class Admin extends User
     {
         $stmt = $this->conn->prepare(
             "SELECT cc.category_id, cc.category_name, cc.category_description, cc.status,
-                    cc.requires_department_selection, cc.leader_endorsable, cc.auto_assign_department_id, cc.default_role_id,
+                    cc.requires_department_selection, cc.leader_endorsable, cc.auto_assign_department_id, cc.default_role_id, cc.default_priority,
                     d.department_name AS default_dept_name,
                     sr.role_name AS default_role_name,
                     COUNT(c.complaint_id) AS complaint_count
@@ -1322,29 +1345,31 @@ class Admin extends User
         return $data;
     }
 
-    public function addCategory($name, $description, $createdBy, $departmentId = null, $requiresDeptSelection = 0, $defaultRoleId = null, $leaderEndorsable = 0)
+    public function addCategory($name, $description, $createdBy, $departmentId = null, $requiresDeptSelection = 0, $defaultRoleId = null, $leaderEndorsable = 0, $defaultPriority = 'medium')
     {
         $deptId = ($departmentId > 0) ? (int) $departmentId : null;
         $roleId = ($defaultRoleId > 0) ? (int) $defaultRoleId : null;
         $reqDept = $requiresDeptSelection ? 1 : 0;
         $endorsable = $leaderEndorsable ? 1 : 0;
+        $priority = in_array($defaultPriority, ['low', 'medium', 'high'], true) ? $defaultPriority : 'medium';
         $stmt = $this->conn->prepare(
             "INSERT INTO complaint_categories
-                (category_name, category_description, requires_department_selection, leader_endorsable, auto_assign_department_id, default_role_id, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?)"
+                (category_name, category_description, requires_department_selection, leader_endorsable, auto_assign_department_id, default_role_id, default_priority, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         );
-        $stmt->bind_param("ssiiiii", $name, $description, $reqDept, $endorsable, $deptId, $roleId, $createdBy);
+        $stmt->bind_param("ssiiiisi", $name, $description, $reqDept, $endorsable, $deptId, $roleId, $priority, $createdBy);
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;
     }
 
-    public function updateCategory($id, $name, $description, $status, $departmentId = null, $requiresDeptSelection = 0, $defaultRoleId = null, $leaderEndorsable = 0)
+    public function updateCategory($id, $name, $description, $status, $departmentId = null, $requiresDeptSelection = 0, $defaultRoleId = null, $leaderEndorsable = 0, $defaultPriority = 'medium')
     {
         $deptId = ($departmentId > 0) ? (int) $departmentId : null;
         $roleId = ($defaultRoleId > 0) ? (int) $defaultRoleId : null;
         $reqDept = $requiresDeptSelection ? 1 : 0;
         $endorsable = $leaderEndorsable ? 1 : 0;
+        $priority = in_array($defaultPriority, ['low', 'medium', 'high'], true) ? $defaultPriority : 'medium';
 
         $wasStmt = $this->conn->prepare("SELECT leader_endorsable FROM complaint_categories WHERE category_id = ?");
         $wasStmt->bind_param("i", $id);
@@ -1355,10 +1380,10 @@ class Admin extends User
         $stmt = $this->conn->prepare(
             "UPDATE complaint_categories
              SET category_name = ?, category_description = ?, status = ?,
-                 requires_department_selection = ?, leader_endorsable = ?, auto_assign_department_id = ?, default_role_id = ?
+                 requires_department_selection = ?, leader_endorsable = ?, auto_assign_department_id = ?, default_role_id = ?, default_priority = ?
              WHERE category_id = ?"
         );
-        $stmt->bind_param("sssiiiii", $name, $description, $status, $reqDept, $endorsable, $deptId, $roleId, $id);
+        $stmt->bind_param("sssiiiisi", $name, $description, $status, $reqDept, $endorsable, $deptId, $roleId, $priority, $id);
         $ok = $stmt->execute();
         $stmt->close();
 
@@ -1703,6 +1728,45 @@ class Admin extends User
         $cnt = (int) $stmt->get_result()->fetch_assoc()['cnt'];
         $stmt->close();
         return $cnt;
+    }
+
+    // Count activity_logs rows a purge would remove ($days = null means all records)
+    public function countPurgableActivityLogs(?int $days): int
+    {
+        if ($days === null) {
+            $row = $this->conn->query("SELECT COUNT(*) AS cnt FROM activity_logs")->fetch_assoc();
+            return (int) $row['cnt'];
+        }
+        $stmt = $this->conn->prepare(
+            "SELECT COUNT(*) AS cnt FROM activity_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)"
+        );
+        $stmt->bind_param('i', $days);
+        $stmt->execute();
+        $cnt = (int) $stmt->get_result()->fetch_assoc()['cnt'];
+        $stmt->close();
+        return $cnt;
+    }
+
+    // Delete old activity_logs rows ($days = null means all records) and record the purge itself
+    public function purgeActivityLogs(?int $days, int $adminId): int
+    {
+        $count = $this->countPurgableActivityLogs($days);
+
+        if ($days === null) {
+            $this->conn->query("DELETE FROM activity_logs");
+        } else {
+            $stmt = $this->conn->prepare(
+                "DELETE FROM activity_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)"
+            );
+            $stmt->bind_param('i', $days);
+            $stmt->execute();
+            $stmt->close();
+        }
+
+        $period = $days === null ? 'all time' : "older than {$days} days";
+        $this->logActivity($adminId, 'logs_purged', 'activity_logs', null, null, "Cleared {$count} audit log record(s) ({$period}).");
+
+        return $count;
     }
 
     // Collaboration / info

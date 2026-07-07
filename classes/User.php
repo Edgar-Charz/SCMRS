@@ -19,8 +19,8 @@ class User
 
             // Validate registration number
             $reg_no = trim($reg_no);
-            if (!preg_match('/^202\d-04-\d{5}$/', $reg_no)) {
-                throw new Exception("Invalid registration number format. Must be in the format 202X-04-XXXXX.");
+            if (!preg_match('/^20\d{2}-04-\d{5}$/', $reg_no)) {
+                throw new Exception("Invalid registration number format. Must be in the format 20XX-04-XXXXX.");
             }
 
             // Validate phone number

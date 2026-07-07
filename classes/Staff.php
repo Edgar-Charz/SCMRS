@@ -631,16 +631,13 @@ class Staff
                 $delStmt->execute();
                 $delegators = $delStmt->get_result()->fetch_all(MYSQLI_ASSOC);
                 $delStmt->close();
-                $notif = new Notification($this->conn);
-                foreach ($delegators as $d) {
-                    $notif->create(
-                        (int) $d['staff_user_id'],
-                        "A complaint you delegated (#{$complaintId}) has been resolved.",
-                        'complaint_delegated_resolved',
-                        "assigned_complaint_details.php?id={$complaintId}",
-                        $complaintId
-                    );
-                }
+                (new Notification($this->conn))->createBulk(
+                    array_column($delegators, 'staff_user_id'),
+                    "A complaint you delegated (#{$complaintId}) has been resolved.",
+                    'complaint_delegated_resolved',
+                    "assigned_complaint_details.php?id={$complaintId}",
+                    $complaintId
+                );
             }
 
             // Notify leaders who endorsed this complaint (status only - they never see the resolution text)
@@ -651,16 +648,13 @@ class Staff
                 $endorsers = $endStmt->get_result()->fetch_all(MYSQLI_ASSOC);
                 $endStmt->close();
                 $statusLabel = $newStatus === STATUS_RESOLVED ? 'Resolved' : 'Rejected';
-                $notifLeader = new Notification($this->conn);
-                foreach ($endorsers as $row) {
-                    $notifLeader->create(
-                        (int) $row['leader_id'],
-                        "A complaint you endorsed (#$complaintId) has been marked as $statusLabel.",
-                        'endorsed_complaint_updated',
-                        "leader_complaint_details.php?id=$complaintId",
-                        $complaintId
-                    );
-                }
+                (new Notification($this->conn))->createBulk(
+                    array_column($endorsers, 'leader_id'),
+                    "A complaint you endorsed (#$complaintId) has been marked as $statusLabel.",
+                    'endorsed_complaint_updated',
+                    "leader_complaint_details.php?id=$complaintId",
+                    $complaintId
+                );
             }
 
             return true;

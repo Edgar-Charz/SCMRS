@@ -139,4 +139,51 @@ class EmailQueue
         );
         return $conn->affected_rows;
     }
+
+    // WHERE clause + bind params for a purge scope.
+    private static function purgeWhere(string $scope, ?int $days): array
+    {
+        $statuses = $scope === 'sent_failed' ? ['sent', 'failed'] : ['sent'];
+        $placeholders = implode(',', array_fill(0, count($statuses), '?'));
+        $sql = "WHERE status IN ($placeholders)";
+        $types = str_repeat('s', count($statuses));
+        $params = $statuses;
+
+        if ($days !== null) {
+            $sql .= " AND created_at < DATE_SUB(NOW(), INTERVAL ? DAY)";
+            $types .= 'i';
+            $params[] = $days;
+        }
+
+        return [$sql, $types, $params];
+    }
+
+    // Count how many queue rows a purge would remove.
+    public static function countPurgable(mysqli $conn, string $scope, ?int $days): int
+    {
+        [$where, $types, $params] = self::purgeWhere($scope, $days);
+        $stmt = $conn->prepare("SELECT COUNT(*) AS cnt FROM email_queue $where");
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $cnt = (int) $stmt->get_result()->fetch_assoc()['cnt'];
+        $stmt->close();
+        return $cnt;
+    }
+
+    // Delete old queue rows matching scope/period. Returns rows removed.
+    public static function purge(mysqli $conn, string $scope, ?int $days): int
+    {
+        $count = self::countPurgable($conn, $scope, $days);
+        if ($count === 0) {
+            return 0;
+        }
+
+        [$where, $types, $params] = self::purgeWhere($scope, $days);
+        $stmt = $conn->prepare("DELETE FROM email_queue $where");
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $stmt->close();
+
+        return $count;
+    }
 }
