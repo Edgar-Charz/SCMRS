@@ -146,6 +146,7 @@ CREATE TABLE `complaint_categories` (
   `leader_endorsable` tinyint(1) NOT NULL DEFAULT 0,
   `auto_assign_department_id` int(11) DEFAULT NULL,
   `default_role_id` int(11) DEFAULT NULL,
+  `default_priority` enum('low','medium','high') NOT NULL DEFAULT 'medium',
   `created_by` int(11) DEFAULT NULL,
   `status` enum('active','inactive') DEFAULT 'active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
@@ -482,7 +483,8 @@ ALTER TABLE `complaints`
   ADD KEY `category_id` (`category_id`),
   ADD KEY `subcategory_id` (`subcategory_id`),
   ADD KEY `department_id` (`department_id`),
-  ADD KEY `preferred_staff_id` (`preferred_staff_id`);
+  ADD KEY `preferred_staff_id` (`preferred_staff_id`),
+  ADD KEY `idx_status_created` (`complaint_status`, `created_at`);
 
 --
 -- Indexes for table `complaint_assignments`
