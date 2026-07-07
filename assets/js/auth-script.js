@@ -216,9 +216,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function vRegNo(val) {
     if (!val) return "Registration number is required.";
-    return /^202[0-9]-04-[0-9]{5}$/.test(val)
+    return /^20[0-9]{2}-04-[0-9]{5}$/.test(val)
       ? ""
-      : "Use format 202X-04-XXXXX (e.g. 2024-04-00123).";
+      : "Use format 20XX-04-XXXXX (e.g. 2024-04-00123).";
   }
 
   function vStaffId(val) {

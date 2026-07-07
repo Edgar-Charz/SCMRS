@@ -702,8 +702,8 @@ $staffPost   = isset($_POST['registerStaffBTN']);
                             <div class="field-wrap">
                                 <i class="fas fa-id-card field-icon"></i>
                                 <input type="text" id="s_reg_no" class="form-control icon-input" name="reg_no"
-                                    placeholder="202X-04-XXXXX" pattern="^202[0-9]-04-[0-9]{5}$"
-                                    title="Use format 202X-04-XXXXX" maxlength="13" minlength="13"
+                                    placeholder="20XX-04-XXXXX" pattern="^20[0-9]{2}-04-[0-9]{5}$"
+                                    title="Use format 20XX-04-XXXXX" maxlength="13" minlength="13"
                                     oninput="this.value=this.value.toUpperCase().replace(/[^0-9-]/g,'').slice(0,13)"
                                     value="<?= $studentPost ? htmlspecialchars($_POST['reg_no'] ?? '') : '' ?>" required>
                                 <div class="invalid-feedback"></div>
@@ -993,7 +993,7 @@ $staffPost   = isset($_POST['registerStaffBTN']);
         wireText('s_reg_no', function(el) {
             var v = el.value.trim();
             if (!v)                                          fieldError(el, 'Registration number is required.');
-            else if (!/^202[0-9]-04-[0-9]{5}$/.test(v))    fieldError(el, 'Use format 202X-04-XXXXX (e.g. 2024-04-12345).');
+            else if (!/^20[0-9]{2}-04-[0-9]{5}$/.test(v))    fieldError(el, 'Use format 20XX-04-XXXXX (e.g. 2024-04-12345).');
             else                                             fieldOk(el);
         });
         wireText('s_email', function(el) {

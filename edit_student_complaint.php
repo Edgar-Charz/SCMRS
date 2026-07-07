@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $categoryId,
                     $subcategoryId,
                     $effectiveDepartmentId,
-                    'medium'
+                    $categoryMeta['default_priority']
                 );
             }
 
@@ -186,7 +186,7 @@ $departments = $department->getDepartments();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Complaint #<?= $complaintId ?> | Student</title>
+    <title>Student | Edit Complaint #<?= $complaintId ?></title>
     <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
     <!-- <link rel="stylesheet" href="assets/css/bootstrap.min.css"> -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
