@@ -6,7 +6,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'student_leader')
     exit;
 }
 
-$userId = (int)$_SESSION['user_id'];
+$userId = (int) $_SESSION['user_id'];
 
 require_once 'config/Database.php';
 require_once 'classes/StudentLeader.php';
@@ -15,18 +15,15 @@ require_once 'classes/Department.php';
 require_once 'classes/Notification.php';
 require_once 'includes/csrf.php';
 
-$db        = new Database();
-$conn      = $db->connect();
-$leader    = new StudentLeader($conn, $userId);
+$db = new Database();
+$conn = $db->connect();
+$leader = new StudentLeader($conn, $userId);
 $complaint = new Complaint($conn);
 $department = new Department($conn);
 
-// This form is for a leader's own complaint (they're a student too) and is unrelated
-// to which department(s) they represent as a leader - so, like any student, they can
-// pick from every department, and only when the chosen category calls for it.
 $categories = $complaint->getComplaintCategories();
 $departments = $department->getDepartments();
-$studentId  = $leader->getStudentId();
+$studentId = $leader->getStudentId();
 
 $message = $error = '';
 
@@ -37,13 +34,13 @@ if (isset($_POST['submitComplaintBTN'])) {
             throw new Exception("No student profile found for your account. Please contact an administrator.");
         }
 
-        $title          = trim($_POST['title'] ?? '');
-        $description    = trim($_POST['description'] ?? '');
-        $category_id    = isset($_POST['category_id'])    ? (int)$_POST['category_id']    : null;
-        $subcategory_id = isset($_POST['subcategory_id']) ? (int)$_POST['subcategory_id'] : null;
-        $department_id  = isset($_POST['department_id'])  ? (int)$_POST['department_id']  : null;
+        $title = trim($_POST['title'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        $category_id = isset($_POST['category_id']) ? (int) $_POST['category_id'] : null;
+        $subcategory_id = isset($_POST['subcategory_id']) ? (int) $_POST['subcategory_id'] : null;
+        $department_id = isset($_POST['department_id']) ? (int) $_POST['department_id'] : null;
         $preferred_staff_id = trim($_POST['preferred_staff_id'] ?? '');
-        $is_anonymous   = isset($_POST['is_anonymous']) ? 1 : 0;
+        $is_anonymous = isset($_POST['is_anonymous']) ? 1 : 0;
 
         $categoryMeta = $category_id ? $complaint->getCategoryRoutingMeta($category_id) : null;
         if (!$categoryMeta) {
@@ -61,8 +58,14 @@ if (isset($_POST['submitComplaintBTN'])) {
         }
 
         $newComplaintId = $complaint->createComplaint(
-            $title, $description, $category_id, $effectiveDepartmentId,
-            $is_anonymous, $studentId, $userId, $subcategory_id
+            $title,
+            $description,
+            $category_id,
+            $effectiveDepartmentId,
+            $is_anonymous,
+            $studentId,
+            $userId,
+            $subcategory_id
         );
 
         if ($newComplaintId) {
@@ -98,18 +101,14 @@ if (isset($_SESSION['message'])) {
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Submit Complaint | Student Rep</title>
-    <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.2/animate.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <title>Student Rep | Submit Complaint</title>
+    <?php include 'includes/head_assets.php'; ?>
 </head>
+
 <body>
     <?php require_once 'includes/flash_toast.php'; ?>
 
@@ -133,7 +132,8 @@ if (isset($_SESSION['message'])) {
                         <li class="breadcrumb-item">
                             <a href="leader_dashboard.php"><i class="fas fa-chart-pie" style="color:black;"></i></a>
                         </li>
-                        <li class="breadcrumb-item"><a href="leader_dashboard.php" style="color:black;">Student Rep</a></li>
+                        <li class="breadcrumb-item"><a href="leader_dashboard.php" style="color:black;">Student Rep</a>
+                        </li>
                         <li class="breadcrumb-item active">Submit Complaint</li>
                     </ol>
                 </nav>
@@ -142,147 +142,153 @@ if (isset($_SESSION['message'])) {
                     <div class="container-card shadow-sm text-center py-5">
                         <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
                         <h5 class="mb-2">Student Profile Not Found</h5>
-                        <p class="text-muted">Your account does not have a linked student profile. Please contact an administrator.</p>
+                        <p class="text-muted">
+                            Your account does not have a linked student profile. Please contact an administrator.
+                        </p>
                         <a href="leader_dashboard.php" class="btn btn-outline-secondary">
                             <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
                         </a>
                     </div>
                 <?php else: ?>
 
-                <form action="" method="POST" enctype="multipart/form-data">
-                    <?= csrf_field() ?>
+                    <form action="" method="POST" enctype="multipart/form-data">
+                        <?= csrf_field() ?>
 
-                    <div class="form-card shadow-sm mb-4">
-                        <h4 class="mb-3 fw-bold"><i class="fas fa-info-circle me-2"></i>Basic Information</h4>
+                        <div class="form-card shadow-sm mb-4">
+                            <h4 class="mb-3 fw-bold"><i class="fas fa-info-circle me-2"></i>
+                                Basic Information
+                            </h4>
 
-                        <div class="row">
-                            <div class="col-12 mb-2">
-                                <label class="form-label fw-bold">Complaint Title <span class="text-danger">*</span></label>
-                                <input type="text" name="title" id="title" class="form-control p-3 shadow-sm"
-                                    style="border-radius:10px;border:1px solid #e0e6ed;"
-                                    placeholder="e.g. Issue with Hostel facilities" minlength="10" maxlength="200" required>
-                                <div class="char-count"><span id="titleCount">0</span>/200 characters (min 10)</div>
-                            </div>
+                            <div class="row">
+                                <div class="col-12 mb-2">
+                                    <label class="form-label fw-bold">Complaint Title <span
+                                            class="text-danger">*</span></label>
+                                    <input type="text" name="title" id="title" class="form-control p-3 shadow-sm"
+                                        style="border-radius:10px;border:1px solid #e0e6ed;"
+                                        placeholder="e.g. Issue with Hostel facilities" minlength="10" maxlength="200"
+                                        required>
+                                    <div class="char-count"><span id="titleCount">0</span>/200 characters (min 10)</div>
+                                </div>
 
-                            <div class="col-12 col-md-6 mb-2">
-                                <label class="form-label fw-bold">Category <span class="text-danger">*</span></label>
-                                <select class="form-select p-3 shadow-sm" name="category_id" id="category_id"
-                                    style="border-radius:10px;border:1px solid #e0e6ed;">
-                                    <option value="" selected disabled>--- Choose Category ---</option>
-                                    <?php if ($categories): ?>
-                                        <?php while ($cat_row = $categories->fetch_assoc()): ?>
-                                            <option value="<?= $cat_row['category_id'] ?>"
-                                                data-requires-dept="<?= (int) $cat_row['requires_department_selection'] ?>">
-                                                <?= htmlspecialchars($cat_row['category_name']) ?>
+                                <div class="col-12 col-md-6 mb-2">
+                                    <label class="form-label fw-bold">Category <span class="text-danger">*</span></label>
+                                    <select class="form-select p-3 shadow-sm" name="category_id" id="category_id"
+                                        style="border-radius:10px;border:1px solid #e0e6ed;">
+                                        <option value="" selected disabled>--- Choose Category ---</option>
+                                        <?php if ($categories): ?>
+                                            <?php while ($cat_row = $categories->fetch_assoc()): ?>
+                                                <option value="<?= $cat_row['category_id'] ?>"
+                                                    data-requires-dept="<?= (int) $cat_row['requires_department_selection'] ?>">
+                                                    <?= htmlspecialchars($cat_row['category_name']) ?>
+                                                </option>
+                                            <?php endwhile; ?>
+                                        <?php endif; ?>
+                                    </select>
+                                </div>
+
+                                <div class="col-12 col-md-6 mb-2">
+                                    <label class="form-label fw-bold">Sub-Category <span
+                                            class="text-danger">*</span></label>
+                                    <select class="form-select p-3 shadow-sm" name="subcategory_id" id="subcategory_id"
+                                        disabled style="border-radius:10px;border:1px solid #e0e6ed;">
+                                        <option value="" selected disabled>--- Choose category first ---</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-12 col-md-6 mb-2" id="departmentFieldWrap" style="display:none;">
+                                    <label class="form-label fw-bold">Department <span class="text-danger">*</span></label>
+                                    <select class="form-select p-3 shadow-sm" name="department_id" id="department_id"
+                                        style="border-radius:10px;border:1px solid #e0e6ed;">
+                                        <option value="" selected disabled>--- Select Department ---</option>
+                                        <?php foreach ($departments as $dept): ?>
+                                            <option value="<?= $dept['department_id'] ?>">
+                                                <?= htmlspecialchars($dept['department_name']) ?>
                                             </option>
-                                        <?php endwhile; ?>
-                                    <?php endif; ?>
-                                </select>
-                            </div>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <small class="form-hint">
+                                        <i class="fas fa-info-circle"></i> This category requires your department to route
+                                        the complaint to the right staff member.
+                                    </small>
+                                </div>
 
-                            <div class="col-12 col-md-6 mb-2">
-                                <label class="form-label fw-bold">Sub-Category <span class="text-danger">*</span></label>
-                                <select class="form-select p-3 shadow-sm" name="subcategory_id" id="subcategory_id"
-                                    disabled style="border-radius:10px;border:1px solid #e0e6ed;">
-                                    <option value="" selected disabled>--- Choose category first ---</option>
-                                </select>
+                                <div class="col-12 col-md-6 mb-2">
+                                    <label class="form-label fw-bold">
+                                        Suggest Staff Member
+                                        <span class="text-muted fw-normal">(optional)</span>
+                                    </label>
+                                    <select class="form-select p-3 shadow-sm" name="preferred_staff_id"
+                                        id="preferred_staff_id" disabled
+                                        style="border-radius:10px;border:1px solid #e0e6ed;">
+                                        <option value="">--- Select department first ---</option>
+                                    </select>
+                                    <small class="form-hint">
+                                        <i class="fas fa-info-circle"></i> This is a suggestion only - the final assignment
+                                        is made by an administrator.
+                                    </small>
+                                </div>
                             </div>
+                        </div>
 
-                            <div class="col-12 col-md-6 mb-2" id="departmentFieldWrap" style="display:none;">
-                                <label class="form-label fw-bold">Department <span class="text-danger">*</span></label>
-                                <select class="form-select p-3 shadow-sm" name="department_id" id="department_id"
+                        <div class="form-card shadow-sm mb-4">
+                            <h4 class="mb-3 fw-bold"><i class="fas fa-align-left me-2"></i>Complaint Description</h4>
+                            <div class="col-12 mb-2">
+                                <label class="form-label fw-bold">Description <span class="text-danger">*</span></label>
+                                <textarea name="description" id="description" class="form-control p-3 shadow-sm" rows="10"
+                                    style="border-radius:8px;border:1px solid #e0e6ed;"
+                                    placeholder="Please describe your complaint in detail..." minlength="30"
+                                    maxlength="5000" required></textarea>
+                                <div class="char-count"><span id="descCount">0</span>/5000 characters (min 30)</div>
+                            </div>
+                        </div>
+
+                        <div class="form-card shadow-sm mb-4">
+                            <h4 class="mb-2 fw-bold"><i class="fas fa-paperclip me-2"></i>Evidence Attachments</h4>
+                            <div class="col-12 mb-2">
+                                <label class="form-label fw-bold">Supporting Evidence / Documents</label>
+                                <input type="file" id="attachments" name="attachments[]" multiple
+                                    accept=".pdf,.jpg,.jpeg,.png" class="form-control p-3 shadow-sm"
                                     style="border-radius:10px;border:1px solid #e0e6ed;">
-                                    <option value="" selected disabled>--- Select Department ---</option>
-                                    <?php foreach ($departments as $dept): ?>
-                                        <option value="<?= $dept['department_id'] ?>">
-                                            <?= htmlspecialchars($dept['department_name']) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
                                 <small class="form-hint">
-                                    <i class="fas fa-info-circle"></i> This category requires your department to route
-                                    the complaint to the right staff member.
+                                    <i class="fas fa-info-circle"></i> PDF, JPG, JPEG, PNG - max 5 MB each.
                                 </small>
+                                <div id="fileList" style="margin-top:10px;"></div>
                             </div>
+                        </div>
 
-                            <div class="col-12 col-md-6 mb-2">
-                                <label class="form-label fw-bold">
-                                    Suggest Staff Member
-                                    <span class="text-muted fw-normal">(optional)</span>
+                        <div class="form-card shadow-sm mb-4">
+                            <h4 class="mb-4 fw-bold"><i class="fas fa-user-shield me-2"></i>Privacy Options</h4>
+                            <div class="form-group">
+                                <label style="display:flex;align-items:center;">
+                                    <input type="checkbox" id="is_anonymous" name="is_anonymous" value="1"
+                                        style="width:auto;" class="me-2">
+                                    <span class="fw-bold">Submit this complaint anonymously</span>
                                 </label>
-                                <select class="form-select p-3 shadow-sm" name="preferred_staff_id" id="preferred_staff_id"
-                                    disabled style="border-radius:10px;border:1px solid #e0e6ed;">
-                                    <option value="">--- Select department first ---</option>
-                                </select>
                                 <small class="form-hint">
-                                    <i class="fas fa-info-circle"></i> This is a suggestion only - the final assignment is made by an administrator.
+                                    <i class="fas fa-shield-alt small"></i>
+                                    Your identity will be hidden from department staff when enabled.
+                                    Administrators can still view it for system management.
                                 </small>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="form-card shadow-sm mb-4">
-                        <h4 class="mb-3 fw-bold"><i class="fas fa-align-left me-2"></i>Complaint Description</h4>
-                        <div class="col-12 mb-2">
-                            <label class="form-label fw-bold">Description <span class="text-danger">*</span></label>
-                            <textarea name="description" id="description" class="form-control p-3 shadow-sm"
-                                rows="10" style="border-radius:8px;border:1px solid #e0e6ed;"
-                                placeholder="Please describe your complaint in detail..." minlength="30" maxlength="5000" required></textarea>
-                            <div class="char-count"><span id="descCount">0</span>/5000 characters (min 30)</div>
+                        <div class="d-rigid gap-2 text-center">
+                            <button type="submit" name="submitComplaintBTN" class="btn btn-primary p-3 fw-bold mb-2"
+                                style="border-radius:10px;background-color:var(--udsm-blue);width:70%;">
+                                Submit Complaint
+                            </button>
+                            <a href="leader_dashboard.php" class="btn btn-danger p-3 fw-bold mb-2"
+                                style="border-radius:10px;width:20%;">Cancel</a>
                         </div>
-                    </div>
-
-                    <div class="form-card shadow-sm mb-4">
-                        <h4 class="mb-2 fw-bold"><i class="fas fa-paperclip me-2"></i>Evidence Attachments</h4>
-                        <div class="col-12 mb-2">
-                            <label class="form-label fw-bold">Supporting Evidence / Documents</label>
-                            <input type="file" id="attachments" name="attachments[]" multiple
-                                accept=".pdf,.jpg,.jpeg,.png" class="form-control p-3 shadow-sm"
-                                style="border-radius:10px;border:1px solid #e0e6ed;">
-                            <small class="form-hint">
-                                <i class="fas fa-info-circle"></i> PDF, JPG, JPEG, PNG - max 5 MB each.
-                            </small>
-                            <div id="fileList" style="margin-top:10px;"></div>
-                        </div>
-                    </div>
-
-                    <div class="form-card shadow-sm mb-4">
-                        <h4 class="mb-4 fw-bold"><i class="fas fa-user-shield me-2"></i>Privacy Options</h4>
-                        <div class="form-group">
-                            <label style="display:flex;align-items:center;">
-                                <input type="checkbox" id="is_anonymous" name="is_anonymous" value="1"
-                                    style="width:auto;" class="me-2">
-                                <span class="fw-bold">Submit this complaint anonymously</span>
-                            </label>
-                            <small class="form-hint">
-                                <i class="fas fa-shield-alt small"></i>
-                                Your identity will be hidden from department staff when enabled.
-                                Administrators can still view it for system management.
-                            </small>
-                        </div>
-                    </div>
-
-                    <div class="d-rigid gap-2 text-center">
-                        <button type="submit" name="submitComplaintBTN"
-                            class="btn btn-primary p-3 fw-bold mb-2"
-                            style="border-radius:10px;background-color:var(--udsm-blue);width:70%;">
-                            Submit Complaint
-                        </button>
-                        <a href="leader_dashboard.php" class="btn btn-danger p-3 fw-bold mb-2"
-                            style="border-radius:10px;width:20%;">Cancel</a>
-                    </div>
-                </form>
+                    </form>
                 <?php endif; ?>
 
             </div><!-- /p-4 -->
         </div><!-- /content -->
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap4.min.js"></script>
-    <script src="assets/plugins/sweetalert/sweetalert2.all.min.js"></script>
+    <?php $useDataTablesJs = true;
+    include 'includes/foot_scripts.php'; ?>
     <script src="assets/plugins/sweetalert/sweetalerts.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
@@ -299,8 +305,8 @@ if (isset($_SESSION['message'])) {
 
         // File upload with validation
         const fileInput = document.getElementById('attachments');
-        const fileList  = document.getElementById('fileList');
-        const MAX_SIZE  = 5 * 1024 * 1024;
+        const fileList = document.getElementById('fileList');
+        const MAX_SIZE = 5 * 1024 * 1024;
         const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png'];
         const ALLOWED_MIME = ['application/pdf', 'image/jpeg', 'image/png'];
         let selectedFiles = [];
@@ -356,9 +362,11 @@ if (isset($_SESSION['message'])) {
                 renderList();
                 syncInput();
                 if (errors.length) {
-                    Swal.fire({ icon: 'warning', title: 'Some files were rejected',
+                    Swal.fire({
+                        icon: 'warning', title: 'Some files were rejected',
                         html: errors.map(e => `<div class="text-start small mb-1">${e}</div>`).join(''),
-                        confirmButtonColor: '#1e3a5f' });
+                        confirmButtonColor: '#1e3a5f'
+                    });
                 }
             });
         }
@@ -366,8 +374,8 @@ if (isset($_SESSION['message'])) {
     <script>
         $(function () {
             // Subcategory loader
-            const $cat     = $('#category_id');
-            const $subcat  = $('#subcategory_id');
+            const $cat = $('#category_id');
+            const $subcat = $('#subcategory_id');
             const $deptWrap = $('#departmentFieldWrap');
             const $deptSelect = $('#department_id');
 
@@ -403,8 +411,8 @@ if (isset($_SESSION['message'])) {
             });
 
             // Staff loader - loads staff based on selected department
-            const $dept   = $('#department_id');
-            const $staff  = $('#preferred_staff_id');
+            const $dept = $('#department_id');
+            const $staff = $('#preferred_staff_id');
 
             function resetStaff(msg) {
                 $staff.prop('disabled', true).html(`<option value="">${msg}</option>`);
@@ -433,4 +441,5 @@ if (isset($_SESSION['message'])) {
         });
     </script>
 </body>
+
 </html>
