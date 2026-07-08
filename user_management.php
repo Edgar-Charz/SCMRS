@@ -629,29 +629,14 @@ if (isset($_SESSION['message'])) {
                                                             <i class="fas fa-trash text-dark"></i>
                                                         </button>
 
-                                                        <!-- Assign as Rep Button -->
+                                                        <!-- Assign Leader Button -->
                                                         <button type="button" class="btn btn-status btn-outline-secondary me-2"
-                                                            data-bs-toggle="modal" data-bs-target="#assignRepModal"
-                                                            onclick="openAssignRep(<?= $student['user_id'] ?>, '<?= htmlspecialchars($student['username'], ENT_QUOTES) ?>')"
-                                                            title="Assign as department rep"
+                                                            data-bs-toggle="modal" data-bs-target="#assignLeaderModal"
+                                                            onclick="openAssignLeader(<?= $student['user_id'] ?>, '<?= htmlspecialchars($student['username'], ENT_QUOTES) ?>', <?= (($student['user_role'] ?? '') === 'student_leader') ? 'true' : 'false' ?>)"
+                                                            title="Assign Leader"
                                                             style="color:#6f42c1;border-color:#6f42c1;">
-                                                            <i class="fas fa-user-friends" style="color:#6f42c1;"></i>
+                                                            <i class="fas fa-user-tag" style="color:#6f42c1;"></i>
                                                         </button>
-
-                                                        <?php if (($student['user_role'] ?? '') !== 'student_leader'): ?>
-                                                        <!-- Promote as Senior Leader Button -->
-                                                        <form method="POST" style="display:inline;" id="promoteSeniorForm<?= $student['user_id'] ?>">
-                                                            <?= csrf_field() ?>
-                                                            <input type="hidden" name="promote_senior" value="1">
-                                                            <input type="hidden" name="rep_user_id" value="<?= $student['user_id'] ?>">
-                                                        </form>
-                                                        <button type="button" class="btn btn-status btn-outline-secondary me-2"
-                                                            onclick="confirmPromoteSenior(<?= $student['user_id'] ?>, '<?= htmlspecialchars($student['username'], ENT_QUOTES) ?>')"
-                                                            title="Promote to Senior Leader (all departments)"
-                                                            style="color:#b8860b;border-color:#b8860b;">
-                                                            <i class="fas fa-crown" style="color:#b8860b;"></i>
-                                                        </button>
-                                                        <?php endif; ?>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -1970,6 +1955,64 @@ if (isset($_SESSION['message'])) {
     </div>
     <!-- /Assign Rep Modal -->
 
+    <!-- Assign Leader Modal -->
+    <div class="modal fade" id="assignLeaderModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content shadow-lg rounded-3">
+                <div class="modal-header text-white" id="assignLeaderHeader" style="background:linear-gradient(135deg,#6f42c1,#8a5cf7);">
+                    <h5 class="modal-title fw-bold text-white">
+                        <i class="fas fa-user-tag me-2"></i>Assign Leader
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" id="assignLeaderForm">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="rep_user_id" id="assignLeaderUserId">
+                    <input type="hidden" name="assign_rep" id="assignLeaderRepInput" value="1">
+                    <input type="hidden" name="promote_senior" id="assignLeaderSeniorInput" value="1" disabled>
+                    <div class="modal-body">
+                        <p class="mb-3">Assigning <strong id="assignLeaderName"></strong> as a leader.</p>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Leader Type</label>
+                            <select id="assignLeaderType" class="form-select" onchange="toggleLeaderTypeUI()">
+                                <option value="department">Department Leader (single department)</option>
+                                <option value="senior">Senior Leader (all departments)</option>
+                            </select>
+                            <small id="assignLeaderSeniorDisabledHint" class="text-muted d-none">
+                                Already a leader - use the Reps tab to change scope or demote first.
+                            </small>
+                        </div>
+
+                        <div class="mb-3" id="assignLeaderDeptWrapper">
+                            <label class="form-label fw-bold">Department</label>
+                            <select name="rep_department_id" id="assignLeaderDept" class="form-select" required>
+                                <option value="">-- Select Department --</option>
+                                <?php foreach ($departments as $dept): ?>
+                                    <option value="<?= $dept['department_id'] ?>">
+                                        <?= htmlspecialchars($dept['department_name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="alert alert-warning py-2 px-3 small d-none" id="assignLeaderSeniorNote">
+                            <i class="fas fa-crown me-1"></i>
+                            Senior Leaders see and can endorse complaints across every department, not just one.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn text-white" id="assignLeaderSubmitBtn" style="background-color:#6f42c1;">
+                            <i class="fas fa-check me-1"></i>Assign
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- /Assign Leader Modal -->
+
     <!-- View Rep Modal -->
     <div class="modal fade" id="viewRepModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -2139,6 +2182,67 @@ if (isset($_SESSION['message'])) {
             document.getElementById('assignRepName').textContent = username;
         }
 
+        function toggleLeaderTypeUI() {
+            var mode = document.getElementById('assignLeaderType').value;
+            var isSenior = mode === 'senior';
+
+            document.getElementById('assignLeaderDeptWrapper').classList.toggle('d-none', isSenior);
+            document.getElementById('assignLeaderDept').required = !isSenior;
+            document.getElementById('assignLeaderDept').disabled = isSenior;
+
+            document.getElementById('assignLeaderSeniorNote').classList.toggle('d-none', !isSenior);
+
+            document.getElementById('assignLeaderRepInput').disabled = isSenior;
+            document.getElementById('assignLeaderSeniorInput').disabled = !isSenior;
+
+            var header = document.getElementById('assignLeaderHeader');
+            var submitBtn = document.getElementById('assignLeaderSubmitBtn');
+            if (isSenior) {
+                header.style.background = 'linear-gradient(135deg,#b8860b,#d4af37)';
+                submitBtn.style.backgroundColor = '#b8860b';
+                submitBtn.innerHTML = '<i class="fas fa-crown me-1"></i>Promote';
+            } else {
+                header.style.background = 'linear-gradient(135deg,#6f42c1,#8a5cf7)';
+                submitBtn.style.backgroundColor = '#6f42c1';
+                submitBtn.innerHTML = '<i class="fas fa-check me-1"></i>Assign';
+            }
+        }
+
+        function openAssignLeader(userId, username, isAlreadyLeader) {
+            document.getElementById('assignLeaderUserId').value = userId;
+            document.getElementById('assignLeaderName').textContent = username;
+
+            var typeSelect = document.getElementById('assignLeaderType');
+            var seniorOption = typeSelect.querySelector('option[value="senior"]');
+            seniorOption.disabled = isAlreadyLeader;
+            document.getElementById('assignLeaderSeniorDisabledHint').classList.toggle('d-none', !isAlreadyLeader);
+
+            typeSelect.value = 'department';
+            toggleLeaderTypeUI();
+        }
+
+        document.getElementById('assignLeaderForm').addEventListener('submit', function (e) {
+            var mode = document.getElementById('assignLeaderType').value;
+            if (mode === 'senior') {
+                e.preventDefault();
+                var username = document.getElementById('assignLeaderName').textContent;
+                Swal.fire({
+                    icon: 'question',
+                    title: 'Promote to Senior Leader?',
+                    text: `"${username}" will see and be able to endorse complaints across every department, not just one.`,
+                    showCancelButton: true,
+                    confirmButtonColor: '#b8860b',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Yes, promote',
+                    cancelButtonText: 'Cancel'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        e.target.submit();
+                    }
+                });
+            }
+        });
+
         function viewRep(rep) {
             document.getElementById('viewRep_name').textContent       = rep.username || '-';
             document.getElementById('viewRep_regnum').textContent     = rep.student_registration_number || 'N/A';
@@ -2173,23 +2277,6 @@ if (isset($_SESSION['message'])) {
             }).then((result) => {
                 if (result.isConfirmed) {
                     document.getElementById(formId).submit();
-                }
-            });
-        }
-
-        function confirmPromoteSenior(userId, username) {
-            Swal.fire({
-                icon: 'question',
-                title: 'Promote to Senior Leader?',
-                text: `"${username}" will see and be able to endorse complaints across every department, not just one.`,
-                showCancelButton: true,
-                confirmButtonColor: '#b8860b',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Yes, promote',
-                cancelButtonText: 'Cancel'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    document.getElementById('promoteSeniorForm' + userId).submit();
                 }
             });
         }
