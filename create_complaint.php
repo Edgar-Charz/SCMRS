@@ -15,18 +15,25 @@ require_once "classes/Complaint.php";
 require_once "classes/ComplaintRouter.php";
 require_once "classes/Department.php";
 require_once "classes/Notification.php";
+require_once "classes/Settings.php";
 require_once "includes/csrf.php";
 
 $db = new Database();
-$conn = $db->connect(); 
+$conn = $db->connect();
 
 $student = new Student($conn);
 $complaint = new Complaint($conn);
 $department = new Department($conn);
+$settingsSvc = new Settings($conn);
 
 $studentId = $student->getStudentId($userId);
 $categories = $complaint->getComplaintCategories();
 $departments = $department->getDepartments();
+
+$maxAttachmentMb = $settingsSvc->getMaxAttachmentSizeMb();
+$allowedAttachmentExt = $settingsSvc->getAllowedAttachmentExtensions();
+$allowedAttachmentLabel = $settingsSvc->getAllowedAttachmentLabel();
+$allowedAttachmentMimes = $settingsSvc->getAllowedAttachmentTypes();
 
 $message = $error = "";
 
@@ -279,11 +286,11 @@ if (isset($_SESSION['message'])) {
                             <div class="col-12 col-md-12 col-lg-12 mb-2">
                                 <label for="" class="form-label fw-bold">Supporting Evidence / Documents</label>
                                 <input type="file" id="attachments" name="attachments[]" multiple
-                                    accept=".pdf,.jpg,.jpeg,.png" class="form-control p-3 shadow-sm"
+                                    accept="<?= htmlspecialchars(implode(',', $allowedAttachmentExt)) ?>" class="form-control p-3 shadow-sm"
                                     style="border-radius: 10px; border: 1px solid #e0e6ed;">
                                 <small class="form-hint">
                                     <i class="fas fa-info-circle"></i> You can upload multiple files (PDF or images).
-                                    Maximum file size: 5MB per file. Accepted formats: PDF, JPG, JPEG, PNG.
+                                    Maximum file size: <?= $maxAttachmentMb ?>MB per file. Accepted formats: <?= htmlspecialchars($allowedAttachmentLabel) ?>.
                                 </small>
                                 <div id="fileList" style="margin-top: 10px;"></div>
                             </div>
@@ -408,9 +415,11 @@ if (isset($_SESSION['message'])) {
         // File upload with remove buttons, format & size validation
         const fileInput = document.getElementById('attachments');
         const fileList = document.getElementById('fileList');
-        const MAX_SIZE = 5 * 1024 * 1024;
-        const ALLOWED = ['application/pdf', 'image/jpeg', 'image/png'];
-        const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png'];
+        const MAX_SIZE = <?= (int) ($maxAttachmentMb * 1024 * 1024) ?>;
+        const ALLOWED = <?= json_encode($allowedAttachmentMimes) ?>;
+        const ALLOWED_EXT = <?= json_encode($allowedAttachmentExt) ?>;
+        const ALLOWED_LABEL = <?= json_encode($allowedAttachmentLabel) ?>;
+        const MAX_SIZE_MB = <?= $maxAttachmentMb ?>;
         let selectedFiles = [];
 
         function formatBytes(bytes) {
@@ -475,11 +484,11 @@ if (isset($_SESSION['message'])) {
                 Array.from(this.files).forEach(file => {
                     const ext = '.' + file.name.split('.').pop().toLowerCase();
                     if (!ALLOWED_EXT.includes(ext) || !ALLOWED.includes(file.type)) {
-                        errors.push(`"${file.name}" - invalid format. Only PDF, JPG, JPEG, PNG are allowed.`);
+                        errors.push(`"${file.name}" - invalid format. Only ${ALLOWED_LABEL} are allowed.`);
                         return;
                     }
                     if (file.size > MAX_SIZE) {
-                        errors.push(`"${file.name}" - exceeds the 5 MB limit (${formatBytes(file.size)}).`);
+                        errors.push(`"${file.name}" - exceeds the ${MAX_SIZE_MB} MB limit (${formatBytes(file.size)}).`);
                         return;
                     }
                     const isDuplicate = selectedFiles.some(f => f.name === file.name && f.size === file.size);

@@ -18,6 +18,7 @@ require_once "classes/Student.php";
 require_once "classes/Complaint.php";
 require_once "classes/ComplaintRouter.php";
 require_once "classes/Department.php";
+require_once "classes/Settings.php";
 require_once "includes/csrf.php";
 
 $db             = new Database();
@@ -25,6 +26,12 @@ $conn           = $db->connect();
 $student        = new Student($conn);
 $complaintModel = new Complaint($conn);
 $department     = new Department($conn);
+$settingsSvc    = new Settings($conn);
+
+$maxAttachmentMb = $settingsSvc->getMaxAttachmentSizeMb();
+$allowedAttachmentExt = $settingsSvc->getAllowedAttachmentExtensions();
+$allowedAttachmentLabel = $settingsSvc->getAllowedAttachmentLabel();
+$allowedAttachmentMimes = $settingsSvc->getAllowedAttachmentTypes();
 
 $leaderDepts = [];
 if ($_isLeader) {
@@ -126,8 +133,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Upload new attachments
             if (!empty($_FILES['attachments']['name'][0])) {
-                $allowed_types = ['image/jpeg', 'image/png', 'application/pdf'];
-                $max_size      = 5 * 1024 * 1024;
+                $allowed_types = $allowedAttachmentMimes;
+                $max_size      = $settingsSvc->getMaxAttachmentSizeBytes();
                 $upload_dir    = 'uploads/complaints/' . $complaintId . '/';
 
                 if (!file_exists($upload_dir)) {
@@ -443,10 +450,10 @@ $departments = $department->getDepartments();
                         <h4 class="mb-2 fw-bold"><i class="fas fa-upload me-2"></i>Add New Attachments</h4>
 
                         <input type="file" id="attachments" name="attachments[]" multiple
-                            accept=".pdf,.jpg,.jpeg,.png" class="form-control p-3 shadow-sm"
+                            accept="<?= htmlspecialchars(implode(',', $allowedAttachmentExt)) ?>" class="form-control p-3 shadow-sm"
                             style="border-radius:10px;border:1px solid #e0e6ed;">
                         <small class="form-hint">
-                            <i class="fas fa-info-circle"></i> PDF, JPG, JPEG, PNG - max 5 MB per file.
+                            <i class="fas fa-info-circle"></i> <?= htmlspecialchars($allowedAttachmentLabel) ?> - max <?= $maxAttachmentMb ?> MB per file.
                         </small>
                         <div id="fileList" style="margin-top:10px;"></div>
                     </div>
@@ -510,9 +517,11 @@ $departments = $department->getDepartments();
         // New file upload list with validation
         const fileInput   = document.getElementById('attachments');
         const fileList    = document.getElementById('fileList');
-        const MAX_SIZE    = 5 * 1024 * 1024;
-        const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png'];
-        const ALLOWED_MIME = ['application/pdf', 'image/jpeg', 'image/png'];
+        const MAX_SIZE    = <?= (int) ($maxAttachmentMb * 1024 * 1024) ?>;
+        const ALLOWED_EXT = <?= json_encode($allowedAttachmentExt) ?>;
+        const ALLOWED_MIME = <?= json_encode($allowedAttachmentMimes) ?>;
+        const ALLOWED_LABEL = <?= json_encode($allowedAttachmentLabel) ?>;
+        const MAX_SIZE_MB = <?= $maxAttachmentMb ?>;
         let selectedFiles = [];
 
         function formatBytes(bytes) {
@@ -573,11 +582,11 @@ $departments = $department->getDepartments();
                 Array.from(this.files).forEach(function (file) {
                     const ext = '.' + file.name.split('.').pop().toLowerCase();
                     if (!ALLOWED_EXT.includes(ext) || !ALLOWED_MIME.includes(file.type)) {
-                        errors.push('"' + file.name + '" - invalid format.');
+                        errors.push('"' + file.name + '" - invalid format. Only ' + ALLOWED_LABEL + ' are allowed.');
                         return;
                     }
                     if (file.size > MAX_SIZE) {
-                        errors.push('"' + file.name + '" - exceeds 5 MB (' + formatBytes(file.size) + ').');
+                        errors.push('"' + file.name + '" - exceeds ' + MAX_SIZE_MB + ' MB (' + formatBytes(file.size) + ').');
                         return;
                     }
                     if (!selectedFiles.some(f => f.name === file.name && f.size === file.size)) {

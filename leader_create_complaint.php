@@ -11,8 +11,10 @@ $userId = (int) $_SESSION['user_id'];
 require_once 'config/Database.php';
 require_once 'classes/StudentLeader.php';
 require_once 'classes/Complaint.php';
+require_once 'classes/ComplaintRouter.php';
 require_once 'classes/Department.php';
 require_once 'classes/Notification.php';
+require_once 'classes/Settings.php';
 require_once 'includes/csrf.php';
 
 $db = new Database();
@@ -20,10 +22,16 @@ $conn = $db->connect();
 $leader = new StudentLeader($conn, $userId);
 $complaint = new Complaint($conn);
 $department = new Department($conn);
+$settingsSvc = new Settings($conn);
 
 $categories = $complaint->getComplaintCategories();
 $departments = $department->getDepartments();
 $studentId = $leader->getStudentId();
+
+$maxAttachmentMb = $settingsSvc->getMaxAttachmentSizeMb();
+$allowedAttachmentExt = $settingsSvc->getAllowedAttachmentExtensions();
+$allowedAttachmentLabel = $settingsSvc->getAllowedAttachmentLabel();
+$allowedAttachmentMimes = $settingsSvc->getAllowedAttachmentTypes();
 
 $message = $error = '';
 
@@ -39,8 +47,22 @@ if (isset($_POST['submitComplaintBTN'])) {
         $category_id = isset($_POST['category_id']) ? (int) $_POST['category_id'] : null;
         $subcategory_id = isset($_POST['subcategory_id']) ? (int) $_POST['subcategory_id'] : null;
         $department_id = isset($_POST['department_id']) ? (int) $_POST['department_id'] : null;
-        $preferred_staff_id = trim($_POST['preferred_staff_id'] ?? '');
         $is_anonymous = isset($_POST['is_anonymous']) ? 1 : 0;
+        $onBehalfStudentId = isset($_POST['on_behalf_student_id']) ? (int) $_POST['on_behalf_student_id'] : 0;
+
+        // Filing for someone else - resolve and validate the target student
+        $targetStudentId = $studentId;
+        $onBehalfUserId = null;
+        $onBehalfUsername = null;
+        if ($onBehalfStudentId > 0 && $onBehalfStudentId !== $studentId) {
+            $targetStudent = $leader->findStudentById($onBehalfStudentId);
+            if (!$targetStudent) {
+                throw new Exception("Selected student could not be found.");
+            }
+            $targetStudentId = (int) $targetStudent['student_id'];
+            $onBehalfUserId = (int) $targetStudent['user_id'];
+            $onBehalfUsername = $targetStudent['username'];
+        }
 
         $categoryMeta = $category_id ? $complaint->getCategoryRoutingMeta($category_id) : null;
         if (!$categoryMeta) {
@@ -50,7 +72,7 @@ if (isset($_POST['submitComplaintBTN'])) {
         $requiresDeptSelection = (int) $categoryMeta['requires_department_selection'] === 1;
         if ($requiresDeptSelection) {
             if (empty($department_id)) {
-                throw new Exception("Please select your department for this category.");
+                throw new Exception("Please select a department for this category.");
             }
             $effectiveDepartmentId = $department_id;
         } else {
@@ -63,21 +85,27 @@ if (isset($_POST['submitComplaintBTN'])) {
             $category_id,
             $effectiveDepartmentId,
             $is_anonymous,
-            $studentId,
+            $targetStudentId,
             $userId,
             $subcategory_id
         );
 
         if ($newComplaintId) {
-            // Save preferred staff suggestion if provided
-            if (!empty($preferred_staff_id)) {
-                $leader->setPreferredStaff($newComplaintId, $preferred_staff_id);
-            }
+            $routeResult = (new ComplaintRouter($conn))->routeComplaint(
+                $newComplaintId,
+                $category_id,
+                $subcategory_id,
+                $effectiveDepartmentId,
+                $categoryMeta['default_priority']
+            );
 
             // Notify admins
             $notifMsg = $is_anonymous
                 ? "A new anonymous complaint has been submitted."
                 : "New complaint from " . htmlspecialchars($_SESSION['username']) . " (Rep): \"$title\"";
+            $notifMsg .= $routeResult['routed']
+                ? " (auto-assigned to staff)"
+                : " - requires manual assignment.";
             (new Notification($conn))->notifyAllAdmins(
                 $notifMsg,
                 'new_complaint',
@@ -85,8 +113,36 @@ if (isset($_POST['submitComplaintBTN'])) {
                 $newComplaintId
             );
 
-            $_SESSION['message'] = "Complaint submitted successfully.";
-            header("Location: leader_my_complaints.php");
+            // Notify other leaders in the department (excluding the leader who just filed it)
+            if ($effectiveDepartmentId && $complaint->isLeaderEndorsable($category_id, $subcategory_id)) {
+                $leaderMsg = $is_anonymous
+                    ? "A new anonymous complaint has been submitted in your department."
+                    : "New complaint in your department: \"$title\"";
+                $leader->notifyLeadersInDepartment(
+                    $effectiveDepartmentId,
+                    $leaderMsg,
+                    'new_complaint_in_rep_scope',
+                    "leader_complaint_details.php?id=$newComplaintId",
+                    $newComplaintId,
+                    $userId
+                );
+            }
+
+            // Let the target student know a complaint was filed on their behalf
+            if ($onBehalfUserId) {
+                (new Notification($conn))->create(
+                    $onBehalfUserId,
+                    "Student Rep " . htmlspecialchars($_SESSION['username']) . " submitted a complaint on your behalf: \"$title\"",
+                    'filed_on_behalf',
+                    "student_complaint_details.php?id=$newComplaintId",
+                    $newComplaintId
+                );
+            }
+
+            $_SESSION['message'] = $onBehalfUsername
+                ? "Complaint submitted successfully on behalf of {$onBehalfUsername}."
+                : "Complaint submitted successfully.";
+            header("Location: " . ($onBehalfUserId ? "leader_dashboard.php" : "leader_my_complaints.php"));
             exit;
         }
     } catch (Exception $e) {
@@ -153,6 +209,41 @@ if (isset($_SESSION['message'])) {
 
                     <form action="" method="POST" enctype="multipart/form-data">
                         <?= csrf_field() ?>
+                        <input type="hidden" name="on_behalf_student_id" id="on_behalf_student_id" value="">
+
+                        <div class="form-card shadow-sm mb-4">
+                            <h4 class="mb-3 fw-bold"><i class="fas fa-user me-2"></i>Complainant</h4>
+
+                            <div class="mb-2">
+                                <label class="d-flex align-items-center mb-2" style="cursor:pointer;">
+                                    <input type="radio" name="complainant_mode" value="self" checked class="me-2"
+                                        style="width:auto;">
+                                    <span class="fw-bold">Myself</span>
+                                </label>
+                                <label class="d-flex align-items-center" style="cursor:pointer;">
+                                    <input type="radio" name="complainant_mode" value="other" class="me-2"
+                                        style="width:auto;">
+                                    <span class="fw-bold">Another Student</span>
+                                </label>
+                            </div>
+
+                            <div id="onBehalfWrap" style="display:none;">
+                                <label class="form-label fw-bold">Search Student <span class="text-danger">*</span></label>
+                                <input type="text" id="studentSearchInput" class="form-control p-3 shadow-sm"
+                                    style="border-radius:10px;border:1px solid #e0e6ed;"
+                                    placeholder="Search by name or registration number...">
+                                <div id="studentSearchResults" class="list-group shadow-sm" style="display:none;position:relative;z-index:5;"></div>
+                                <div id="selectedStudentChip" class="alert alert-info py-2 px-3 mt-2 d-none">
+                                    <i class="fas fa-user-check me-1"></i>
+                                    <span id="selectedStudentText"></span>
+                                    <button type="button" id="changeStudentBtn" class="btn btn-sm btn-link p-0 ms-2">Change</button>
+                                </div>
+                                <small class="form-hint">
+                                    <i class="fas fa-info-circle"></i> The student you select will be notified that this
+                                    complaint was filed on their behalf.
+                                </small>
+                            </div>
+                        </div>
 
                         <div class="form-card shadow-sm mb-4">
                             <h4 class="mb-3 fw-bold"><i class="fas fa-info-circle me-2"></i>
@@ -207,24 +298,8 @@ if (isset($_SESSION['message'])) {
                                         <?php endforeach; ?>
                                     </select>
                                     <small class="form-hint">
-                                        <i class="fas fa-info-circle"></i> This category requires your department to route
-                                        the complaint to the right staff member.
-                                    </small>
-                                </div>
-
-                                <div class="col-12 col-md-6 mb-2">
-                                    <label class="form-label fw-bold">
-                                        Suggest Staff Member
-                                        <span class="text-muted fw-normal">(optional)</span>
-                                    </label>
-                                    <select class="form-select p-3 shadow-sm" name="preferred_staff_id"
-                                        id="preferred_staff_id" disabled
-                                        style="border-radius:10px;border:1px solid #e0e6ed;">
-                                        <option value="">--- Select department first ---</option>
-                                    </select>
-                                    <small class="form-hint">
-                                        <i class="fas fa-info-circle"></i> This is a suggestion only - the final assignment
-                                        is made by an administrator.
+                                        <i class="fas fa-info-circle"></i> This category requires selecting a department
+                                        to route the complaint to the right staff member.
                                     </small>
                                 </div>
                             </div>
@@ -247,10 +322,10 @@ if (isset($_SESSION['message'])) {
                             <div class="col-12 mb-2">
                                 <label class="form-label fw-bold">Supporting Evidence / Documents</label>
                                 <input type="file" id="attachments" name="attachments[]" multiple
-                                    accept=".pdf,.jpg,.jpeg,.png" class="form-control p-3 shadow-sm"
+                                    accept="<?= htmlspecialchars(implode(',', $allowedAttachmentExt)) ?>" class="form-control p-3 shadow-sm"
                                     style="border-radius:10px;border:1px solid #e0e6ed;">
                                 <small class="form-hint">
-                                    <i class="fas fa-info-circle"></i> PDF, JPG, JPEG, PNG - max 5 MB each.
+                                    <i class="fas fa-info-circle"></i> <?= htmlspecialchars($allowedAttachmentLabel) ?> - max <?= $maxAttachmentMb ?> MB each.
                                 </small>
                                 <div id="fileList" style="margin-top:10px;"></div>
                             </div>
@@ -306,9 +381,11 @@ if (isset($_SESSION['message'])) {
         // File upload with validation
         const fileInput = document.getElementById('attachments');
         const fileList = document.getElementById('fileList');
-        const MAX_SIZE = 5 * 1024 * 1024;
-        const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png'];
-        const ALLOWED_MIME = ['application/pdf', 'image/jpeg', 'image/png'];
+        const MAX_SIZE = <?= (int) ($maxAttachmentMb * 1024 * 1024) ?>;
+        const ALLOWED_EXT = <?= json_encode($allowedAttachmentExt) ?>;
+        const ALLOWED_MIME = <?= json_encode($allowedAttachmentMimes) ?>;
+        const ALLOWED_LABEL = <?= json_encode($allowedAttachmentLabel) ?>;
+        const MAX_SIZE_MB = <?= $maxAttachmentMb ?>;
         let selectedFiles = [];
 
         function formatBytes(b) { return (b / 1024 / 1024).toFixed(2) + ' MB'; }
@@ -347,11 +424,11 @@ if (isset($_SESSION['message'])) {
                 Array.from(this.files).forEach(file => {
                     const ext = '.' + file.name.split('.').pop().toLowerCase();
                     if (!ALLOWED_EXT.includes(ext) || !ALLOWED_MIME.includes(file.type)) {
-                        errors.push(`"${file.name}" - invalid format.`);
+                        errors.push(`"${file.name}" - invalid format. Only ${ALLOWED_LABEL} are allowed.`);
                         return;
                     }
                     if (file.size > MAX_SIZE) {
-                        errors.push(`"${file.name}" - exceeds 5 MB.`);
+                        errors.push(`"${file.name}" - exceeds ${MAX_SIZE_MB} MB.`);
                         return;
                     }
                     if (!selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
@@ -410,33 +487,73 @@ if (isset($_SESSION['message'])) {
                     .fail(function () { resetSubcat('--- Failed to load ---'); });
             });
 
-            // Staff loader - loads staff based on selected department
-            const $dept = $('#department_id');
-            const $staff = $('#preferred_staff_id');
+            // Complainant: self vs. on behalf of another student
+            const $onBehalfWrap = $('#onBehalfWrap');
+            const $onBehalfId = $('#on_behalf_student_id');
+            const $studentSearchInput = $('#studentSearchInput');
+            const $studentSearchResults = $('#studentSearchResults');
+            const $selectedChip = $('#selectedStudentChip');
+            const $selectedChipText = $('#selectedStudentText');
 
-            function resetStaff(msg) {
-                $staff.prop('disabled', true).html(`<option value="">${msg}</option>`);
+            function clearSelectedStudent() {
+                $onBehalfId.val('');
+                $selectedChip.addClass('d-none');
+                $studentSearchInput.val('').show();
+                $studentSearchResults.hide().empty();
             }
-            resetStaff('--- Select department first ---');
 
-            $dept.on('change', function () {
-                const deptId = $(this).val();
-                if (!deptId) { resetStaff('--- Select department first ---'); return; }
-                resetStaff('Loading staff...');
-                $.getJSON('ajax/get_staff_by_dept.php', { dept_id: deptId })
-                    .done(function (data) {
-                        if (!data || !data.success || !data.items || !data.items.length) {
-                            resetStaff('--- No staff available in this department ---');
-                            return;
-                        }
-                        let opts = '<option value="">--- No preference (let admin decide) ---</option>';
-                        data.items.forEach(s => {
-                            const role = s.role_name ? ` (${s.role_name})` : '';
-                            opts += `<option value="${s.staff_id}">${s.username}${role}</option>`;
-                        });
-                        $staff.html(opts).prop('disabled', false);
-                    })
-                    .fail(function () { resetStaff('--- Failed to load staff ---'); });
+            $('input[name="complainant_mode"]').on('change', function () {
+                const isOther = $(this).val() === 'other';
+                $onBehalfWrap.toggle(isOther);
+                if (!isOther) clearSelectedStudent();
+            });
+
+            let searchTimer;
+            $studentSearchInput.on('input', function () {
+                clearTimeout(searchTimer);
+                const q = $(this).val().trim();
+                if (q.length < 2) { $studentSearchResults.hide().empty(); return; }
+                searchTimer = setTimeout(function () {
+                    $.getJSON('ajax/search_leader_students.php', { q: q })
+                        .done(function (data) {
+                            $studentSearchResults.empty();
+                            if (!data || !data.success || !data.items || !data.items.length) {
+                                $studentSearchResults.append(
+                                    '<div class="list-group-item text-muted small">No students found</div>'
+                                ).show();
+                                return;
+                            }
+                            data.items.forEach(function (s) {
+                                const $item = $('<button type="button" class="list-group-item list-group-item-action small"></button>')
+                                    .text(s.username + ' (' + s.student_registration_number + ')')
+                                    .on('click', function () {
+                                        $onBehalfId.val(s.student_id);
+                                        $selectedChipText.text(s.username + ' - ' + s.student_registration_number);
+                                        $selectedChip.removeClass('d-none');
+                                        $studentSearchInput.val('').hide();
+                                        $studentSearchResults.hide().empty();
+                                    });
+                                $studentSearchResults.append($item);
+                            });
+                            $studentSearchResults.show();
+                        })
+                        .fail(function () { $studentSearchResults.hide().empty(); });
+                }, 250);
+            });
+
+            $('#changeStudentBtn').on('click', clearSelectedStudent);
+
+            $('form[enctype]').on('submit', function (e) {
+                const isOther = $('input[name="complainant_mode"]:checked').val() === 'other';
+                if (isOther && !$onBehalfId.val()) {
+                    e.preventDefault();
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Select a student',
+                        text: 'Please search and select the student you are filing this complaint for.',
+                        confirmButtonColor: '#1e3a5f'
+                    });
+                }
             });
         });
     </script>
