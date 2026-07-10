@@ -54,6 +54,7 @@ const parentPageMap = {
   "edit_student_complaint.php":     "track_complaints.php",
   "leader_complaint_details.php":   "leader_complaints.php",
   "department_hierarchy.php":       "manage_departments.php",
+  "escalation_diagram.php":         "manage_departments.php",
 };
 
 // Role-aware pages inject window._activeSidebarLink to override the map

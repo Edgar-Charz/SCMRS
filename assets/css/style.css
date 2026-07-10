@@ -899,6 +899,13 @@ div.dataTables_wrapper div.dataTables_info {
   border: 1px solid #f87171;
 }
 
+.badge.reopened,
+.status-badge.reopened {
+  background: #ffedd5;
+  color: #9a3412;
+  border: 1px solid #fb923c;
+}
+
 /* Tabs */
 .filter-tabs {
   display: flex;
@@ -1020,6 +1027,11 @@ div.dataTables_wrapper div.dataTables_info {
 .complaint-card.rejected {
   border-left-color: #dc2626;
   background: #fef2f2;
+}
+
+.complaint-card.reopened {
+  border-left-color: #f97316;
+  background: #fff7ed;
 }
 
 .complaint-header {
