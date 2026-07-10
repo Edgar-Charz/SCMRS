@@ -290,9 +290,10 @@ if (isset($_GET['delete_role']) && is_numeric($_GET['delete_role'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_role'])) {
     $staffUserId = (int) ($_POST['assign_staff_user_id'] ?? 0);
     $roleId = (int) ($_POST['assign_role_id'] ?? 0) ?: null;
+    $departmentId = (int) ($_POST['assign_department_id'] ?? 0) ?: null;
     try {
         if ($staffUserId) {
-            $admin->assignStaffRole($staffUserId, $roleId);
+            $admin->assignStaffRole($staffUserId, $roleId, $departmentId);
             $_SESSION['message'] = "Role assigned successfully.";
         }
     } catch (Exception $e) {
@@ -1064,7 +1065,7 @@ if (isset($_SESSION['message'])) {
                                                         <!-- Assign Role Button -->
                                                         <button type="button" class="btn btn-status btn-outline-secondary me-2"
                                                             data-bs-toggle="modal" data-bs-target="#assignRoleModal"
-                                                            onclick="openAssignRole(<?= $staff['user_id'] ?>, '<?= htmlspecialchars($staff['username'], ENT_QUOTES) ?>', <?= $staff['staff_role_id'] ?: 'null' ?>)"
+                                                            onclick="openAssignRole(<?= $staff['user_id'] ?>, '<?= htmlspecialchars($staff['username'], ENT_QUOTES) ?>', <?= $staff['staff_role_id'] ?: 'null' ?>, <?= $staff['department_id'] ?: 'null' ?>)"
                                                             title="assign role">
                                                             <i class="fas fa-id-badge text-dark"></i>
                                                         </button>
@@ -1448,9 +1449,12 @@ if (isset($_SESSION['message'])) {
 
                     <div class="container-card shadow-sm">
                         <h5 class="mb-1 fw-bold"><i class="fas fa-users me-2"></i>Recently Approved Staffs</h5>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="search-input"></div>
+                        </div>
 
                         <div class="table-responsive">
-                            <table class="table table-striped" id="departmentsTable">
+                            <table class="table table-striped" id="approvedStaffsTable">
                                 <thead class="table-light">
                                     <tr>
                                         <th>#</th>
@@ -1917,15 +1921,33 @@ if (isset($_SESSION['message'])) {
                                     <div class="mb-3">
                                         <label class="form-label fw-bold small">Select Role</label>
                                         <select name="assign_role_id" id="assign_role_id"
-                                            class="form-select p-3 shadow-sm" style="border-radius: 10px;">
-                                            <option value="">-- No Role --</option>
+                                            class="form-select p-3 shadow-sm" style="border-radius: 10px;"
+                                            onchange="onAssignRoleChange()">
+                                            <option value="" data-scoped="1">-- No Role --</option>
                                             <?php foreach ($staff_roles as $role): ?>
-                                                <option value="<?= $role['role_id'] ?>">
+                                                <option value="<?= $role['role_id'] ?>"
+                                                    data-scoped="<?= (int) $role['is_department_scoped'] ?>">
                                                     <?= htmlspecialchars($role['role_name']) ?> (Rank
                                                     <?= $role['role_rank'] ?>)
+                                                    <?= $role['is_department_scoped'] ? '' : ' - University-wide' ?>
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold small">Department</label>
+                                        <select name="assign_department_id" id="assign_department_id"
+                                            class="form-select p-3 shadow-sm" style="border-radius: 10px;">
+                                            <option value="">-- No Department --</option>
+                                            <?php foreach ($departments as $dept): ?>
+                                                <option value="<?= $dept['department_id'] ?>">
+                                                    <?= htmlspecialchars($dept['department_name']) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <div class="form-text" id="assign_department_hint">
+                                            Changes the staff member's department.
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="modal-footer">
@@ -2403,11 +2425,28 @@ if (isset($_SESSION['message'])) {
             });
         }
 
-        function openAssignRole(userId, username, currentRoleId) {
+        function openAssignRole(userId, username, currentRoleId, currentDepartmentId) {
             document.getElementById('assign_staff_user_id').value = userId;
             document.getElementById('assign_staff_name').textContent = username;
-            const select = document.getElementById('assign_role_id');
-            select.value = currentRoleId || '';
+            document.getElementById('assign_role_id').value = currentRoleId || '';
+            document.getElementById('assign_department_id').value = currentDepartmentId || '';
+            onAssignRoleChange();
+        }
+
+        function onAssignRoleChange() {
+            const roleSelect = document.getElementById('assign_role_id');
+            const deptSelect = document.getElementById('assign_department_id');
+            const hint = document.getElementById('assign_department_hint');
+            const isScoped = roleSelect.selectedOptions[0]?.dataset.scoped !== '0';
+
+            if (isScoped) {
+                deptSelect.disabled = false;
+                hint.textContent = "Changes the staff member's department.";
+            } else {
+                deptSelect.value = '';
+                deptSelect.disabled = true;
+                hint.textContent = 'This is a university-wide role, so no department applies.';
+            }
         }
 
         function confirmToggleStatus(userId, currentStatus, type) {
@@ -2547,6 +2586,30 @@ if (isset($_SESSION['message'])) {
                         search: " ",
                         sLengthMenu: "_MENU_",
                         searchPlaceholder: "Search Roles...",
+                        info: "_START_ - _END_ of _TOTAL_ items"
+                    },
+                    initComplete: function (settings) {
+                        $(settings.nTableWrapper).find('.dataTables_filter')
+                            .appendTo($(settings.nTable).closest('.container-card').find('.search-input'));
+                    }
+                });
+            }
+        });
+    </script>
+    <script>
+        $(document).ready(function () {
+            if ($("#approvedStaffsTable").length > 0 && !$.fn.DataTable.isDataTable("#approvedStaffsTable")) {
+                $("#approvedStaffsTable").DataTable({
+                    destroy: true,
+                    bFilter: true,
+                    sDom: "fBtlpi",
+                    pagingType: "numbers",
+                    ordering: true,
+                    columnDefs: [{ orderable: false, targets: [5] }],
+                    language: {
+                        search: " ",
+                        sLengthMenu: "_MENU_",
+                        searchPlaceholder: "Search Approved Staffs...",
                         info: "_START_ - _END_ of _TOTAL_ items"
                     },
                     initComplete: function (settings) {
