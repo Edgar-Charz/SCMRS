@@ -84,6 +84,7 @@ CREATE TABLE `complaints` (
   `complaint_description` text NOT NULL,
   `priority` enum('low','medium','high') DEFAULT 'medium',
   `complaint_status` enum('pending','in_progress','awaiting_student_response','resolved','rejected','reopened','on_hold','deleted') NOT NULL DEFAULT 'pending',
+  `escalation_level` tinyint(1) NOT NULL DEFAULT 1,
   `hold_reason` text DEFAULT NULL,
   `is_anonymous` tinyint(1) DEFAULT 0,
   `complaint_response` text DEFAULT NULL,
@@ -146,6 +147,8 @@ CREATE TABLE `complaint_categories` (
   `leader_endorsable` tinyint(1) NOT NULL DEFAULT 0,
   `auto_assign_department_id` int(11) DEFAULT NULL,
   `default_role_id` int(11) DEFAULT NULL,
+  `level2_role_id` int(11) DEFAULT NULL,
+  `level3_role_id` int(11) DEFAULT NULL,
   `default_priority` enum('low','medium','high') NOT NULL DEFAULT 'medium',
   `created_by` int(11) DEFAULT NULL,
   `status` enum('active','inactive') DEFAULT 'active',
@@ -322,7 +325,7 @@ CREATE TABLE `notifications` (
   `user_id` int(11) NOT NULL,
   `complaint_id` int(11) DEFAULT NULL,
   `message` varchar(255) NOT NULL,
-  `type` enum('status_change','new_assignment','request_info','new_complaint','new_registration','staff_approved','info_responded','complaint_rejected','complaint_resolved','staff_rejected','complaint_deleted','complaint_reopened','complaint_delegated','complaint_delegated_resolved','complaint_overdue','new_complaint_in_rep_scope','endorsed_complaint_updated','system','password_reset_admin') NOT NULL DEFAULT 'status_change',
+  `type` enum('status_change','new_assignment','request_info','new_complaint','new_registration','staff_approved','info_responded','complaint_rejected','complaint_resolved','staff_rejected','complaint_deleted','complaint_reopened','complaint_delegated','complaint_delegated_resolved','complaint_overdue','new_complaint_in_rep_scope','endorsed_complaint_updated','system','password_reset_admin','filed_on_behalf') NOT NULL DEFAULT 'status_change',
   `link` varchar(255) DEFAULT NULL,
   `is_read` tinyint(1) DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
@@ -369,6 +372,7 @@ CREATE TABLE `staff_roles` (
   `role_id` int(11) NOT NULL,
   `role_name` varchar(50) NOT NULL,
   `role_rank` tinyint(4) NOT NULL COMMENT 'Higher = more senior',
+  `is_department_scoped` tinyint(1) NOT NULL DEFAULT 1 COMMENT '1 = one holder per department (e.g. HoD); 0 = single university-wide holder (e.g. Principal, Dean of Students)',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -424,6 +428,19 @@ CREATE TABLE `system_settings` (
   `institution_name` varchar(150) NOT NULL DEFAULT 'UDSM',
   `institution_logo_path` varchar(255) DEFAULT 'assets/img/logo.png',
   `institution_contact_email` varchar(150) DEFAULT NULL,
+  `max_login_attempts` int(11) NOT NULL DEFAULT 3,
+  `lockout_duration_minutes` int(11) NOT NULL DEFAULT 15,
+  `max_attachment_size_mb` int(11) NOT NULL DEFAULT 5,
+  `allowed_attachment_types` varchar(255) NOT NULL DEFAULT 'image/jpeg,image/png,application/pdf',
+  `password_min_length` int(11) NOT NULL DEFAULT 8,
+  `password_require_upper` tinyint(1) NOT NULL DEFAULT 1,
+  `password_require_lower` tinyint(1) NOT NULL DEFAULT 1,
+  `password_require_number` tinyint(1) NOT NULL DEFAULT 1,
+  `password_require_special` tinyint(1) NOT NULL DEFAULT 1,
+  `session_timeout_minutes` int(11) NOT NULL DEFAULT 30,
+  `ip_rate_limit_attempts` int(11) NOT NULL DEFAULT 10,
+  `ip_rate_limit_window_minutes` int(11) NOT NULL DEFAULT 15,
+  `password_reset_token_hours` int(11) NOT NULL DEFAULT 1,
   `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
   `updated_by` int(11) DEFAULT NULL COMMENT 'users.user_id of admin who last saved settings; no FK on purpose'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -842,7 +859,9 @@ ALTER TABLE `complaint_attachments`
 --
 ALTER TABLE `complaint_categories`
   ADD CONSTRAINT `complaint_categories_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_category_default_role` FOREIGN KEY (`default_role_id`) REFERENCES `staff_roles` (`role_id`) ON DELETE SET NULL ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_category_default_role` FOREIGN KEY (`default_role_id`) REFERENCES `staff_roles` (`role_id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_category_level2_role` FOREIGN KEY (`level2_role_id`) REFERENCES `staff_roles` (`role_id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_category_level3_role` FOREIGN KEY (`level3_role_id`) REFERENCES `staff_roles` (`role_id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Constraints for table `complaint_endorsements`
