@@ -222,8 +222,8 @@ $leaderNotes        = array_filter(
 $infoRequests       = $staff->getInformationRequests($complaintId);
 $statusLogs         = $staff->getComplaintStatusLogs($complaintId);
 $escalationHistory  = $staff->getEscalationHistoryForComplaint($complaintId);
-$staffForEscalation = $staff->getStaffForEscalation($staffId);
-$staffForDelegation = $staff->getStaffForDelegation($staffId);
+$staffForEscalation = $staff->getStaffForEscalation($complaintId, $staffId);
+$staffForDelegation = $staff->getStaffForDelegation($complaintId, $staffId);
 $feedback           = $staff->getComplaintFeedback($complaintId);
 $progressUpdates    = $staff->getProgressUpdates($complaintId);
 
@@ -332,7 +332,10 @@ function statusBadge($status)
                             <h4 class="fw-bold mb-0">
                                 <i class="fas fa-file-invoice me-2"></i>Complaint #<?= $complaintId ?>
                             </h4>
-                            <?= statusBadge($complaint['complaint_status']) ?>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-dark text-white">Level <?= (int) ($complaint['escalation_level'] ?? 1) ?></span>
+                                <?= statusBadge($complaint['complaint_status']) ?>
+                            </div>
                         </div>
                     </div>
 
