@@ -217,7 +217,7 @@ if (isset($_POST["loginBTN"])) {
 
     <div id="loader" class="loader-branded">
         <div class="loader-content">
-            <img src="<?= htmlspecialchars($branding['institution_logo_path']) ?>" alt="<?= htmlspecialchars($branding['institution_name']) ?>" class="loader-logo">
+            <img src="<?= htmlspecialchars($branding['institution_logo_path']) ?>?v=<?= @filemtime(__DIR__ . '/' . $branding['institution_logo_path']) ?: 0 ?>" alt="<?= htmlspecialchars($branding['institution_name']) ?>" class="loader-logo">
             <div class="spinner"></div>
             <p class="loader-text">Please wait...</p>
         </div>
@@ -231,7 +231,7 @@ if (isset($_POST["loginBTN"])) {
     <div class="slide-bg"></div>
 
     <div class="auth-wrap">
-        <img src="<?= htmlspecialchars($branding['institution_logo_path']) ?>" alt="<?= htmlspecialchars($branding['institution_name']) ?> Logo" class="rounded-circle brand-logo">
+        <img src="<?= htmlspecialchars($branding['institution_logo_path']) ?>?v=<?= @filemtime(__DIR__ . '/' . $branding['institution_logo_path']) ?: 0 ?>" alt="<?= htmlspecialchars($branding['institution_name']) ?> Logo" class="rounded-circle brand-logo">
         <div class="auth-card text-center">
             <h4 class="fw-bold mb-1">Welcome Back</h4>
             <p class="text-muted small mb-2">Login to manage your complaints</p>
@@ -289,6 +289,12 @@ if (isset($_POST["loginBTN"])) {
                         class="fas fa-arrow-right"></i></button>
                 <p class="small mb-0">Don't have an account? <a href="register.php" class="fw-bold text-decoration-none"
                         style="color: var(--udsm-blue);">Register</a></p>
+                <?php if (!empty($branding['institution_contact_email'])): ?>
+                    <p class="small text-muted mb-0 mt-2">Trouble signing in? Contact
+                        <a href="mailto:<?= htmlspecialchars($branding['institution_contact_email']) ?>"
+                            style="color: var(--udsm-blue);"><?= htmlspecialchars($branding['institution_contact_email']) ?></a>
+                    </p>
+                <?php endif; ?>
             </form>
         </div><!-- /.auth-card -->
     </div><!-- /.auth-wrap -->

@@ -239,9 +239,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['addStaffBTN'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_role'])) {
     $name = trim($_POST['role_name'] ?? '');
     $rank = (int) ($_POST['role_rank'] ?? 0);
+    $isDepartmentScoped = isset($_POST['is_department_scoped']) ? 1 : 0;
     try {
         if ($name && $rank > 0) {
-            $admin->addStaffRole($name, $rank);
+            $admin->addStaffRole($name, $rank, $isDepartmentScoped);
             $_SESSION['message'] = "Role '{$name}' added successfully.";
         } else {
             $_SESSION['message_error'] = "Role name and rank are required.";
@@ -258,9 +259,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_role'])) {
     $id = (int) ($_POST['role_id'] ?? 0);
     $name = trim($_POST['role_name'] ?? '');
     $rank = (int) ($_POST['role_rank'] ?? 0);
+    $isDepartmentScoped = isset($_POST['is_department_scoped']) ? 1 : 0;
     try {
         if ($id && $name && $rank > 0) {
-            $admin->updateStaffRole($id, $name, $rank);
+            $admin->updateStaffRole($id, $name, $rank, $isDepartmentScoped);
             $_SESSION['message'] = "Role updated successfully.";
         } else {
             $_SESSION['message_error'] = "All fields are required.";
@@ -1672,6 +1674,7 @@ if (isset($_SESSION['message'])) {
                                         <th>#</th>
                                         <th>ROLE NAME</th>
                                         <th class="text-center">RANK</th>
+                                        <th class="text-center">SCOPE</th>
                                         <th class="text-center">STAFF COUNT</th>
                                         <th class="text-center">ACTION</th>
                                     </tr>
@@ -1685,6 +1688,13 @@ if (isset($_SESSION['message'])) {
                                                 <td><?= htmlspecialchars($role['role_name']) ?></td>
                                                 <td class="text-center">
                                                     <span class="badge bg-secondary"><?= $role['role_rank'] ?></span>
+                                                </td>
+                                                <td class="text-center">
+                                                    <?php if ((int) $role['is_department_scoped']): ?>
+                                                        <span class="badge bg-info text-white" title="One holder per department">Departmental</span>
+                                                    <?php else: ?>
+                                                        <span class="badge bg-warning text-dark" title="Single university-wide holder">University-wide</span>
+                                                    <?php endif; ?>
                                                 </td>
                                                 <td class="text-center">
                                                     <span class="badge bg-primary"><?= $role['staff_count'] ?></span>
@@ -1707,7 +1717,7 @@ if (isset($_SESSION['message'])) {
                                         <?php endforeach; ?>
                                     <?php else: ?>
                                         <tr>
-                                            <td colspan="5" class="text-center py-4 text-muted">No roles defined yet.</td>
+                                            <td colspan="6" class="text-center py-4 text-muted">No roles defined yet.</td>
                                         </tr>
                                     <?php endif; ?>
                                 </tbody>
@@ -1744,6 +1754,16 @@ if (isset($_SESSION['message'])) {
                                                 style="border-radius: 10px;" placeholder="e.g., 2" min="1" required>
                                             <small class="text-muted">Higher rank = more authority. Roles can share a
                                                 rank if they're peers who don't escalate to each other.</small>
+                                        </div>
+                                        <div class="mb-3 form-check">
+                                            <input type="checkbox" class="form-check-input" name="is_department_scoped"
+                                                id="add_role_departmental" value="1" checked>
+                                            <label class="form-check-label fw-bold small" for="add_role_departmental">
+                                                Departmental role (one holder per department)
+                                            </label>
+                                            <div class="form-text">Uncheck for a single university-wide role like
+                                                Principal or Dean of Students - staff escalation and routing will
+                                                ignore department when picking someone with this role.</div>
                                         </div>
                                     </div>
                                     <div class="modal-footer">
@@ -1790,6 +1810,16 @@ if (isset($_SESSION['message'])) {
                                                 required>
                                             <small class="text-muted">Higher rank = more authority. Roles can share a
                                                 rank if they're peers who don't escalate to each other.</small>
+                                        </div>
+                                        <div class="mb-3 form-check">
+                                            <input type="checkbox" class="form-check-input" name="is_department_scoped"
+                                                id="edit_role_departmental" value="1">
+                                            <label class="form-check-label fw-bold small" for="edit_role_departmental">
+                                                Departmental role (one holder per department)
+                                            </label>
+                                            <div class="form-text">Uncheck for a single university-wide role like
+                                                Principal or Dean of Students - staff escalation and routing will
+                                                ignore department when picking someone with this role.</div>
                                         </div>
                                     </div>
                                     <div class="modal-footer">
@@ -2336,6 +2366,7 @@ if (isset($_SESSION['message'])) {
             document.getElementById('edit_role_id').value = role.role_id;
             document.getElementById('edit_role_name').value = role.role_name;
             document.getElementById('edit_role_rank').value = role.role_rank;
+            document.getElementById('edit_role_departmental').checked = !!parseInt(role.is_department_scoped);
         }
 
         function confirmDeleteRole(id, name) {

@@ -3,11 +3,13 @@ require_once 'config/session.php';
 
 require_once "config/Database.php";
 require_once "classes/User.php";
+require_once "classes/Settings.php";
 require_once "includes/csrf.php";
 
 $db = new Database();
 $conn = $db->connect();
 $user = new User($conn);
+$settingsSvc = new Settings($conn);
 
 $token = trim($_GET['token'] ?? '');
 $message = $error = "";
@@ -33,20 +35,11 @@ if ($validToken && isset($_POST['resetBtn'])) {
 
     if (empty($password) || empty($confirmPassword)) {
         $error = "Both password fields are required.";
-    } elseif (strlen($password) < 8) {
-        $error = "Password must be at least 8 characters long.";
-    } elseif (!preg_match('/[A-Z]/', $password)) {
-        $error = "Password must contain at least one uppercase letter.";
-    } elseif (!preg_match('/[a-z]/', $password)) {
-        $error = "Password must contain at least one lowercase letter.";
-    } elseif (!preg_match('/[0-9]/', $password)) {
-        $error = "Password must contain at least one number.";
-    } elseif (!preg_match('/[\W]/', $password)) {
-        $error = "Password must contain at least one special character.";
     } elseif ($password !== $confirmPassword) {
         $error = "Passwords do not match.";
     } else {
         try {
+            $settingsSvc->validatePassword($password);
             $user->resetPassword($token, $password);
             $_SESSION['message'] = "Password reset successfully. You can now log in with your new password.";
             header("Location: login.php");

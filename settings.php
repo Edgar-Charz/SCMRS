@@ -36,11 +36,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_admin'])) {
             $_SESSION['message_error'] = "Username, email and password are required.";
         } elseif ($password !== $confirm) {
             $_SESSION['message_error'] = "Passwords do not match.";
-        } elseif (strlen($password) < 8) {
-            $_SESSION['message_error'] = "Password must be at least 8 characters.";
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $_SESSION['message_error'] = "Please enter a valid email address.";
         } else {
+            $settingsSvc->validatePassword($password);
             $admin->addAdminAccount($username, $email, $password, $phone);
             $admin->logActivity($adminId, 'user_created', 'user', 0, $username, "Admin account created by admin");
             $_SESSION['message'] = "Admin '{$username}' added successfully.";
@@ -118,9 +117,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_routing'])) {
 // Update branding
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_branding'])) {
     try {
+        $logoPath = $settingsSvc->get()['institution_logo_path'] ?? 'assets/img/logo.png';
+
+        if (!empty($_FILES['institution_logo']['name'])) {
+            if ($_FILES['institution_logo']['error'] !== UPLOAD_ERR_OK) {
+                throw new Exception("Logo upload failed. Please try again.");
+            }
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $fileType = $finfo->file($_FILES['institution_logo']['tmp_name']);
+            if ($fileType !== 'image/png') {
+                throw new Exception("Logo must be a PNG image.");
+            }
+            if ($_FILES['institution_logo']['size'] > 2 * 1024 * 1024) {
+                throw new Exception("Logo must be under 2 MB.");
+            }
+            if (!move_uploaded_file($_FILES['institution_logo']['tmp_name'], __DIR__ . '/assets/img/logo.png')) {
+                throw new Exception("Could not save the uploaded logo.");
+            }
+            $logoPath = 'assets/img/logo.png';
+        }
+
         $settingsSvc->updateBranding(
             trim($_POST['institution_name'] ?? ''),
-            trim($_POST['institution_logo_path'] ?? ''),
+            $logoPath,
             trim($_POST['institution_contact_email'] ?? '') ?: null,
             $adminId
         );
@@ -130,6 +149,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_branding'])) {
         $_SESSION['message_error'] = $e->getMessage();
     }
     header("Location: settings.php#branding");
+    exit;
+}
+
+// Update security policy
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_security'])) {
+    try {
+        $allowedTypes = $_POST['allowed_attachment_types'] ?? [];
+        if (empty($allowedTypes)) {
+            throw new Exception("At least one attachment file type must be allowed.");
+        }
+        $settingsSvc->updateSecurity(
+            (int) ($_POST['max_login_attempts'] ?? 3),
+            (int) ($_POST['lockout_duration_minutes'] ?? 15),
+            (int) ($_POST['max_attachment_size_mb'] ?? 5),
+            $allowedTypes,
+            (int) ($_POST['password_min_length'] ?? 8),
+            isset($_POST['password_require_upper']) ? 1 : 0,
+            isset($_POST['password_require_lower']) ? 1 : 0,
+            isset($_POST['password_require_number']) ? 1 : 0,
+            isset($_POST['password_require_special']) ? 1 : 0,
+            $adminId
+        );
+        $admin->logActivity($adminId, 'settings_updated', 'system_settings', 0, 'Security Policy', 'Updated login lockout, upload and password policy settings');
+        $_SESSION['message'] = "Security settings updated.";
+    } catch (Exception $e) {
+        $_SESSION['message_error'] = $e->getMessage();
+    }
+    header("Location: settings.php#security");
     exit;
 }
 
@@ -209,6 +256,12 @@ if (isset($_SESSION['message'])) {
                         <button class="nav-link fw-bold" onclick="switchTab('branding')" id="tab-branding">
                             <i class="fas fa-palette me-2"></i>
                             Branding
+                        </button>
+                    </li>
+                    <li class="nav-item me-2" role="presentation">
+                        <button class="nav-link fw-bold" onclick="switchTab('security')" id="tab-security">
+                            <i class="fas fa-shield-alt me-2"></i>
+                            Security
                         </button>
                     </li>
                 </ul>
@@ -404,7 +457,7 @@ if (isset($_SESSION['message'])) {
                         <h5 class="mb-3 fw-bold" style="color: var(--udsm-blue);">
                             <i class="fas fa-palette me-2"></i>System Branding
                         </h5>
-                        <form action="settings.php" method="POST">
+                        <form action="settings.php" method="POST" enctype="multipart/form-data">
                             <?= csrf_field() ?>
                             <div class="mb-3">
                                 <label class="form-label fw-bold small">Institution Name</label>
@@ -414,21 +467,131 @@ if (isset($_SESSION['message'])) {
                                 <div class="form-text">Shown in the sidebar, login page and notification emails.</div>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label fw-bold small">Logo Path or URL</label>
-                                <input type="text" name="institution_logo_path" class="form-control"
-                                    style="border-radius:10px;"
-                                    value="<?= htmlspecialchars($settings['institution_logo_path'] ?? '') ?>">
-                                <div class="form-text">A path relative to the site root (e.g. assets/img/logo.png) or a
-                                    full URL.</div>
+                                <label class="form-label fw-bold small">Logo</label>
+                                <div class="d-flex align-items-center gap-3 mb-2">
+                                    <img src="<?= htmlspecialchars($settings['institution_logo_path'] ?? 'assets/img/logo.png') ?>?v=<?= @filemtime(__DIR__ . '/' . ($settings['institution_logo_path'] ?? 'assets/img/logo.png')) ?: 0 ?>"
+                                        alt="Current logo" style="width:64px;height:64px;object-fit:contain;border:1px solid #e8ecf4;border-radius:8px;padding:4px;">
+                                    <input type="file" name="institution_logo" class="form-control" accept="image/png"
+                                        style="border-radius:10px;">
+                                </div>
+                                <div class="form-text">PNG only. Uploading a new logo replaces
+                                    <code>assets/img/logo.png</code>. Leave empty to keep the current logo.</div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-bold small">Contact Email</label>
                                 <input type="email" name="institution_contact_email" class="form-control"
                                     style="border-radius:10px;"
                                     value="<?= htmlspecialchars($settings['institution_contact_email'] ?? '') ?>">
+                                <div class="form-text">Shown on the login page and in notification email footers as
+                                    a "need help" contact.</div>
                             </div>
                             <button type="submit" name="update_branding" class="btn btn-primary fw-bold">
                                 <i class="fas fa-save me-1"></i> Save Branding
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Security -->
+                <div id="security-section" class="management-content d-none">
+                    <div class="container-card border-0 shadow-sm p-4">
+                        <h5 class="mb-3 fw-bold" style="color: var(--udsm-blue);">
+                            <i class="fas fa-shield-alt me-2"></i>Security Policy
+                        </h5>
+                        <form action="settings.php" method="POST">
+                            <?= csrf_field() ?>
+
+                            <h6 class="fw-bold mb-2">Login Lockout</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold small">Max Failed Attempts</label>
+                                    <input type="number" name="max_login_attempts" class="form-control"
+                                        style="border-radius:10px;" value="<?= (int) $settings['max_login_attempts'] ?>"
+                                        min="1" required>
+                                    <div class="form-text">Number of wrong passwords before an account is locked.
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold small">Lockout Duration (minutes)</label>
+                                    <input type="number" name="lockout_duration_minutes" class="form-control"
+                                        style="border-radius:10px;"
+                                        value="<?= (int) $settings['lockout_duration_minutes'] ?>" min="1" required>
+                                </div>
+                            </div>
+
+                            <hr class="my-3">
+
+                            <h6 class="fw-bold mb-2">Attachment Uploads</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold small">Max File Size (MB)</label>
+                                    <input type="number" name="max_attachment_size_mb" class="form-control"
+                                        style="border-radius:10px;"
+                                        value="<?= (int) $settings['max_attachment_size_mb'] ?>" min="1" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold small">Allowed File Types</label>
+                                    <?php $allowedTypes = array_map('trim', explode(',', $settings['allowed_attachment_types'])); ?>
+                                    <div class="d-flex gap-3 mt-2">
+                                        <?php foreach (Settings::getAttachmentTypeCatalog() as $mime => $info): ?>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox"
+                                                    name="allowed_attachment_types[]" value="<?= $mime ?>"
+                                                    id="attach_<?= md5($mime) ?>"
+                                                    <?= in_array($mime, $allowedTypes) ? 'checked' : '' ?>>
+                                                <label class="form-check-label" for="attach_<?= md5($mime) ?>">
+                                                    <?= htmlspecialchars($info['label']) ?>
+                                                </label>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="my-3">
+
+                            <h6 class="fw-bold mb-2">Password Policy</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold small">Minimum Length</label>
+                                    <input type="number" name="password_min_length" class="form-control"
+                                        style="border-radius:10px;" value="<?= (int) $settings['password_min_length'] ?>"
+                                        min="6" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold small d-block">Required Character Types</label>
+                                    <div class="d-flex flex-wrap gap-3 mt-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox"
+                                                name="password_require_upper" value="1" id="pwd_upper"
+                                                <?= $settings['password_require_upper'] ? 'checked' : '' ?>>
+                                            <label class="form-check-label" for="pwd_upper">Uppercase</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox"
+                                                name="password_require_lower" value="1" id="pwd_lower"
+                                                <?= $settings['password_require_lower'] ? 'checked' : '' ?>>
+                                            <label class="form-check-label" for="pwd_lower">Lowercase</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox"
+                                                name="password_require_number" value="1" id="pwd_number"
+                                                <?= $settings['password_require_number'] ? 'checked' : '' ?>>
+                                            <label class="form-check-label" for="pwd_number">Number</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox"
+                                                name="password_require_special" value="1" id="pwd_special"
+                                                <?= $settings['password_require_special'] ? 'checked' : '' ?>>
+                                            <label class="form-check-label" for="pwd_special">Special
+                                                character</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="submit" name="update_security" class="btn btn-primary fw-bold">
+                                <i class="fas fa-save me-1"></i> Save Security Settings
                             </button>
                         </form>
                     </div>
@@ -495,7 +658,7 @@ if (isset($_SESSION['message'])) {
     <script src="assets/js/script.js"></script>
     <script>
         (function () {
-            var VALID_TABS = ['accounts', 'email', 'routing', 'branding'];
+            var VALID_TABS = ['accounts', 'email', 'routing', 'branding', 'security'];
             var LS_KEY = 'settings_active_tab';
 
             window.switchTab = function (tabName) {

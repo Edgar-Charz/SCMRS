@@ -26,11 +26,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
     $desc = trim($_POST['category_description'] ?? '');
     $deptId = (int) ($_POST['auto_assign_department_id'] ?? 0);
     $roleId = (int) ($_POST['default_role_id'] ?? 0);
+    $level2RoleId = (int) ($_POST['level2_role_id'] ?? 0);
+    $level3RoleId = (int) ($_POST['level3_role_id'] ?? 0);
     $reqDept = isset($_POST['requires_department_selection']) ? 1 : 0;
     $endorsable = isset($_POST['leader_endorsable']) ? 1 : 0;
     $priority = in_array($_POST['default_priority'] ?? '', ['low', 'medium', 'high'], true) ? $_POST['default_priority'] : 'medium';
     if ($name !== '') {
-        $admin->addCategory($name, $desc, $adminId, $deptId ?: null, $reqDept, $roleId ?: null, $endorsable, $priority);
+        $admin->addCategory($name, $desc, $adminId, $deptId ?: null, $reqDept, $roleId ?: null, $endorsable, $priority, $level2RoleId ?: null, $level3RoleId ?: null);
         $admin->logActivity($adminId, 'category_added', 'category', 0, $name, "Category '{$name}' added");
         $_SESSION['message'] = "Category '{$name}' added successfully.";
     } else {
@@ -48,11 +50,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_category'])) {
     $status = in_array($_POST['status'] ?? '', ['active', 'inactive']) ? $_POST['status'] : 'active';
     $deptId = (int) ($_POST['auto_assign_department_id'] ?? 0);
     $roleId = (int) ($_POST['default_role_id'] ?? 0);
+    $level2RoleId = (int) ($_POST['level2_role_id'] ?? 0);
+    $level3RoleId = (int) ($_POST['level3_role_id'] ?? 0);
     $reqDept = isset($_POST['requires_department_selection']) ? 1 : 0;
     $endorsable = isset($_POST['leader_endorsable']) ? 1 : 0;
     $priority = in_array($_POST['default_priority'] ?? '', ['low', 'medium', 'high'], true) ? $_POST['default_priority'] : 'medium';
     if ($id && $name !== '') {
-        $admin->updateCategory($id, $name, $desc, $status, $deptId ?: null, $reqDept, $roleId ?: null, $endorsable, $priority);
+        $admin->updateCategory($id, $name, $desc, $status, $deptId ?: null, $reqDept, $roleId ?: null, $endorsable, $priority, $level2RoleId ?: null, $level3RoleId ?: null);
         $admin->logActivity($adminId, 'category_updated', 'category', $id, $name, "Category updated to '{$name}' (status: {$status})");
         $_SESSION['message'] = "Category updated successfully.";
     } else {
@@ -197,6 +201,8 @@ $staffRoles = $admin->getAllStaffRoles();
                                     <th>CATEGORY NAME</th>
                                     <th>DESCRIPTION</th>
                                     <th class="text-center">DEFAULT DEPT</th>
+                                    <th class="text-center">LEVEL 2</th>
+                                    <th class="text-center">LEVEL 3</th>
                                     <th class="text-center">DEFAULT PRIORITY</th>
                                     <th class="text-center">LEADER ENDORSABLE</th>
                                     <th class="text-center">COMPLAINTS</th>
@@ -219,6 +225,24 @@ $staffRoles = $admin->getAllStaffRoles();
                                                 <?php if (!empty($cat['default_dept_name'])): ?>
                                                     <span class="badge bg-info text-white" style="font-size:0.75rem;">
                                                         <?= htmlspecialchars($cat['default_dept_name']) ?>
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="text-muted small">-</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-center">
+                                                <?php if (!empty($cat['level2_role_name'])): ?>
+                                                    <span class="badge bg-warning text-dark" style="font-size:0.75rem;">
+                                                        <?= htmlspecialchars($cat['level2_role_name']) ?>
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="text-muted small">-</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-center">
+                                                <?php if (!empty($cat['level3_role_name'])): ?>
+                                                    <span class="badge bg-danger text-white" style="font-size:0.75rem;">
+                                                        <?= htmlspecialchars($cat['level3_role_name']) ?>
                                                     </span>
                                                 <?php else: ?>
                                                     <span class="text-muted small">-</span>
@@ -279,7 +303,7 @@ $staffRoles = $admin->getAllStaffRoles();
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="10" class="text-center py-4 text-muted">No categories found. Add one to
+                                        <td colspan="12" class="text-center py-4 text-muted">No categories found. Add one to
                                             get started.</td>
                                     </tr>
                                 <?php endif; ?>
@@ -359,6 +383,35 @@ $staffRoles = $admin->getAllStaffRoles();
                                     </label>
                                     <select name="default_role_id" class="form-select" style="border-radius:10px;">
                                         <option value="0">- No auto-routing (admin assigns manually) -</option>
+                                        <?php foreach ($staffRoles as $role): ?>
+                                            <option value="<?= $role['role_id'] ?>">
+                                                <?= htmlspecialchars($role['role_name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">
+                                        Level 2 Escalation Role
+                                        <span class="text-muted fw-normal">(who Level 1 staff escalate to)</span>
+                                    </label>
+                                    <select name="level2_role_id" class="form-select" style="border-radius:10px;">
+                                        <option value="0">- No Level 2 escalation -</option>
+                                        <?php foreach ($staffRoles as $role): ?>
+                                            <option value="<?= $role['role_id'] ?>">
+                                                <?= htmlspecialchars($role['role_name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">
+                                        Level 3 Escalation Role
+                                        <span class="text-muted fw-normal">(final escalation tier, e.g. Dean of
+                                            Students)</span>
+                                    </label>
+                                    <select name="level3_role_id" class="form-select" style="border-radius:10px;">
+                                        <option value="0">- No Level 3 escalation -</option>
                                         <?php foreach ($staffRoles as $role): ?>
                                             <option value="<?= $role['role_id'] ?>">
                                                 <?= htmlspecialchars($role['role_name']) ?>
@@ -454,6 +507,37 @@ $staffRoles = $admin->getAllStaffRoles();
                                     <select name="default_role_id" id="edit_cat_role" class="form-select"
                                         style="border-radius:10px;">
                                         <option value="0">- No auto-routing (admin assigns manually) -</option>
+                                        <?php foreach ($staffRoles as $role): ?>
+                                            <option value="<?= $role['role_id'] ?>">
+                                                <?= htmlspecialchars($role['role_name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">
+                                        Level 2 Escalation Role
+                                        <span class="text-muted fw-normal">(who Level 1 staff escalate to)</span>
+                                    </label>
+                                    <select name="level2_role_id" id="edit_cat_level2_role" class="form-select"
+                                        style="border-radius:10px;">
+                                        <option value="0">- No Level 2 escalation -</option>
+                                        <?php foreach ($staffRoles as $role): ?>
+                                            <option value="<?= $role['role_id'] ?>">
+                                                <?= htmlspecialchars($role['role_name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">
+                                        Level 3 Escalation Role
+                                        <span class="text-muted fw-normal">(final escalation tier, e.g. Dean of
+                                            Students)</span>
+                                    </label>
+                                    <select name="level3_role_id" id="edit_cat_level3_role" class="form-select"
+                                        style="border-radius:10px;">
+                                        <option value="0">- No Level 3 escalation -</option>
                                         <?php foreach ($staffRoles as $role): ?>
                                             <option value="<?= $role['role_id'] ?>">
                                                 <?= htmlspecialchars($role['role_name']) ?>
@@ -679,6 +763,8 @@ $staffRoles = $admin->getAllStaffRoles();
             document.getElementById('edit_cat_requires_dept').checked = !!parseInt(cat.requires_department_selection);
             document.getElementById('edit_cat_leader_endorsable').checked = !!parseInt(cat.leader_endorsable);
             document.getElementById('edit_cat_role').value = cat.default_role_id || '0';
+            document.getElementById('edit_cat_level2_role').value = cat.level2_role_id || '0';
+            document.getElementById('edit_cat_level3_role').value = cat.level3_role_id || '0';
             document.getElementById('edit_cat_priority').value = cat.default_priority || 'medium';
         }
 
