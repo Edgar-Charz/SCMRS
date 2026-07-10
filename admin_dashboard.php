@@ -309,7 +309,7 @@ $pendingStaffCount = $admin->getPendingStaffCount();
                         <div class="col-12 col-md-6 col-lg">
                             <a href="audit_log.php" class="action-card action-card--amber">
                                 <i class="fas fa-clipboard-list action-icon"></i>
-                                <h5>System Admins' Audit Log</h5>
+                                <h5>System Audit Logs</h5>
                                 <small>Track all system administrators' activity</small>
                             </a>
                         </div>
