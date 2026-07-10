@@ -169,6 +169,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_security'])) {
             isset($_POST['password_require_lower']) ? 1 : 0,
             isset($_POST['password_require_number']) ? 1 : 0,
             isset($_POST['password_require_special']) ? 1 : 0,
+            (int) ($_POST['session_timeout_minutes'] ?? 30),
+            (int) ($_POST['ip_rate_limit_attempts'] ?? 10),
+            (int) ($_POST['ip_rate_limit_window_minutes'] ?? 15),
+            (int) ($_POST['password_reset_token_hours'] ?? 1),
             $adminId
         );
         $admin->logActivity($adminId, 'settings_updated', 'system_settings', 0, 'Security Policy', 'Updated login lockout, upload and password policy settings');
@@ -517,6 +521,40 @@ if (isset($_SESSION['message'])) {
                                         style="border-radius:10px;"
                                         value="<?= (int) $settings['lockout_duration_minutes'] ?>" min="1" required>
                                 </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold small">IP Rate Limit - Max Attempts</label>
+                                    <input type="number" name="ip_rate_limit_attempts" class="form-control"
+                                        style="border-radius:10px;"
+                                        value="<?= (int) $settings['ip_rate_limit_attempts'] ?>" min="1" required>
+                                    <div class="form-text">Blocks a single IP address after this many failed
+                                        logins, regardless of which account is being tried.</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold small">IP Rate Limit Window (minutes)</label>
+                                    <input type="number" name="ip_rate_limit_window_minutes" class="form-control"
+                                        style="border-radius:10px;"
+                                        value="<?= (int) $settings['ip_rate_limit_window_minutes'] ?>" min="1" required>
+                                </div>
+                            </div>
+
+                            <hr class="my-3">
+
+                            <h6 class="fw-bold mb-2">Session &amp; Password Reset</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold small">Session Timeout (minutes)</label>
+                                    <input type="number" name="session_timeout_minutes" class="form-control"
+                                        style="border-radius:10px;"
+                                        value="<?= (int) $settings['session_timeout_minutes'] ?>" min="1" required>
+                                    <div class="form-text">How long an inactive login session stays valid.</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold small">Password Reset Link Validity
+                                        (hours)</label>
+                                    <input type="number" name="password_reset_token_hours" class="form-control"
+                                        style="border-radius:10px;"
+                                        value="<?= (int) $settings['password_reset_token_hours'] ?>" min="1" required>
+                                </div>
                             </div>
 
                             <hr class="my-3">
@@ -691,6 +729,8 @@ if (isset($_SESSION['message'])) {
             switchTab(initTab);
         }());
 
+        var PASSWORD_MIN_LENGTH = <?= (int) $settings['password_min_length'] ?>;
+
         function checkPasswords(pwdId, confirmId) {
             var pwd = document.getElementById(pwdId).value;
             var confirm = document.getElementById(confirmId).value;
@@ -698,8 +738,8 @@ if (isset($_SESSION['message'])) {
                 alert('Passwords do not match. Please try again.');
                 return false;
             }
-            if (pwd.length < 8) {
-                alert('Password must be at least 8 characters.');
+            if (pwd.length < PASSWORD_MIN_LENGTH) {
+                alert('Password must be at least ' + PASSWORD_MIN_LENGTH + ' characters.');
                 return false;
             }
             return true;
