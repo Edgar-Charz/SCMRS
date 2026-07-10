@@ -372,7 +372,7 @@ CREATE TABLE `staff_roles` (
   `role_id` int(11) NOT NULL,
   `role_name` varchar(50) NOT NULL,
   `role_rank` tinyint(4) NOT NULL COMMENT 'Higher = more senior',
-  `is_department_scoped` tinyint(1) NOT NULL DEFAULT 1 COMMENT '1 = one holder per department (e.g. HoD); 0 = single university-wide holder (e.g. Principal, Dean of Students)',
+  `is_department_scoped` tinyint(1) NOT NULL DEFAULT 1 COMMENT '1 = one holder per department; 0 = single university-wide holder',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
