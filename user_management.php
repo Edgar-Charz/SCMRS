@@ -558,9 +558,8 @@ if (isset($_SESSION['message'])) {
                                 </thead>
 
                                 <tbody>
-                                    <?php if (!empty($registered_students)): ?>
-                                        <?php $n = 1;
-                                        foreach ($registered_students as $student): ?>
+                                    <?php $n = 1;
+                                    foreach ($registered_students as $student): ?>
                                             <tr>
                                                 <td><?php echo $n++; ?></td>
                                                 <td class="text-center">
@@ -643,12 +642,7 @@ if (isset($_SESSION['message'])) {
                                                     </div>
                                                 </td>
                                             </tr>
-                                        <?php endforeach; ?>
-                                    <?php else: ?>
-                                        <tr>
-                                            <td colspan="3" class="text-center py-4">No students registered yet</td>
-                                        </tr>
-                                    <?php endif; ?>
+                                    <?php endforeach; ?>
 
                                     <!-- View Student Modal -->
                                     <div class="modal fade" id="viewStudent" tabindex="-1"
@@ -1028,9 +1022,8 @@ if (isset($_SESSION['message'])) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php if (!empty($registered_staffs)): ?>
-                                        <?php $counter = 1;
-                                        foreach ($registered_staffs as $staff): ?>
+                                    <?php $counter = 1;
+                                    foreach ($registered_staffs as $staff): ?>
                                             <tr>
                                                 <td><?php echo $counter++; ?></td>
                                                 <td class="text-center"><?php echo htmlspecialchars($staff['username']); ?></td>
@@ -1096,12 +1089,7 @@ if (isset($_SESSION['message'])) {
 
                                                 </td>
                                             </tr>
-                                        <?php endforeach; ?>
-                                    <?php else: ?>
-                                        <tr>
-                                            <td colspan="4" class="text-center py-4">No staff registered yet</td>
-                                        </tr>
-                                    <?php endif; ?>
+                                    <?php endforeach; ?>
 
                                     <!-- View Staff Modal -->
                                     <div class="modal fade" id="viewStaff" tabindex="-1"
@@ -1466,9 +1454,8 @@ if (isset($_SESSION['message'])) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php if (!empty($approved_staffs)): ?>
-                                        <?php $counter = 1;
-                                        foreach ($approved_staffs as $staff): ?>
+                                    <?php $counter = 1;
+                                    foreach ($approved_staffs as $staff): ?>
                                             <tr>
                                                 <td><?php echo $counter++; ?></td>
                                                 <td class="text-center"><?php echo htmlspecialchars($staff['username']); ?></td>
@@ -1511,12 +1498,7 @@ if (isset($_SESSION['message'])) {
 
                                                 </td>
                                             </tr>
-                                        <?php endforeach; ?>
-                                    <?php else: ?>
-                                        <tr>
-                                            <td colspan="6" class="text-center py-4">No approved staff yet</td>
-                                        </tr>
-                                    <?php endif; ?>
+                                    <?php endforeach; ?>
 
                                     <!-- View Approved Staff Modal -->
                                     <div class="modal fade" id="viewApprovedStaff" tabindex="-1"
@@ -1684,9 +1666,8 @@ if (isset($_SESSION['message'])) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php if (!empty($staff_roles)): ?>
-                                        <?php $n = 1;
-                                        foreach ($staff_roles as $role): ?>
+                                    <?php $n = 1;
+                                    foreach ($staff_roles as $role): ?>
                                             <tr>
                                                 <td><?= $n++ ?></td>
                                                 <td><?= htmlspecialchars($role['role_name']) ?></td>
@@ -1718,12 +1699,7 @@ if (isset($_SESSION['message'])) {
                                                     </div>
                                                 </td>
                                             </tr>
-                                        <?php endforeach; ?>
-                                    <?php else: ?>
-                                        <tr>
-                                            <td colspan="6" class="text-center py-4 text-muted">No roles defined yet.</td>
-                                        </tr>
-                                    <?php endif; ?>
+                                    <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
@@ -2537,7 +2513,8 @@ if (isset($_SESSION['message'])) {
                             search: " ",
                             sLengthMenu: "_MENU_",
                             searchPlaceholder: "Search Students...",
-                            info: "_START_ - _END_ of _TOTAL_ items"
+                            info: "_START_ - _END_ of _TOTAL_ items",
+                            emptyTable: "No students registered yet"
                         },
                         initComplete: function (settings) {
                             $(settings.nTableWrapper).find('.dataTables_filter')
@@ -2562,7 +2539,8 @@ if (isset($_SESSION['message'])) {
                             search: " ",
                             sLengthMenu: "_MENU_",
                             searchPlaceholder: "Search Staffs...",
-                            info: "_START_ - _END_ of _TOTAL_ items"
+                            info: "_START_ - _END_ of _TOTAL_ items",
+                            emptyTable: "No staff registered yet"
                         },
                         initComplete: function (settings) {
                             $(settings.nTableWrapper).find('.dataTables_filter')
@@ -2586,7 +2564,8 @@ if (isset($_SESSION['message'])) {
                         search: " ",
                         sLengthMenu: "_MENU_",
                         searchPlaceholder: "Search Roles...",
-                        info: "_START_ - _END_ of _TOTAL_ items"
+                        info: "_START_ - _END_ of _TOTAL_ items",
+                        emptyTable: "No roles defined yet."
                     },
                     initComplete: function (settings) {
                         $(settings.nTableWrapper).find('.dataTables_filter')
@@ -2610,7 +2589,8 @@ if (isset($_SESSION['message'])) {
                         search: " ",
                         sLengthMenu: "_MENU_",
                         searchPlaceholder: "Search Approved Staffs...",
-                        info: "_START_ - _END_ of _TOTAL_ items"
+                        info: "_START_ - _END_ of _TOTAL_ items",
+                        emptyTable: "No approved staff yet"
                     },
                     initComplete: function (settings) {
                         $(settings.nTableWrapper).find('.dataTables_filter')
