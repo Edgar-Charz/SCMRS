@@ -198,13 +198,13 @@ $staffRoles = $admin->getAllStaffRoles();
                             <thead class="table-light">
                                 <tr>
                                     <th>#</th>
-                                    <th>CATEGORY NAME</th>
+                                    <th>NAME</th>
                                     <th>DESCRIPTION</th>
                                     <th class="text-center">DEFAULT DEPT</th>
                                     <th class="text-center">LEVEL 2</th>
                                     <th class="text-center">LEVEL 3</th>
-                                    <th class="text-center">DEFAULT PRIORITY</th>
-                                    <th class="text-center">LEADER ENDORSABLE</th>
+                                    <th class="text-center">PRIORITY</th>
+                                    <th class="text-center">ENDORSABLE</th>
                                     <th class="text-center">COMPLAINTS</th>
                                     <th class="text-center">STATUS</th>
                                     <th class="text-center">SUBCATEGORIES</th>
@@ -257,7 +257,8 @@ $staffRoles = $admin->getAllStaffRoles();
                                                 ];
                                                 $priClass = $priorityMap[$cat['default_priority']] ?? 'bg-secondary';
                                                 ?>
-                                                <span class="badge <?= $priClass ?>"><?= ucfirst($cat['default_priority']) ?></span>
+                                                <span
+                                                    class="badge <?= $priClass ?>"><?= ucfirst($cat['default_priority']) ?></span>
                                             </td>
                                             <td class="text-center">
                                                 <?php if (!empty($cat['leader_endorsable'])): ?>
@@ -315,7 +316,7 @@ $staffRoles = $admin->getAllStaffRoles();
 
             <!-- Add Category Modal -->
             <div class="modal fade" id="addCategoryModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-dialog modal-lg modal-dialog-centered">
                     <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
                         <div class="modal-header text-white"
                             style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
@@ -336,73 +337,89 @@ $staffRoles = $admin->getAllStaffRoles();
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label fw-bold small">Description</label>
-                                    <textarea name="category_description" class="form-control shadow-sm" rows="3"
+                                    <textarea name="category_description" class="form-control shadow-sm" rows="2"
                                         style="border-radius: 10px;"
                                         placeholder="Brief description of the category..."></textarea>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold small">
-                                        Default Department
-                                        <span class="text-muted fw-normal">(optional - auto-filters staff when
-                                            assigning)</span>
-                                    </label>
-                                    <select name="auto_assign_department_id" class="form-select"
-                                        style="border-radius:10px;">
-                                        <option value="0">- No default department -</option>
-                                        <?php foreach ($departments as $dept): ?>
-                                            <option value="<?= $dept['department_id'] ?>">
-                                                <?= htmlspecialchars($dept['department_name']) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="mb-3 form-check">
-                                    <input type="checkbox" class="form-check-input" name="requires_department_selection"
-                                        id="cat_requires_dept" value="1">
-                                    <label class="form-check-label fw-bold small" for="cat_requires_dept">
-                                        Requires student to pick a department at submission
-                                    </label>
-                                    <div class="form-text">Enable for academic categories where routing
-                                        depends on the student's own department
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold small">
+                                            Default Department
+                                            <span class="text-muted fw-normal">(optional - auto-filters staff)</span>
+                                        </label>
+                                        <select name="auto_assign_department_id" class="form-select"
+                                            style="border-radius:10px;">
+                                            <option value="0">- No default department -</option>
+                                            <?php foreach ($departments as $dept): ?>
+                                                <option value="<?= $dept['department_id'] ?>">
+                                                    <?= htmlspecialchars($dept['department_name']) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold small">
+                                            Default Priority
+                                            <span class="text-muted fw-normal">(used when auto-routed)</span>
+                                        </label>
+                                        <select name="default_priority" class="form-select" style="border-radius:10px;">
+                                            <option value="low">Low</option>
+                                            <option value="medium" selected>Medium</option>
+                                            <option value="high">High</option>
+                                        </select>
                                     </div>
                                 </div>
-                                <div class="mb-3 form-check">
-                                    <input type="checkbox" class="form-check-input" name="leader_endorsable"
-                                        id="cat_leader_endorsable" value="1">
-                                    <label class="form-check-label fw-bold small" for="cat_leader_endorsable">
-                                        Can be endorsed by student leaders
-                                    </label>
-                                    <div class="form-text">Enable if complaints in this category should be visible to
-                                        and endorsable by student leaders. Leave off for categories leaders shouldn't
-                                        see at all.</div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" name="requires_department_selection"
+                                            id="cat_requires_dept" value="1">
+                                        <label class="form-check-label fw-bold small" for="cat_requires_dept">
+                                            Requires student to pick a department at submission
+                                        </label>
+                                        <div class="form-text">Enable for categories where routing
+                                            depends on the student's own department
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" name="leader_endorsable"
+                                            id="cat_leader_endorsable" value="1">
+                                        <label class="form-check-label fw-bold small" for="cat_leader_endorsable">
+                                            Can be endorsed by student leaders
+                                        </label>
+                                        <div class="form-text">Enable if complaints in this category should be visible to
+                                            and endorsable by student leaders.
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold small">
-                                        Default Staff Role
-                                        <span class="text-muted fw-normal">(optional - enables auto-routing)</span>
-                                    </label>
-                                    <select name="default_role_id" class="form-select" style="border-radius:10px;">
-                                        <option value="0">- No auto-routing (admin assigns manually) -</option>
-                                        <?php foreach ($staffRoles as $role): ?>
-                                            <option value="<?= $role['role_id'] ?>">
-                                                <?= htmlspecialchars($role['role_name']) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold small">
-                                        Level 2 Escalation Role
-                                        <span class="text-muted fw-normal">(who Level 1 staff escalate to)</span>
-                                    </label>
-                                    <select name="level2_role_id" class="form-select" style="border-radius:10px;">
-                                        <option value="0">- No Level 2 escalation -</option>
-                                        <?php foreach ($staffRoles as $role): ?>
-                                            <option value="<?= $role['role_id'] ?>">
-                                                <?= htmlspecialchars($role['role_name']) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold small">
+                                            Default Staff Role
+                                            <span class="text-muted fw-normal">(optional - enables auto-routing)</span>
+                                        </label>
+                                        <select name="default_role_id" class="form-select" style="border-radius:10px;">
+                                            <option value="0">- No auto-routing (admin assigns manually) -</option>
+                                            <?php foreach ($staffRoles as $role): ?>
+                                                <option value="<?= $role['role_id'] ?>">
+                                                    <?= htmlspecialchars($role['role_name']) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold small">
+                                            Level 2 Escalation Role
+                                            <span class="text-muted fw-normal">(who Level 1 staff escalate to)</span>
+                                        </label>
+                                        <select name="level2_role_id" class="form-select" style="border-radius:10px;">
+                                            <option value="0">- No Level 2 escalation -</option>
+                                            <?php foreach ($staffRoles as $role): ?>
+                                                <option value="<?= $role['role_id'] ?>">
+                                                    <?= htmlspecialchars($role['role_name']) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label fw-bold small">
@@ -419,18 +436,6 @@ $staffRoles = $admin->getAllStaffRoles();
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold small">
-                                        Default Priority
-                                        <span class="text-muted fw-normal">(used when a complaint in this category is
-                                            auto-routed)</span>
-                                    </label>
-                                    <select name="default_priority" class="form-select" style="border-radius:10px;">
-                                        <option value="low">Low</option>
-                                        <option value="medium" selected>Medium</option>
-                                        <option value="high">High</option>
-                                    </select>
-                                </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="submit" name="add_category" class="btn btn-primary fw-bold">
@@ -445,7 +450,7 @@ $staffRoles = $admin->getAllStaffRoles();
 
             <!-- Edit Category Modal -->
             <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-dialog modal-lg modal-dialog-centered">
                     <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
                         <div class="modal-header text-white"
                             style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
@@ -468,102 +473,109 @@ $staffRoles = $admin->getAllStaffRoles();
                                 <div class="mb-3">
                                     <label class="form-label fw-bold small">Description</label>
                                     <textarea name="category_description" id="edit_cat_desc"
-                                        class="form-control shadow-sm" rows="3" style="border-radius: 10px;"></textarea>
+                                        class="form-control shadow-sm" rows="2" style="border-radius: 10px;"></textarea>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold small">
-                                        Default Department
-                                        <span class="text-muted fw-normal">(optional)</span>
-                                    </label>
-                                    <select name="auto_assign_department_id" id="edit_cat_dept" class="form-select"
-                                        style="border-radius:10px;">
-                                        <option value="0">- No default department -</option>
-                                        <?php foreach ($departments as $dept): ?>
-                                            <option value="<?= $dept['department_id'] ?>">
-                                                <?= htmlspecialchars($dept['department_name']) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold small">
+                                            Default Department
+                                            <span class="text-muted fw-normal">(optional)</span>
+                                        </label>
+                                        <select name="auto_assign_department_id" id="edit_cat_dept" class="form-select"
+                                            style="border-radius:10px;">
+                                            <option value="0">- No default department -</option>
+                                            <?php foreach ($departments as $dept): ?>
+                                                <option value="<?= $dept['department_id'] ?>">
+                                                    <?= htmlspecialchars($dept['department_name']) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold small">
+                                            Default Priority
+                                            <span class="text-muted fw-normal">(used when auto-routed)</span>
+                                        </label>
+                                        <select name="default_priority" id="edit_cat_priority" class="form-select"
+                                            style="border-radius:10px;">
+                                            <option value="low">Low</option>
+                                            <option value="medium">Medium</option>
+                                            <option value="high">High</option>
+                                        </select>
+                                    </div>
                                 </div>
-                                <div class="mb-3 form-check">
-                                    <input type="checkbox" class="form-check-input" name="requires_department_selection"
-                                        id="edit_cat_requires_dept" value="1">
-                                    <label class="form-check-label fw-bold small" for="edit_cat_requires_dept">
-                                        Requires student to pick a department at submission
-                                    </label>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" name="requires_department_selection"
+                                            id="edit_cat_requires_dept" value="1">
+                                        <label class="form-check-label fw-bold small" for="edit_cat_requires_dept">
+                                            Requires student to pick a department at submission
+                                        </label>
+                                    </div>
+                                    <div class="col-md-6 mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" name="leader_endorsable"
+                                            id="edit_cat_leader_endorsable" value="1">
+                                        <label class="form-check-label fw-bold small" for="edit_cat_leader_endorsable">
+                                            Can be endorsed by student leaders
+                                        </label>
+                                    </div>
                                 </div>
-                                <div class="mb-3 form-check">
-                                    <input type="checkbox" class="form-check-input" name="leader_endorsable"
-                                        id="edit_cat_leader_endorsable" value="1">
-                                    <label class="form-check-label fw-bold small" for="edit_cat_leader_endorsable">
-                                        Can be endorsed by student leaders
-                                    </label>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold small">
+                                            Default Staff Role
+                                            <span class="text-muted fw-normal">(optional - enables auto-routing)</span>
+                                        </label>
+                                        <select name="default_role_id" id="edit_cat_role" class="form-select"
+                                            style="border-radius:10px;">
+                                            <option value="0">- No auto-routing (admin assigns manually) -</option>
+                                            <?php foreach ($staffRoles as $role): ?>
+                                                <option value="<?= $role['role_id'] ?>">
+                                                    <?= htmlspecialchars($role['role_name']) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold small">
+                                            Level 2 Escalation Role
+                                            <span class="text-muted fw-normal">(who Level 1 staff escalate to)</span>
+                                        </label>
+                                        <select name="level2_role_id" id="edit_cat_level2_role" class="form-select"
+                                            style="border-radius:10px;">
+                                            <option value="0">- No Level 2 escalation -</option>
+                                            <?php foreach ($staffRoles as $role): ?>
+                                                <option value="<?= $role['role_id'] ?>">
+                                                    <?= htmlspecialchars($role['role_name']) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold small">
-                                        Default Staff Role
-                                        <span class="text-muted fw-normal">(optional - enables auto-routing)</span>
-                                    </label>
-                                    <select name="default_role_id" id="edit_cat_role" class="form-select"
-                                        style="border-radius:10px;">
-                                        <option value="0">- No auto-routing (admin assigns manually) -</option>
-                                        <?php foreach ($staffRoles as $role): ?>
-                                            <option value="<?= $role['role_id'] ?>">
-                                                <?= htmlspecialchars($role['role_name']) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold small">
-                                        Level 2 Escalation Role
-                                        <span class="text-muted fw-normal">(who Level 1 staff escalate to)</span>
-                                    </label>
-                                    <select name="level2_role_id" id="edit_cat_level2_role" class="form-select"
-                                        style="border-radius:10px;">
-                                        <option value="0">- No Level 2 escalation -</option>
-                                        <?php foreach ($staffRoles as $role): ?>
-                                            <option value="<?= $role['role_id'] ?>">
-                                                <?= htmlspecialchars($role['role_name']) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold small">
-                                        Level 3 Escalation Role
-                                        <span class="text-muted fw-normal">(final escalation tier, e.g. Dean of
-                                            Students)</span>
-                                    </label>
-                                    <select name="level3_role_id" id="edit_cat_level3_role" class="form-select"
-                                        style="border-radius:10px;">
-                                        <option value="0">- No Level 3 escalation -</option>
-                                        <?php foreach ($staffRoles as $role): ?>
-                                            <option value="<?= $role['role_id'] ?>">
-                                                <?= htmlspecialchars($role['role_name']) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold small">
-                                        Default Priority
-                                        <span class="text-muted fw-normal">(used when a complaint in this category is
-                                            auto-routed)</span>
-                                    </label>
-                                    <select name="default_priority" id="edit_cat_priority" class="form-select"
-                                        style="border-radius:10px;">
-                                        <option value="low">Low</option>
-                                        <option value="medium">Medium</option>
-                                        <option value="high">High</option>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold small">Status</label>
-                                    <select name="status" id="edit_cat_status" class="form-select">
-                                        <option value="active">Active</option>
-                                        <option value="inactive">Inactive</option>
-                                    </select>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold small">
+                                            Level 3 Escalation Role
+                                            <span class="text-muted fw-normal">(final escalation tier, e.g. Dean of
+                                                Students)</span>
+                                        </label>
+                                        <select name="level3_role_id" id="edit_cat_level3_role" class="form-select"
+                                            style="border-radius:10px;">
+                                            <option value="0">- No Level 3 escalation -</option>
+                                            <?php foreach ($staffRoles as $role): ?>
+                                                <option value="<?= $role['role_id'] ?>">
+                                                    <?= htmlspecialchars($role['role_name']) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label fw-bold small">Status</label>
+                                        <select name="status" id="edit_cat_status" class="form-select">
+                                            <option value="active">Active</option>
+                                            <option value="inactive">Inactive</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                             <div class="modal-footer">
