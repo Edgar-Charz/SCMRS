@@ -389,7 +389,7 @@ class Student extends User
         $types  = "i";
         $params = [$studentId];
 
-        $validStatuses = ['pending', 'in_progress', 'resolved', 'rejected', 'awaiting_student_response'];
+        $validStatuses = ['pending', 'in_progress', 'resolved', 'rejected', 'awaiting_student_response', 'reopened'];
         if ($filter !== 'all' && in_array($filter, $validStatuses)) {
             $where   .= " AND c.complaint_status = ?";
             $types   .= "s";
@@ -403,7 +403,7 @@ class Student extends User
                 LEFT JOIN departments d ON c.department_id = d.department_id
                 LEFT JOIN complaint_categories cc ON c.category_id = cc.category_id
                 $where
-                ORDER BY FIELD(c.complaint_status, 'awaiting_student_response', 'pending', 'in_progress', 'resolved', 'rejected'),
+                ORDER BY FIELD(c.complaint_status, 'awaiting_student_response', 'reopened', 'pending', 'in_progress', 'resolved', 'rejected'),
                          c.created_at DESC";
 
         $stmt = $this->conn->prepare($sql);
@@ -433,7 +433,7 @@ class Student extends User
             $counts[$row['complaint_status']] = (int) $row['cnt'];
             $counts['all'] += (int) $row['cnt'];
         }
-        foreach (['awaiting_student_response', 'pending', 'in_progress', 'resolved', 'rejected'] as $s) {
+        foreach (['awaiting_student_response', 'pending', 'in_progress', 'resolved', 'rejected', 'reopened'] as $s) {
             $counts[$s] = $counts[$s] ?? 0;
         }
 

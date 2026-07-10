@@ -120,11 +120,28 @@ class ComplaintRouter
 
     // Picks an approved, active staff member holding the given role, scoped to the
     // given department when one is supplied and the role is department-scoped.
+    // If the role is department-scoped but nobody holds it in that department, falls
+    // back to a university-wide holder of the same role (no department tied to them).
     // Ties are broken by whoever currently has the fewest active assignments.
     public function findLeastLoadedStaff($roleId, $departmentId)
     {
-        $departmentId = $this->scopedDepartmentId($roleId, $departmentId);
+        $scopedDeptId = $this->scopedDepartmentId($roleId, $departmentId);
 
+        if ($scopedDeptId === null) {
+            return $this->queryLeastLoadedStaff($roleId, '1=1');
+        }
+
+        $staffId = $this->queryLeastLoadedStaff($roleId, 's.staff_department_id = ?', $scopedDeptId);
+        if ($staffId) {
+            return $staffId;
+        }
+
+        // No department-local holder of this role - fall back to a university-wide holder.
+        return $this->queryLeastLoadedStaff($roleId, 's.staff_department_id IS NULL');
+    }
+
+    private function queryLeastLoadedStaff($roleId, string $deptCondition, $deptParam = null)
+    {
         $stmt = $this->conn->prepare(
             "SELECT s.staff_id
              FROM staffs s
@@ -134,12 +151,16 @@ class ComplaintRouter
              WHERE s.staff_role_id = ?
                AND s.staff_approval_status = 1
                AND u.user_status = 'active'
-               AND (? IS NULL OR s.staff_department_id = ?)
+               AND $deptCondition
              GROUP BY s.staff_id
              ORDER BY COUNT(ca.assignment_id) ASC
              LIMIT 1"
         );
-        $stmt->bind_param('iii', $roleId, $departmentId, $departmentId);
+        if ($deptParam !== null) {
+            $stmt->bind_param('ii', $roleId, $deptParam);
+        } else {
+            $stmt->bind_param('i', $roleId);
+        }
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();

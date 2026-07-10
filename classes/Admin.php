@@ -1205,11 +1205,25 @@ class Admin extends User
         return $ok;
     }
 
-    public function assignStaffRole($staffUserId, $roleId)
+    public function assignStaffRole($staffUserId, $roleId, $departmentId = null)
     {
-        $stmt = $this->conn->prepare("UPDATE staffs SET staff_role_id = ? WHERE staff_user_id = ?");
         $roleVal = $roleId ?: null;
-        $stmt->bind_param("ii", $roleVal, $staffUserId);
+        $deptVal = $departmentId ?: null;
+
+        // University-wide roles (is_department_scoped = 0) never have a department
+        if ($roleVal !== null) {
+            $roleStmt = $this->conn->prepare("SELECT is_department_scoped FROM staff_roles WHERE role_id = ?");
+            $roleStmt->bind_param("i", $roleVal);
+            $roleStmt->execute();
+            $roleRow = $roleStmt->get_result()->fetch_assoc();
+            $roleStmt->close();
+            if ($roleRow && !$roleRow['is_department_scoped']) {
+                $deptVal = null;
+            }
+        }
+
+        $stmt = $this->conn->prepare("UPDATE staffs SET staff_role_id = ?, staff_department_id = ? WHERE staff_user_id = ?");
+        $stmt->bind_param("iii", $roleVal, $deptVal, $staffUserId);
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;
@@ -1322,6 +1336,121 @@ class Admin extends User
         }
 
         return array_values($tiers);
+    }
+
+    // Resolves a single Level 1/2/3 escalation slot to its role + current
+    // holder(s). Department-scoped roles (e.g. Head of Department) are
+    // filtered to $departmentId; university-wide roles (e.g. Principal, Dean
+    // of Students) are collected once into $universityWide instead, since
+    // they aren't tied to any one department.
+    private function buildEscalationLevelRow($router, $roleId, $departmentId, array &$universityWide, $label = null)
+    {
+        if (!$roleId) {
+            return ['configured' => false, 'label' => $label];
+        }
+
+        $roleStmt = $this->conn->prepare("SELECT role_name, is_department_scoped FROM staff_roles WHERE role_id = ?");
+        $roleStmt->bind_param('i', $roleId);
+        $roleStmt->execute();
+        $roleInfo = $roleStmt->get_result()->fetch_assoc();
+        $roleStmt->close();
+
+        $roleName = $roleInfo['role_name'] ?? 'Unknown Role';
+        $isDeptScoped = $roleInfo ? (bool) $roleInfo['is_department_scoped'] : true;
+
+        if (!$isDeptScoped) {
+            if (!isset($universityWide[$roleId])) {
+                $universityWide[$roleId] = [
+                    'role_id' => $roleId,
+                    'role_name' => $roleName,
+                    'staff' => $router->getStaffForRole($roleId, null),
+                ];
+            }
+            return [
+                'configured' => true,
+                'label' => $label,
+                'role_id' => $roleId,
+                'role_name' => $roleName,
+                'is_department_scoped' => false,
+                'staff' => null,
+            ];
+        }
+
+        return [
+            'configured' => true,
+            'label' => $label,
+            'role_id' => $roleId,
+            'role_name' => $roleName,
+            'is_department_scoped' => true,
+            'staff' => $router->getStaffForRole($roleId, $departmentId),
+        ];
+    }
+
+    // For a given department, resolves what the complaint escalation matrix
+    // actually looks like right now: for every active category, who holds
+    // Level 1 (per subcategory), Level 2 and Level 3. University-wide roles
+    // are pulled out into their own bucket so they're shown once rather than
+    // repeated under every category that references them.
+    public function getEscalationPathForDepartment($departmentId)
+    {
+        require_once __DIR__ . '/ComplaintRouter.php';
+        $router = new ComplaintRouter($this->conn);
+
+        $catStmt = $this->conn->prepare(
+            "SELECT category_id, category_name, default_role_id, level2_role_id, level3_role_id
+             FROM complaint_categories
+             WHERE status = 'active'
+             ORDER BY category_name ASC"
+        );
+        $catStmt->execute();
+        $categories = $catStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $catStmt->close();
+
+        $subStmt = $this->conn->prepare(
+            "SELECT subcategory_id, category_id, subcategory_name, default_role_id
+             FROM complaint_subcategories
+             WHERE status = 'active'
+             ORDER BY subcategory_name ASC"
+        );
+        $subStmt->execute();
+        $subsByCategory = [];
+        foreach ($subStmt->get_result()->fetch_all(MYSQLI_ASSOC) as $sub) {
+            $subsByCategory[(int) $sub['category_id']][] = $sub;
+        }
+        $subStmt->close();
+
+        $universityWide = [];
+        $result = [];
+
+        foreach ($categories as $cat) {
+            $categoryId = (int) $cat['category_id'];
+            $subs = $subsByCategory[$categoryId] ?? [];
+            $level1Rows = [];
+
+            if (!empty($subs)) {
+                foreach ($subs as $sub) {
+                    $subRoleId = $sub['default_role_id'] ? (int) $sub['default_role_id'] : null;
+                    $roleId = $subRoleId ?: ($cat['default_role_id'] ? (int) $cat['default_role_id'] : null);
+                    $level1Rows[] = $this->buildEscalationLevelRow($router, $roleId, $departmentId, $universityWide, $sub['subcategory_name']);
+                }
+            } else {
+                $roleId = $cat['default_role_id'] ? (int) $cat['default_role_id'] : null;
+                $level1Rows[] = $this->buildEscalationLevelRow($router, $roleId, $departmentId, $universityWide, null);
+            }
+
+            $result[] = [
+                'category_id' => $categoryId,
+                'category_name' => $cat['category_name'],
+                'level1' => $level1Rows,
+                'level2' => $this->buildEscalationLevelRow($router, $cat['level2_role_id'] ? (int) $cat['level2_role_id'] : null, $departmentId, $universityWide, null),
+                'level3' => $this->buildEscalationLevelRow($router, $cat['level3_role_id'] ? (int) $cat['level3_role_id'] : null, $departmentId, $universityWide, null),
+            ];
+        }
+
+        return [
+            'categories' => $result,
+            'university_wide' => array_values($universityWide),
+        ];
     }
 
     // Categories CRUD
