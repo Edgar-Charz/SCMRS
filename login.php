@@ -36,7 +36,8 @@ if (isset($_POST["loginBTN"])) {
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = "Invalid email format";
     } elseif ($user->isIpRateLimited($clientIp)) {
-        $error = "Too many failed login attempts from your IP. Please try again in 15 minutes.";
+        $ipWindow = $branding['ip_rate_limit_window_minutes'] ?? 15;
+        $error = "Too many failed login attempts from your IP. Please try again in {$ipWindow} minutes.";
     } else {
         $result = $user->userLogin($email, $password);
 

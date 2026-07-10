@@ -4,11 +4,13 @@ require_once 'config/session.php';
 require_once "config/Database.php";
 require_once "classes/User.php";
 require_once "classes/Mailer.php";
+require_once "classes/Settings.php";
 require_once "includes/csrf.php";
 
 $db = new Database();
 $conn = $db->connect();
 $user = new User($conn);
+$settingsSvc = new Settings($conn);
 
 $message = $error = "";
 
@@ -27,8 +29,10 @@ if (isset($_POST['submitBtn'])) {
             $scheme    = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
             $resetLink = "{$scheme}://{$_SERVER['SERVER_NAME']}/scmrs/reset_password.php?token=" . urlencode($token);
 
+            $validHours = $settingsSvc->getPasswordResetTokenHours();
+            $validText  = $validHours === 1 ? '1 hour' : "{$validHours} hours";
             $message_body = "You requested a password reset for your UDSM SCMRS account. "
-                . "Click the button below to set a new password. This link is valid for 1 hour. "
+                . "Click the button below to set a new password. This link is valid for {$validText}. "
                 . "If you did not request this, you can safely ignore this email.";
 
             $htmlBody = Mailer::buildBody(
