@@ -159,6 +159,14 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                                     <span class="badge btn-primary me-2"><?php echo $counts['rejected']; ?></span>
                                 </a>
                             </li>
+                            <li class="nav-item" role="presentation">
+                                <a href="track_complaints.php?filter=reopened"
+                                    class="nav-link <?php echo $filter === 'reopened' ? 'active' : ''; ?>"
+                                    data-filter="reopened">
+                                    <i class="fas fa-redo"></i> Reopened
+                                    <span class="badge btn-primary me-2"><?php echo $counts['reopened']; ?></span>
+                                </a>
+                            </li>
                         </ul>
                     </div>
                 </div>
@@ -202,6 +210,8 @@ $action_needed_count = $student->getPendingInfoRequestsCount($student_id);
                                         echo 'fa-user-check';
                                     elseif ($complaint_row['complaint_status'] === STATUS_RESOLVED)
                                         echo 'fa-check-circle';
+                                    elseif ($complaint_row['complaint_status'] === STATUS_REOPENED)
+                                        echo 'fa-redo';
                                     else
                                         echo 'fa-times-circle';
                                     ?>"></i>
