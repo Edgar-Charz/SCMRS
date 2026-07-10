@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/Notification.php';
+require_once __DIR__ . '/ComplaintRouter.php';
 
 class Staff
 {
@@ -180,9 +181,44 @@ class Staff
         return (int)($row['cnt'] ?? 0);
     }
 
-    // Get staff members eligible to receive an escalation (higher rank than the forwarding staff)
-    public function getStaffForEscalation($fromStaffId)
+    // Get staff members eligible to receive an escalation for this complaint.
+    // Prefers the complaint's category-defined escalation path (the Level 2/3
+    // role from complaint_categories); falls back to "any higher rank" when
+    // the category has no path configured.
+    public function getStaffForEscalation($complaintId, $fromStaffId)
     {
+        $cStmt = $this->conn->prepare(
+            "SELECT category_id, department_id, escalation_level FROM complaints WHERE complaint_id = ? LIMIT 1"
+        );
+        $cStmt->bind_param('i', $complaintId);
+        $cStmt->execute();
+        $complaint = $cStmt->get_result()->fetch_assoc();
+        $cStmt->close();
+
+        if (!$complaint) {
+            return [];
+        }
+
+        if ((int) $complaint['escalation_level'] >= 3) {
+            return [];
+        }
+
+        $targetLevel = min((int) $complaint['escalation_level'] + 1, 3);
+        $router = new ComplaintRouter($this->conn);
+        $roleId = $router->getCategoryEscalationRoleId((int) $complaint['category_id'], $targetLevel);
+
+        if ($roleId) {
+            $candidates = $router->getStaffForRole($roleId, $complaint['department_id']);
+            $eligible = [];
+            foreach ($candidates as $candidate) {
+                if ($candidate['staff_id'] !== $fromStaffId) {
+                    $eligible[] = $candidate;
+                }
+            }
+            return $eligible;
+        }
+
+        // No category escalation path configured - fall back to generic rank-based lookup.
         $sql = "SELECT u.user_id, u.username, s.staff_id, d.department_name,
                        sr.role_name, sr.role_rank
                 FROM staffs s
@@ -217,29 +253,58 @@ class Staff
 
             // Block if already resolved or rejected
             $statusStmt = $this->conn->prepare(
-                "SELECT complaint_status FROM complaints WHERE complaint_id = ? LIMIT 1"
+                "SELECT complaint_status, category_id, department_id, escalation_level FROM complaints WHERE complaint_id = ? LIMIT 1"
             );
             $statusStmt->bind_param('i', $complaintId);
             $statusStmt->execute();
-            $currentStatus = $statusStmt->get_result()->fetch_assoc()['complaint_status'] ?? '';
+            $complaintRow = $statusStmt->get_result()->fetch_assoc();
             $statusStmt->close();
+            $currentStatus = $complaintRow['complaint_status'] ?? '';
             if (in_array($currentStatus, [STATUS_RESOLVED, STATUS_REJECTED])) {
                 throw new Exception("Cannot escalate a complaint that is already $currentStatus.");
             }
 
-            // Verify destination staff has a higher rank
-            $rankSql = "SELECT
-                            (SELECT COALESCE(sr.role_rank, 0) FROM staffs s JOIN staff_roles sr ON s.staff_role_id = sr.role_id WHERE s.staff_id = ?) AS from_rank,
-                            (SELECT COALESCE(sr.role_rank, 0) FROM staffs s JOIN staff_roles sr ON s.staff_role_id = sr.role_id WHERE s.staff_id = ?) AS to_rank";
-            $rankStmt = $this->conn->prepare($rankSql);
-            $rankStmt->bind_param('ss', $fromStaffId, $toStaffId);
-            $rankStmt->execute();
-            $ranks = $rankStmt->get_result()->fetch_assoc();
-            $rankStmt->close();
-
-            if ((int) $ranks['to_rank'] <= (int) $ranks['from_rank']) {
-                throw new Exception("Can only escalate to a staff member of higher rank.");
+            $currentLevel = (int) ($complaintRow['escalation_level'] ?? 1);
+            if ($currentLevel >= 3) {
+                throw new Exception("This complaint is already at the highest escalation level.");
             }
+            $targetLevel = $currentLevel + 1;
+
+            $router = new ComplaintRouter($this->conn);
+            $pathRoleId = $router->getCategoryEscalationRoleId((int) $complaintRow['category_id'], $targetLevel);
+
+            if ($pathRoleId) {
+                // Category has a defined escalation path - destination must hold that exact role.
+                $roleStmt = $this->conn->prepare("SELECT staff_role_id FROM staffs WHERE staff_id = ?");
+                $roleStmt->bind_param('s', $toStaffId);
+                $roleStmt->execute();
+                $toRoleId = (int) ($roleStmt->get_result()->fetch_assoc()['staff_role_id'] ?? 0);
+                $roleStmt->close();
+
+                if ($toRoleId !== $pathRoleId) {
+                    throw new Exception("Can only escalate to the Level {$targetLevel} role designated for this complaint's category.");
+                }
+            } else {
+                // No category escalation path configured - fall back to rank comparison.
+                $rankSql = "SELECT
+                                (SELECT COALESCE(sr.role_rank, 0) FROM staffs s JOIN staff_roles sr ON s.staff_role_id = sr.role_id WHERE s.staff_id = ?) AS from_rank,
+                                (SELECT COALESCE(sr.role_rank, 0) FROM staffs s JOIN staff_roles sr ON s.staff_role_id = sr.role_id WHERE s.staff_id = ?) AS to_rank";
+                $rankStmt = $this->conn->prepare($rankSql);
+                $rankStmt->bind_param('ss', $fromStaffId, $toStaffId);
+                $rankStmt->execute();
+                $ranks = $rankStmt->get_result()->fetch_assoc();
+                $rankStmt->close();
+
+                if ((int) $ranks['to_rank'] <= (int) $ranks['from_rank']) {
+                    throw new Exception("Can only escalate to a staff member of higher rank.");
+                }
+            }
+
+            // Advance the complaint's escalation level
+            $levelStmt = $this->conn->prepare("UPDATE complaints SET escalation_level = ? WHERE complaint_id = ?");
+            $levelStmt->bind_param('ii', $targetLevel, $complaintId);
+            $levelStmt->execute();
+            $levelStmt->close();
 
             // Log the escalation
             $escStmt = $this->conn->prepare(
@@ -619,25 +684,48 @@ class Staff
                 );
             }
 
-            // Notify all staff who delegated this complaint downward
+            // Notify every staff member in this complaint's transfer chain (both
+            // those who escalated it upward and those who delegated it downward)
             if ($newStatus === STATUS_RESOLVED) {
-                $delStmt = $this->conn->prepare(
-                    "SELECT DISTINCT s.staff_user_id
+                $chainStmt = $this->conn->prepare(
+                    "SELECT DISTINCT s.staff_user_id, ce.type
                      FROM complaint_escalations ce
                      JOIN staffs s ON ce.from_staff_id = s.staff_id
-                     WHERE ce.complaint_id = ? AND ce.type = 'delegation'"
+                     WHERE ce.complaint_id = ?"
                 );
-                $delStmt->bind_param('i', $complaintId);
-                $delStmt->execute();
-                $delegators = $delStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-                $delStmt->close();
-                (new Notification($this->conn))->createBulk(
-                    array_column($delegators, 'staff_user_id'),
-                    "A complaint you delegated (#{$complaintId}) has been resolved.",
-                    'complaint_delegated_resolved',
-                    "assigned_complaint_details.php?id={$complaintId}",
-                    $complaintId
-                );
+                $chainStmt->bind_param('i', $complaintId);
+                $chainStmt->execute();
+                $chain = $chainStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                $chainStmt->close();
+
+                $escalators = [];
+                $delegators = [];
+                foreach ($chain as $link) {
+                    if ($link['type'] === 'delegation') {
+                        $delegators[] = $link['staff_user_id'];
+                    } else {
+                        $escalators[] = $link['staff_user_id'];
+                    }
+                }
+
+                if (!empty($escalators)) {
+                    (new Notification($this->conn))->createBulk(
+                        $escalators,
+                        "A complaint you escalated (#{$complaintId}) has been resolved.",
+                        'complaint_escalation_resolved',
+                        "assigned_complaint_details.php?id={$complaintId}",
+                        $complaintId
+                    );
+                }
+                if (!empty($delegators)) {
+                    (new Notification($this->conn))->createBulk(
+                        $delegators,
+                        "A complaint you delegated (#{$complaintId}) has been resolved.",
+                        'complaint_delegated_resolved',
+                        "assigned_complaint_details.php?id={$complaintId}",
+                        $complaintId
+                    );
+                }
             }
 
             // Notify leaders who endorsed this complaint (status only - they never see the resolution text)
@@ -681,9 +769,45 @@ class Staff
         return $cnt;
     }
 
-    // Get lower-ranked staff eligible to receive a delegation
-    public function getStaffForDelegation($fromStaffId)
+    // Get staff eligible to receive a delegation for this complaint - the role
+    // one level below the complaint's current escalation level, per the
+    // category's escalation path. Falls back to "any lower rank" when the
+    // category has no path configured.
+    public function getStaffForDelegation($complaintId, $fromStaffId)
     {
+        $cStmt = $this->conn->prepare(
+            "SELECT category_id, subcategory_id, department_id, escalation_level FROM complaints WHERE complaint_id = ? LIMIT 1"
+        );
+        $cStmt->bind_param('i', $complaintId);
+        $cStmt->execute();
+        $complaint = $cStmt->get_result()->fetch_assoc();
+        $cStmt->close();
+
+        if (!$complaint) {
+            return [];
+        }
+
+        $currentLevel = (int) $complaint['escalation_level'];
+        if ($currentLevel <= 1) {
+            return [];
+        }
+
+        $targetLevel = $currentLevel - 1;
+        $router = new ComplaintRouter($this->conn);
+        $roleId = $router->getRoleIdForLevel((int) $complaint['category_id'], $complaint['subcategory_id'], $targetLevel);
+
+        if ($roleId) {
+            $candidates = $router->getStaffForRole($roleId, $complaint['department_id']);
+            $eligible = [];
+            foreach ($candidates as $candidate) {
+                if ($candidate['staff_id'] !== $fromStaffId) {
+                    $eligible[] = $candidate;
+                }
+            }
+            return $eligible;
+        }
+
+        // No category path configured - fall back to generic rank-based lookup.
         $sql = "SELECT u.user_id, u.username, s.staff_id, d.department_name,
                        sr.role_name, sr.role_rank
                 FROM staffs s
@@ -707,7 +831,8 @@ class Staff
         return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     }
 
-    // Delegate a complaint downward to a lower-ranked staff member
+    // Delegate a complaint downward, one level per the category's escalation
+    // path (mirrors forwardComplaint's upward logic in reverse).
     public function delegateComplaint($complaintId, $fromStaffId, $toStaffId, $delegatedByUserId, $reason)
     {
         try {
@@ -715,29 +840,58 @@ class Staff
 
             // Block if already resolved or rejected
             $statusStmt = $this->conn->prepare(
-                "SELECT complaint_status FROM complaints WHERE complaint_id = ? LIMIT 1"
+                "SELECT complaint_status, category_id, subcategory_id, escalation_level FROM complaints WHERE complaint_id = ? LIMIT 1"
             );
             $statusStmt->bind_param('i', $complaintId);
             $statusStmt->execute();
-            $currentStatus = $statusStmt->get_result()->fetch_assoc()['complaint_status'] ?? '';
+            $complaintRow = $statusStmt->get_result()->fetch_assoc();
             $statusStmt->close();
+            $currentStatus = $complaintRow['complaint_status'] ?? '';
             if (in_array($currentStatus, [STATUS_RESOLVED, STATUS_REJECTED])) {
                 throw new Exception("Cannot delegate a complaint that is already $currentStatus.");
             }
 
-            // Verify destination staff has a lower rank
-            $rankSql = "SELECT
-                            (SELECT COALESCE(sr.role_rank, 0) FROM staffs s JOIN staff_roles sr ON s.staff_role_id = sr.role_id WHERE s.staff_id = ?) AS from_rank,
-                            (SELECT COALESCE(sr.role_rank, 0) FROM staffs s JOIN staff_roles sr ON s.staff_role_id = sr.role_id WHERE s.staff_id = ?) AS to_rank";
-            $rankStmt = $this->conn->prepare($rankSql);
-            $rankStmt->bind_param('ss', $fromStaffId, $toStaffId);
-            $rankStmt->execute();
-            $ranks = $rankStmt->get_result()->fetch_assoc();
-            $rankStmt->close();
-
-            if ((int) $ranks['to_rank'] >= (int) $ranks['from_rank']) {
-                throw new Exception("Can only delegate to a staff member of lower rank.");
+            $currentLevel = (int) ($complaintRow['escalation_level'] ?? 1);
+            if ($currentLevel <= 1) {
+                throw new Exception("This complaint is already at Level 1 - it cannot be delegated further down.");
             }
+            $targetLevel = $currentLevel - 1;
+
+            $router = new ComplaintRouter($this->conn);
+            $pathRoleId = $router->getRoleIdForLevel((int) $complaintRow['category_id'], $complaintRow['subcategory_id'], $targetLevel);
+
+            if ($pathRoleId) {
+                // Category has a defined escalation path - destination must hold that exact role.
+                $roleStmt = $this->conn->prepare("SELECT staff_role_id FROM staffs WHERE staff_id = ?");
+                $roleStmt->bind_param('s', $toStaffId);
+                $roleStmt->execute();
+                $toRoleId = (int) ($roleStmt->get_result()->fetch_assoc()['staff_role_id'] ?? 0);
+                $roleStmt->close();
+
+                if ($toRoleId !== $pathRoleId) {
+                    throw new Exception("Can only delegate to the Level {$targetLevel} role designated for this complaint's category.");
+                }
+            } else {
+                // No category path configured - fall back to rank comparison.
+                $rankSql = "SELECT
+                                (SELECT COALESCE(sr.role_rank, 0) FROM staffs s JOIN staff_roles sr ON s.staff_role_id = sr.role_id WHERE s.staff_id = ?) AS from_rank,
+                                (SELECT COALESCE(sr.role_rank, 0) FROM staffs s JOIN staff_roles sr ON s.staff_role_id = sr.role_id WHERE s.staff_id = ?) AS to_rank";
+                $rankStmt = $this->conn->prepare($rankSql);
+                $rankStmt->bind_param('ss', $fromStaffId, $toStaffId);
+                $rankStmt->execute();
+                $ranks = $rankStmt->get_result()->fetch_assoc();
+                $rankStmt->close();
+
+                if ((int) $ranks['to_rank'] >= (int) $ranks['from_rank']) {
+                    throw new Exception("Can only delegate to a staff member of lower rank.");
+                }
+            }
+
+            // Step the complaint's escalation level back down
+            $levelStmt = $this->conn->prepare("UPDATE complaints SET escalation_level = ? WHERE complaint_id = ?");
+            $levelStmt->bind_param('ii', $targetLevel, $complaintId);
+            $levelStmt->execute();
+            $levelStmt->close();
 
             // Log the delegation
             $escStmt = $this->conn->prepare(

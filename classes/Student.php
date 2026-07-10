@@ -271,7 +271,7 @@ class Student extends User
     {
         // Verify ownership, status and 7-day window
         $stmt = $this->conn->prepare(
-            "SELECT complaint_status, updated_at
+            "SELECT complaint_status, updated_at, category_id, department_id, escalation_level
              FROM complaints
              WHERE complaint_id = ? AND student_id = ?"
         );
@@ -307,9 +307,9 @@ class Student extends User
         $stmt->execute();
         $stmt->close();
 
-        // Look up the active lead staff via complaint_assignments
+        // Look up the current active lead assignment
         $stmt = $this->conn->prepare(
-            "SELECT sf.staff_user_id
+            "SELECT ca.staff_id, sf.staff_user_id
              FROM complaint_assignments ca
              JOIN staffs sf ON ca.staff_id = sf.staff_id
              WHERE ca.complaint_id = ? AND ca.status = 'active' AND ca.is_lead = 1
@@ -317,9 +317,69 @@ class Student extends User
         );
         $stmt->bind_param("i", $complaintId);
         $stmt->execute();
-        $staffRow = $stmt->get_result()->fetch_assoc();
+        $currentAssignment = $stmt->get_result()->fetch_assoc();
         $stmt->close();
-        return $staffRow['staff_user_id'] ?? null;
+
+        // A reopened complaint escalates to the next level per the category's
+        // escalation path (never back to the same staff who resolved it),
+        // unless it's already at the top or the category has no path defined.
+        $currentLevel = (int) $row['escalation_level'];
+        if ($currentLevel < 3) {
+            require_once __DIR__ . '/ComplaintRouter.php';
+            $router = new ComplaintRouter($this->conn);
+            $targetLevel = $currentLevel + 1;
+            $roleId = $router->getCategoryEscalationRoleId((int) $row['category_id'], $targetLevel);
+
+            if ($roleId) {
+                $nextStaffId = $router->findLeastLoadedStaff($roleId, $row['department_id']);
+
+                if ($nextStaffId) {
+                    if ($currentAssignment) {
+                        $fwdStmt = $this->conn->prepare(
+                            "UPDATE complaint_assignments SET status = 'forwarded', completed_at = NOW()
+                             WHERE complaint_id = ? AND staff_id = ? AND status = 'active'"
+                        );
+                        $fwdStmt->bind_param("is", $complaintId, $currentAssignment['staff_id']);
+                        $fwdStmt->execute();
+                        $fwdStmt->close();
+                    }
+
+                    $newAssignStmt = $this->conn->prepare(
+                        "INSERT INTO complaint_assignments (complaint_id, staff_id, assigned_by, is_lead, status, notes)
+                         VALUES (?, ?, ?, 1, 'active', 'Auto-escalated: complaint reopened by student.')"
+                    );
+                    $newAssignStmt->bind_param("isi", $complaintId, $nextStaffId, $userId);
+                    $newAssignStmt->execute();
+                    $newAssignStmt->close();
+
+                    $escStmt = $this->conn->prepare(
+                        "INSERT INTO complaint_escalations (complaint_id, from_staff_id, to_staff_id, forwarded_by, reason, status)
+                         VALUES (?, ?, ?, ?, 'Student reopened the complaint after resolution.', 'pending')"
+                    );
+                    $fromStaffId = $currentAssignment['staff_id'] ?? '';
+                    $escStmt->bind_param("issi", $complaintId, $fromStaffId, $nextStaffId, $userId);
+                    $escStmt->execute();
+                    $escStmt->close();
+
+                    $levelStmt = $this->conn->prepare("UPDATE complaints SET escalation_level = ? WHERE complaint_id = ?");
+                    $levelStmt->bind_param("ii", $targetLevel, $complaintId);
+                    $levelStmt->execute();
+                    $levelStmt->close();
+
+                    $nextUserStmt = $this->conn->prepare("SELECT staff_user_id FROM staffs WHERE staff_id = ? LIMIT 1");
+                    $nextUserStmt->bind_param("s", $nextStaffId);
+                    $nextUserStmt->execute();
+                    $nextUser = $nextUserStmt->get_result()->fetch_assoc();
+                    $nextUserStmt->close();
+
+                    return $nextUser['staff_user_id'] ?? null;
+                }
+            }
+        }
+
+        // No escalation path available (already at top level, or category has none
+        // configured) - keep the current lead staff informed of the reopening.
+        return $currentAssignment['staff_user_id'] ?? null;
     }
 
     // Get filtered complaints with status tabs support

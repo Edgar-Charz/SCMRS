@@ -1134,11 +1134,11 @@ class Admin extends User
     public function getAllStaffRolesWithCount()
     {
         $stmt = $this->conn->prepare(
-            "SELECT sr.role_id, sr.role_name, sr.role_rank,
+            "SELECT sr.role_id, sr.role_name, sr.role_rank, sr.is_department_scoped,
                     COUNT(s.staff_id) AS staff_count
                  FROM staff_roles sr
                  LEFT JOIN staffs s ON sr.role_id = s.staff_role_id
-                 GROUP BY sr.role_id, sr.role_name, sr.role_rank
+                 GROUP BY sr.role_id, sr.role_name, sr.role_rank, sr.is_department_scoped
                  ORDER BY sr.role_rank ASC"
         );
         $stmt->execute();
@@ -1152,7 +1152,7 @@ class Admin extends User
     // and "Academic Officer" who both report to the same Head, but neither
     // escalates to the other). Only the exact same name+rank pair is rejected
     // as a redundant duplicate.
-    public function addStaffRole($name, $rank)
+    public function addStaffRole($name, $rank, $isDepartmentScoped = 1)
     {
         $chk = $this->conn->prepare("SELECT role_id FROM staff_roles WHERE role_rank = ? AND LOWER(role_name) = LOWER(?)");
         $chk->bind_param("is", $rank, $name);
@@ -1162,14 +1162,15 @@ class Admin extends User
             throw new Exception("A role named '{$name}' at rank {$rank} already exists.");
         }
         $chk->close();
-        $stmt = $this->conn->prepare("INSERT INTO staff_roles (role_name, role_rank) VALUES (?, ?)");
-        $stmt->bind_param("si", $name, $rank);
+        $scoped = $isDepartmentScoped ? 1 : 0;
+        $stmt = $this->conn->prepare("INSERT INTO staff_roles (role_name, role_rank, is_department_scoped) VALUES (?, ?, ?)");
+        $stmt->bind_param("sii", $name, $rank, $scoped);
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;
     }
 
-    public function updateStaffRole($id, $name, $rank)
+    public function updateStaffRole($id, $name, $rank, $isDepartmentScoped = 1)
     {
         $chk = $this->conn->prepare("SELECT role_id FROM staff_roles WHERE role_rank = ? AND LOWER(role_name) = LOWER(?) AND role_id != ?");
         $chk->bind_param("isi", $rank, $name, $id);
@@ -1179,8 +1180,9 @@ class Admin extends User
             throw new Exception("A role named '{$name}' at rank {$rank} already exists.");
         }
         $chk->close();
-        $stmt = $this->conn->prepare("UPDATE staff_roles SET role_name = ?, role_rank = ? WHERE role_id = ?");
-        $stmt->bind_param("sii", $name, $rank, $id);
+        $scoped = $isDepartmentScoped ? 1 : 0;
+        $stmt = $this->conn->prepare("UPDATE staff_roles SET role_name = ?, role_rank = ?, is_department_scoped = ? WHERE role_id = ?");
+        $stmt->bind_param("siii", $name, $rank, $scoped, $id);
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;
@@ -1328,15 +1330,20 @@ class Admin extends User
     {
         $stmt = $this->conn->prepare(
             "SELECT cc.category_id, cc.category_name, cc.category_description, cc.status,
-                    cc.requires_department_selection, cc.leader_endorsable, cc.auto_assign_department_id, cc.default_role_id, cc.default_priority,
+                    cc.requires_department_selection, cc.leader_endorsable, cc.auto_assign_department_id,
+                    cc.default_role_id, cc.level2_role_id, cc.level3_role_id, cc.default_priority,
                     d.department_name AS default_dept_name,
                     sr.role_name AS default_role_name,
+                    sr2.role_name AS level2_role_name,
+                    sr3.role_name AS level3_role_name,
                     COUNT(c.complaint_id) AS complaint_count
                  FROM complaint_categories cc
                  LEFT JOIN complaints c ON cc.category_id = c.category_id
                  LEFT JOIN departments d ON cc.auto_assign_department_id = d.department_id
                  LEFT JOIN staff_roles sr ON cc.default_role_id = sr.role_id
-                 GROUP BY cc.category_id, d.department_name, sr.role_name
+                 LEFT JOIN staff_roles sr2 ON cc.level2_role_id = sr2.role_id
+                 LEFT JOIN staff_roles sr3 ON cc.level3_role_id = sr3.role_id
+                 GROUP BY cc.category_id, d.department_name, sr.role_name, sr2.role_name, sr3.role_name
                  ORDER BY cc.category_name ASC"
         );
         $stmt->execute();
@@ -1345,28 +1352,32 @@ class Admin extends User
         return $data;
     }
 
-    public function addCategory($name, $description, $createdBy, $departmentId = null, $requiresDeptSelection = 0, $defaultRoleId = null, $leaderEndorsable = 0, $defaultPriority = 'medium')
+    public function addCategory($name, $description, $createdBy, $departmentId = null, $requiresDeptSelection = 0, $defaultRoleId = null, $leaderEndorsable = 0, $defaultPriority = 'medium', $level2RoleId = null, $level3RoleId = null)
     {
         $deptId = ($departmentId > 0) ? (int) $departmentId : null;
         $roleId = ($defaultRoleId > 0) ? (int) $defaultRoleId : null;
+        $level2Id = ($level2RoleId > 0) ? (int) $level2RoleId : null;
+        $level3Id = ($level3RoleId > 0) ? (int) $level3RoleId : null;
         $reqDept = $requiresDeptSelection ? 1 : 0;
         $endorsable = $leaderEndorsable ? 1 : 0;
         $priority = in_array($defaultPriority, ['low', 'medium', 'high'], true) ? $defaultPriority : 'medium';
         $stmt = $this->conn->prepare(
             "INSERT INTO complaint_categories
-                (category_name, category_description, requires_department_selection, leader_endorsable, auto_assign_department_id, default_role_id, default_priority, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                (category_name, category_description, requires_department_selection, leader_endorsable, auto_assign_department_id, default_role_id, level2_role_id, level3_role_id, default_priority, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
-        $stmt->bind_param("ssiiiisi", $name, $description, $reqDept, $endorsable, $deptId, $roleId, $priority, $createdBy);
+        $stmt->bind_param("ssiiiiiisi", $name, $description, $reqDept, $endorsable, $deptId, $roleId, $level2Id, $level3Id, $priority, $createdBy);
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;
     }
 
-    public function updateCategory($id, $name, $description, $status, $departmentId = null, $requiresDeptSelection = 0, $defaultRoleId = null, $leaderEndorsable = 0, $defaultPriority = 'medium')
+    public function updateCategory($id, $name, $description, $status, $departmentId = null, $requiresDeptSelection = 0, $defaultRoleId = null, $leaderEndorsable = 0, $defaultPriority = 'medium', $level2RoleId = null, $level3RoleId = null)
     {
         $deptId = ($departmentId > 0) ? (int) $departmentId : null;
         $roleId = ($defaultRoleId > 0) ? (int) $defaultRoleId : null;
+        $level2Id = ($level2RoleId > 0) ? (int) $level2RoleId : null;
+        $level3Id = ($level3RoleId > 0) ? (int) $level3RoleId : null;
         $reqDept = $requiresDeptSelection ? 1 : 0;
         $endorsable = $leaderEndorsable ? 1 : 0;
         $priority = in_array($defaultPriority, ['low', 'medium', 'high'], true) ? $defaultPriority : 'medium';
@@ -1380,10 +1391,11 @@ class Admin extends User
         $stmt = $this->conn->prepare(
             "UPDATE complaint_categories
              SET category_name = ?, category_description = ?, status = ?,
-                 requires_department_selection = ?, leader_endorsable = ?, auto_assign_department_id = ?, default_role_id = ?, default_priority = ?
+                 requires_department_selection = ?, leader_endorsable = ?, auto_assign_department_id = ?,
+                 default_role_id = ?, level2_role_id = ?, level3_role_id = ?, default_priority = ?
              WHERE category_id = ?"
         );
-        $stmt->bind_param("sssiiiisi", $name, $description, $status, $reqDept, $endorsable, $deptId, $roleId, $priority, $id);
+        $stmt->bind_param("sssiiiiiisi", $name, $description, $status, $reqDept, $endorsable, $deptId, $roleId, $level2Id, $level3Id, $priority, $id);
         $ok = $stmt->execute();
         $stmt->close();
 
@@ -1621,9 +1633,7 @@ class Admin extends User
     // Reset any user's password without requiring their current password
     public function adminResetPassword($userId, $newPassword)
     {
-        if (strlen($newPassword) < 8) {
-            throw new Exception("Password must be at least 8 characters.");
-        }
+        (new Settings($this->conn))->validatePassword($newPassword);
         $hash = password_hash($newPassword, PASSWORD_DEFAULT);
         $stmt = $this->conn->prepare("UPDATE users SET user_password = ? WHERE user_id = ?");
         $stmt->bind_param("si", $hash, $userId);

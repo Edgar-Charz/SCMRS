@@ -8,7 +8,7 @@ $_sidebarBranding = (new Settings($conn))->get();
 <nav id="sidebar">
     <div class="sidebar-header d-flex align-items-center">
         <div class="logo-container me-2">
-            <img src="<?= htmlspecialchars($_sidebarBranding['institution_logo_path']) ?>" alt="<?= htmlspecialchars($_sidebarBranding['institution_name']) ?> Logo" class="img-fluid rounded circle"
+            <img src="<?= htmlspecialchars($_sidebarBranding['institution_logo_path']) ?>?v=<?= @filemtime(dirname(__DIR__) . '/' . $_sidebarBranding['institution_logo_path']) ?: 0 ?>" alt="<?= htmlspecialchars($_sidebarBranding['institution_name']) ?> Logo" class="img-fluid rounded circle"
                 style="width:45px; height:45px; object-fit:cover; border:2px solid var(--udsm-yellow);">
         </div>
         <div class="header-text">

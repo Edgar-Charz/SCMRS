@@ -24,9 +24,11 @@ class Notification
         'new_registration' => 'New Staff Registration Pending Approval',
         'complaint_delegated' => 'Complaint Delegated to You',
         'complaint_delegated_resolved' => 'Delegated Complaint Resolved',
+        'complaint_escalation_resolved' => 'Escalated Complaint Resolved',
         'complaint_overdue' => 'Complaint Past Resolution Deadline',
         'new_complaint_in_rep_scope' => 'New Complaint in Your Department',
         'endorsed_complaint_updated' => 'An Endorsed Complaint Has Been Updated',
+        'filed_on_behalf' => 'A Complaint Was Filed On Your Behalf',
     ];
 
     public function __construct($db)
@@ -269,10 +271,12 @@ class Notification
             'complaint_deleted' => 'fa-trash text-danger',
             'complaint_reopened' => 'fa-redo text-warning',
             'complaint_delegated_resolved' => 'fa-check-double text-success',
+            'complaint_escalation_resolved' => 'fa-check-double text-success',
             'complaint_delegated' => 'fa-level-down-alt text-info',
             'complaint_overdue' => 'fa-exclamation-triangle text-danger',
             'new_complaint_in_rep_scope' => 'fa-building text-primary',
             'endorsed_complaint_updated' => 'fa-thumbs-up text-success',
+            'filed_on_behalf' => 'fa-user-edit text-info',
             'system' => 'fa-shield-alt text-secondary',
             'password_reset_admin' => 'fa-key text-warning',
         ];

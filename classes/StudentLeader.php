@@ -261,15 +261,22 @@ class StudentLeader
         return $rows;
     }
 
-    // Notify all reps assigned to a department about a new complaint event
-    public function notifyLeadersInDepartment(int $deptId, string $message, string $type, ?string $link, int $complaintId): void
+    // Notify all reps assigned to a department about a new complaint event.
+    // $excludeUserId skips one leader (e.g. the leader who just filed the complaint themselves).
+    public function notifyLeadersInDepartment(int $deptId, string $message, string $type, ?string $link, int $complaintId, int $excludeUserId = 0): void
     {
         $stmt = $this->conn->prepare(
-            "SELECT user_id FROM student_rep_departments WHERE department_id = ?"
+            $excludeUserId > 0
+                ? "SELECT user_id FROM student_rep_departments WHERE department_id = ? AND user_id != ?"
+                : "SELECT user_id FROM student_rep_departments WHERE department_id = ?"
         );
         if (!$stmt)
             return;
-        $stmt->bind_param('i', $deptId);
+        if ($excludeUserId > 0) {
+            $stmt->bind_param('ii', $deptId, $excludeUserId);
+        } else {
+            $stmt->bind_param('i', $deptId);
+        }
         $stmt->execute();
         $leaders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
@@ -406,6 +413,24 @@ class StudentLeader
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
         return $row ? (int)$row['student_id'] : null;
+    }
+
+    // Look up a student's identity by student_id (for leaders filing complaints on behalf of others)
+    public function findStudentById(int $studentId): ?array
+    {
+        $stmt = $this->conn->prepare(
+            "SELECT s.student_id, s.student_user_id AS user_id, u.username, s.student_registration_number
+             FROM students s
+             JOIN users u ON u.user_id = s.student_user_id
+             WHERE s.student_id = ? AND u.user_status = 'active'
+             LIMIT 1"
+        );
+        if (!$stmt) return null;
+        $stmt->bind_param('i', $studentId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return $row ?: null;
     }
 
     // Get approved, active staff members for a given department

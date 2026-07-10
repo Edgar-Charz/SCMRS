@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/Settings.php';
+
 class Complaint
 {
     private $conn;
@@ -52,13 +54,15 @@ class Complaint
             $insertComplaintStmt->close();
 
             // Handle file attachments
-            $allowed_types = ['image/jpeg', 'image/png', 'application/pdf'];
-            $max_size = 5 * 1024 * 1024;
+            $settings = new Settings($this->conn);
+            $allowed_types = $settings->getAllowedAttachmentTypes();
+            $max_size = $settings->getMaxAttachmentSizeBytes();
 
             if (!empty($_FILES['attachments']['name'][0])) {
                 // Validate every file before moving any of them
                 $finfo = new finfo(FILEINFO_MIME_TYPE);
                 $rejected = [];
+                $max_size_mb = (int) round($max_size / (1024 * 1024));
                 foreach ($_FILES['attachments']['tmp_name'] as $key => $tmp_name) {
                     if ($_FILES['attachments']['error'][$key] !== UPLOAD_ERR_OK) {
                         $rejected[] = basename($_FILES['attachments']['name'][$key]) . ' (upload error)';
@@ -68,9 +72,9 @@ class Complaint
                     $file_size = $_FILES['attachments']['size'][$key];
                     $file_name = basename($_FILES['attachments']['name'][$key]);
                     if (!in_array($file_type, $allowed_types)) {
-                        $rejected[] = $file_name . ' (unsupported type - only JPEG, PNG, PDF allowed)';
+                        $rejected[] = $file_name . ' (unsupported file type)';
                     } elseif ($file_size > $max_size) {
-                        $rejected[] = $file_name . ' (exceeds 5 MB limit)';
+                        $rejected[] = $file_name . " (exceeds {$max_size_mb} MB limit)";
                     }
                 }
                 if (!empty($rejected)) {

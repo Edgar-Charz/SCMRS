@@ -63,6 +63,13 @@ class Mailer
         $fullUrl = $link ? rtrim($cfg['app_url'], '/') . '/' . ltrim($link, '/') : null;
         $year = date('Y');
         $institutionName = htmlspecialchars($cfg['institution_name']);
+        $recipientName = htmlspecialchars($recipientName);
+        $message = nl2br(htmlspecialchars($message));
+        $contactHtml = !empty($cfg['institution_contact_email'])
+            ? '<p style="margin:8px 0 0;font-size:12px;color:#999;">Need help? Contact
+                  <a href="mailto:' . htmlspecialchars($cfg['institution_contact_email']) . '" style="color:#001a52;">'
+                  . htmlspecialchars($cfg['institution_contact_email']) . '</a></p>'
+            : '';
 
         $buttonHtml = $fullUrl
             ? '<a href="' . htmlspecialchars($fullUrl) . '"
@@ -122,6 +129,7 @@ class Mailer
                                     This is an automated message from the {$institutionName} Student Complaint
                                     Management &amp; Reporting System. Please do not reply to this email.
                                 </p>
+                                {$contactHtml}
                                 <p style="margin:8px 0 0;font-size:12px;color:#bbb;">
                                     &copy; {$year} {$institutionName}
                                 </p>

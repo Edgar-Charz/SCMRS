@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/Settings.php';
+
 class User
 {
     private $conn;
@@ -39,25 +41,7 @@ class User
                 throw new Exception("Passwords do not match.");
             }
 
-            if (strlen($password) < 8) {
-                throw new Exception("Password must be at least 8 characters long.");
-            }
-
-            if (!preg_match('/[A-Z]/', $password)) {
-                throw new Exception("Password must contain at least one uppercase letter.");
-            }
-
-            if (!preg_match('/[a-z]/', $password)) {
-                throw new Exception("Password must contain at least one lowercase letter.");
-            }
-
-            if (!preg_match('/[0-9]/', $password)) {
-                throw new Exception("Password must contain at least one number.");
-            }
-
-            if (!preg_match('/[\W]/', $password)) {
-                throw new Exception("Password must contain at least one special character.");
-            }
+            (new Settings($this->conn))->validatePassword($password);
 
             // Check if email exists
             $email_check_stmt = $this->conn->prepare("SELECT user_id FROM users WHERE user_email = ?");
@@ -152,25 +136,7 @@ class User
                 throw new Exception("Passwords do not match.");
             }
 
-            if (strlen($password) < 8) {
-                throw new Exception("Password must be at least 8 characters long.");
-            }
-
-            if (!preg_match('/[A-Z]/', $password)) {
-                throw new Exception("Password must contain at least one uppercase letter.");
-            }
-
-            if (!preg_match('/[a-z]/', $password)) {
-                throw new Exception("Password must contain at least one lowercase letter.");
-            }
-
-            if (!preg_match('/[0-9]/', $password)) {
-                throw new Exception("Password must contain at least one number.");
-            }
-
-            if (!preg_match('/[\W]/', $password)) {
-                throw new Exception("Password must contain at least one special character.");
-            }
+            (new Settings($this->conn))->validatePassword($password);
 
             // Check if email exists
             $email_check_stmt = $this->conn->prepare("SELECT user_id FROM users WHERE user_email = ?");
@@ -233,6 +199,10 @@ class User
     {
 
         try {
+            $settings = (new Settings($this->conn))->get();
+            $maxAttempts = (int) ($settings['max_login_attempts'] ?? 3);
+            $lockoutSeconds = (int) ($settings['lockout_duration_minutes'] ?? 15) * 60;
+
             // Get user by email
             $stmt = $this->conn->prepare("SELECT * FROM users WHERE user_email = ?");
             $stmt->bind_param("s", $email);
@@ -256,8 +226,8 @@ class User
                 $lockTime = !empty($user['lock_time']) ? strtotime($user['lock_time']) : 0;
                 $currentTime = time();
 
-                if ($currentTime - $lockTime < 900) { // 15 mins
-                    $remaining = 900 - ($currentTime - $lockTime);
+                if ($currentTime - $lockTime < $lockoutSeconds) {
+                    $remaining = $lockoutSeconds - ($currentTime - $lockTime);
 
                     return [
                         "status"         => false,
@@ -309,10 +279,10 @@ class User
                 // Wrong password
                 $attempts = $user['failed_attempts'] + 1;
 
-                if ($attempts >= 3) {
+                if ($attempts >= $maxAttempts) {
 
                     // Lock account
-                    $lock = $this->conn->prepare("UPDATE users 
+                    $lock = $this->conn->prepare("UPDATE users
                                                     SET failed_attempts = ?, account_locked = 1, lock_time = NOW()
                                                     WHERE user_id = ?");
                     $lock->bind_param("ii", $attempts, $user['user_id']);
@@ -321,8 +291,8 @@ class User
 
                     return [
                         "status"         => false,
-                        "message"        => "Account locked after 3 failed attempts.",
-                        "lock_remaining" => 900,
+                        "message"        => "Account locked after {$maxAttempts} failed attempts.",
+                        "lock_remaining" => $lockoutSeconds,
                     ];
                 } else {
 
@@ -442,9 +412,7 @@ class User
         if ($newPassword !== $confirmPassword) {
             throw new Exception("New passwords do not match.");
         }
-        if (strlen($newPassword) < 8) {
-            throw new Exception("New password must be at least 8 characters.");
-        }
+        (new Settings($this->conn))->validatePassword($newPassword);
 
         $stmt = $this->conn->prepare("SELECT user_password FROM users WHERE user_id = ?");
         $stmt->bind_param("i", $userId);
@@ -558,23 +526,28 @@ class User
 
     public function isIpRateLimited(string $ip): bool
     {
-        // Remove attempts older than 15 minutes
+        $settings = new Settings($this->conn);
+        $windowMinutes = $settings->getIpRateLimitWindowMinutes();
+        $maxAttempts = $settings->getIpRateLimitAttempts();
+
+        // Remove attempts older than the configured window
         $clean = $this->conn->prepare(
-            "DELETE FROM login_rate_limits WHERE attempted_at < NOW() - INTERVAL 15 MINUTE"
+            "DELETE FROM login_rate_limits WHERE attempted_at < NOW() - INTERVAL ? MINUTE"
         );
+        $clean->bind_param('i', $windowMinutes);
         $clean->execute();
         $clean->close();
 
         $stmt = $this->conn->prepare(
             "SELECT COUNT(*) AS cnt FROM login_rate_limits
-             WHERE ip_address = ? AND attempted_at >= NOW() - INTERVAL 15 MINUTE"
+             WHERE ip_address = ? AND attempted_at >= NOW() - INTERVAL ? MINUTE"
         );
-        $stmt->bind_param('s', $ip);
+        $stmt->bind_param('si', $ip, $windowMinutes);
         $stmt->execute();
         $count = (int) $stmt->get_result()->fetch_assoc()['cnt'];
         $stmt->close();
 
-        return $count >= 10;
+        return $count >= $maxAttempts;
     }
 
     public function recordFailedIpAttempt(string $ip): void
@@ -609,11 +582,12 @@ class User
         $del->close();
 
         $token = bin2hex(random_bytes(32));
+        $validHours = (new Settings($this->conn))->getPasswordResetTokenHours();
 
         $ins = $this->conn->prepare(
-            "INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, NOW() + INTERVAL 1 HOUR)"
+            "INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, NOW() + INTERVAL ? HOUR)"
         );
-        $ins->bind_param('ss', $email, $token);
+        $ins->bind_param('ssi', $email, $token, $validHours);
         $ins->execute();
         $ins->close();
 
