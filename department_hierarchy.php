@@ -172,9 +172,14 @@ function staffInitial(string $username): string
                         <li class="breadcrumb-item"><a href="manage_departments.php" style="color:black;">Manage Departments</a></li>
                         <li class="breadcrumb-item active"><?= htmlspecialchars($department['department_name']) ?> Hierarchy</li>
                     </ol>
-                    <a href="manage_departments.php" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left"></i> Back to Departments
-                    </a>
+                    <div class="d-flex gap-2">
+                        <a href="escalation_diagram.php?department_id=<?= $departmentId ?>" class="btn btn-outline-primary">
+                            <i class="fas fa-route"></i> View Escalation Path
+                        </a>
+                        <a href="manage_departments.php" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Departments
+                        </a>
+                    </div>
                 </nav>
 
                 <div class="container-card shadow-sm mt-3">

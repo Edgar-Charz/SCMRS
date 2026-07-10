@@ -116,7 +116,7 @@ $departments = $admin->getAllDepartmentsWithStats();
                     </div>
 
                     <div class="table-responsive">
-                        <table class="table table-striped" id="departmentsTable">
+                        <table class="table table-striped table-hover" id="departmentsTable">
                             <thead class="table-light">
                                 <tr>
                                     <th>#</th>
@@ -129,7 +129,7 @@ $departments = $admin->getAllDepartmentsWithStats();
                             <tbody>
                                 <?php if (!empty($departments)): ?>
                                     <?php $n = 1; foreach ($departments as $dept): ?>
-                                    <tr>
+                                    <tr class="clickable-row" data-href="department_hierarchy.php?department_id=<?= $dept['department_id'] ?>">
                                         <td><?= $n++ ?></td>
                                         <td><?= htmlspecialchars($dept['department_name']) ?></td>
                                         <td class="text-center">
@@ -232,6 +232,12 @@ $departments = $admin->getAllDepartmentsWithStats();
         </div>
     </div>
 
+    <style>
+        #departmentsTable tbody tr.clickable-row {
+            cursor: pointer;
+        }
+    </style>
+
     <script>
         function openEditDepartment(dept) {
             document.getElementById('edit_dept_id').value   = dept.department_id;
@@ -280,6 +286,15 @@ $departments = $admin->getAllDepartmentsWithStats();
                     }
                 });
             }
+
+            // Row navigates to the department's hierarchy view, except when the
+            // click landed on one of the row's own action buttons/links.
+            $("#departmentsTable").on('click', 'tbody tr.clickable-row', function (e) {
+                if ($(e.target).closest('a, button').length) {
+                    return;
+                }
+                window.location.href = $(this).data('href');
+            });
         });
     </script>
 
