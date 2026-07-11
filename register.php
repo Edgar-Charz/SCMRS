@@ -27,11 +27,19 @@ if (isset($_POST["registerStudentBTN"])) {
         $password = $_POST['password'];
         $confirmPassword = $_POST['confirm_password'];
 
-        if ($user->studentRegister($username, $reg_no, $email, $phone_number, $password, $confirmPassword)) {
-            (new Notification($conn))->notifyAllAdmins(
+        $newUserId = $user->studentRegister($username, $reg_no, $email, $phone_number, $password, $confirmPassword);
+        if ($newUserId) {
+            $notif = new Notification($conn);
+            $notif->notifyAllAdmins(
                 "New student registered: $username",
                 'new_registration',
                 'user_management.php#students'
+            );
+            $notif->create(
+                $newUserId,
+                "Welcome, $username! Your student account has been created successfully. You can now log in and submit complaints.",
+                'account_created',
+                'login.php'
             );
             $_SESSION['message'] = "Account created successfully. You can now log in.";
             header("Location: login.php");
@@ -54,11 +62,19 @@ if (isset($_POST["registerStaffBTN"])) {
         $staffId = trim($_POST['staff_id'] ?? '');
         $phoneNumber = trim($_POST['phone_number'] ?? '');
 
-        if ($user->staffRegister($username, $email, $password, $confirmPassword, $departmentId, $staffId ?: null, $phoneNumber ?: null)) {
-            (new Notification($conn))->notifyAllAdmins(
+        $newUserId = $user->staffRegister($username, $email, $password, $confirmPassword, $departmentId, $staffId ?: null, $phoneNumber ?: null);
+        if ($newUserId) {
+            $notif = new Notification($conn);
+            $notif->notifyAllAdmins(
                 "New staff member registered: $username (pending your approval)",
                 'new_registration',
                 'user_management.php#approval'
+            );
+            $notif->create(
+                $newUserId,
+                "Welcome, $username! Your staff account has been submitted for review. You'll be notified once an admin approves it.",
+                'account_created',
+                'login.php'
             );
             $_SESSION['message'] = "Registration submitted. An admin will review and approve your account before you can log in.";
             header("Location: login.php");
