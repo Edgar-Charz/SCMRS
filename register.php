@@ -39,7 +39,7 @@ if (isset($_POST["registerStudentBTN"])) {
                 $newUserId,
                 "Welcome, $username! Your student account has been created successfully. You can now log in and submit complaints.",
                 'account_created',
-                'login.php'
+                'student_dashboard.php'
             );
             $_SESSION['message'] = "Account created successfully. You can now log in.";
             header("Location: login.php");
@@ -73,8 +73,7 @@ if (isset($_POST["registerStaffBTN"])) {
             $notif->create(
                 $newUserId,
                 "Welcome, $username! Your staff account has been submitted for review. You'll be notified once an admin approves it.",
-                'account_created',
-                'login.php'
+                'account_created'
             );
             $_SESSION['message'] = "Registration submitted. An admin will review and approve your account before you can log in.";
             header("Location: login.php");
