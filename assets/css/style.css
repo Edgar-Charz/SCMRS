@@ -254,7 +254,7 @@ html {
 }
 
 .custom-nav {
-  background-color: #1e3a5f !important;
+  background-color: var(--sidebar-bg) !important;
 }
 
 /* Welcome banner */
@@ -1221,8 +1221,8 @@ div.dataTables_wrapper div.dataTables_info {
   border-left: 4px solid var(--danger);
 }
 
-#userManagementTabs .nav-link {
-  color: #64748b;
+/* #userManagementTabs .nav-link {
+  color: var(--udsm-blue);
   border-radius: 10px;
   padding: 10px 20px;
   transition: all 0.3s ease;
@@ -1232,13 +1232,13 @@ div.dataTables_wrapper div.dataTables_info {
 }
 
 #userManagementTabs .nav-link.active {
-  background-color: var(--sidebar-bg);
+  background-color: var(--udsm-blue);
   color: white;
 }
 
 #userManagementTabs .nav-link:hover:not(.active) {
   background-color: #f1f5f9;
-}
+} */
 
 .management-content .d-none {
   display: none !important;
