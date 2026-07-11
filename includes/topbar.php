@@ -133,7 +133,7 @@ if (isset($_SESSION['user_id'])) {
                                         </div>
                                         <?php if ($_isLongMsg): ?>
                                             <a href="javascript:void(0)" class="fw-semibold notif-readmore"
-                                                style="font-size:.72rem; color:var(--udsm-blue);"
+                                                style="font-size:.72rem; color:var(--udsm-blue); text-decoration: none;"
                                                 onclick="event.stopPropagation(); toggleNotifMsg(this);">
                                                 Read more
                                             </a>
