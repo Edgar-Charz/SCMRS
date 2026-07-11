@@ -27,6 +27,19 @@ if (isset($_SESSION['user_id'])) {
 }
 ?>
 
+<style>
+    /* Notification list: allow vertical scroll but hide the scrollbar track */
+    #notifList {
+        overflow-x: hidden;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    #notifList::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+    }
+</style>
+
 <!-- Topbar -->
 <nav class="navbar navbar-dark custom-nav">
     <div class="d-flex align-items-center w-100 px-2 gap-2">
@@ -57,7 +70,7 @@ if (isset($_SESSION['user_id'])) {
                 </button>
 
                 <div class="dropdown-menu dropdown-menu-end shadow-lg border-0 p-0" aria-labelledby="notifDropdown"
-                    style="min-width:340px; max-width:360px; border-radius:12px; overflow:hidden;">
+                    style="min-width:420px; max-width:460px; border-radius:12px; overflow:hidden;">
 
                     <!-- Header -->
                     <div class="d-flex align-items-center justify-content-between px-3 py-2"
@@ -104,28 +117,27 @@ if (isset($_SESSION['user_id'])) {
                                         </div>
                                     </div>
 
-                                    <?php
-                                        $_msgLimit = 90;
-                                        $_isLongMsg = mb_strlen($n['message']) > $_msgLimit;
-                                        $_shortMsg = $_isLongMsg ? rtrim(mb_substr($n['message'], 0, $_msgLimit)) . '…' : $n['message'];
-                                    ?>
-                                    <div class="flex-grow-1 min-w-0">
+                                    <?php $_isLongMsg = mb_strlen($n['message']) > 75; ?>
+                                    <div class="flex-grow-1" style="min-width:0;">
                                         <div class="small <?= $n['is_read'] ? 'text-muted' : 'fw-semibold' ?>"
                                             style="line-height:1.3;">
-                                            <?= htmlspecialchars($_shortMsg) ?>
+                                            <div class="notif-msg-short"
+                                                style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                                <?= htmlspecialchars($n['message']) ?>
+                                            </div>
                                             <?php if ($_isLongMsg): ?>
-                                                <a href="javascript:void(0)" class="fw-semibold text-nowrap"
-                                                    style="font-size:.72rem; color:var(--udsm-blue);"
-                                                    data-full="<?= htmlspecialchars($n['message']) ?>"
-                                                    data-link="<?= htmlspecialchars($n['link'] ?? '') ?>"
-                                                    data-time="<?= htmlspecialchars(Notification::timeAgo($n['created_at'])) ?>"
-                                                    data-icon="<?= htmlspecialchars(Notification::typeIcon($n['type'])) ?>"
-                                                    data-id="<?= $n['notification_id'] ?>"
-                                                    onclick="event.stopPropagation(); openNotifModal(this);">
-                                                    Read more
-                                                </a>
+                                                <div class="notif-msg-full d-none" style="white-space:normal;">
+                                                    <?= htmlspecialchars($n['message']) ?>
+                                                </div>
                                             <?php endif; ?>
                                         </div>
+                                        <?php if ($_isLongMsg): ?>
+                                            <a href="javascript:void(0)" class="fw-semibold notif-readmore"
+                                                style="font-size:.72rem; color:var(--udsm-blue);"
+                                                onclick="event.stopPropagation(); toggleNotifMsg(this);">
+                                                Read more
+                                            </a>
+                                        <?php endif; ?>
                                         <div class="text-muted" style="font-size:.7rem; margin-top:2px;">
                                             <?= Notification::timeAgo($n['created_at']) ?>
                                         </div>
@@ -251,60 +263,23 @@ if (isset($_SESSION['user_id'])) {
     </div>
 </nav>
 
-<!-- Notification detail modal -->
-<div class="modal fade" id="notifDetailModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius:12px;">
-            <div class="modal-header text-white" style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
-                <h6 class="modal-title fw-bold text-white mb-0">
-                    <i id="notifModalIcon" class="fas fa-bell me-2"></i>Notification
-                </h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p id="notifModalMessage" class="mb-2" style="white-space:pre-wrap;"></p>
-                <div class="text-muted small" id="notifModalTime"></div>
-            </div>
-            <div class="modal-footer">
-                <a href="javascript:void(0)" id="notifModalViewBtn" class="btn btn-primary btn-sm d-none">
-                    <i class="fas fa-arrow-right me-1"></i>View Complaint
-                </a>
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
     var _csrfToken = <?= json_encode(csrf_token()) ?>;
 
-    function openNotifModal(el) {
-        var full = el.dataset.full || '';
-        var link = el.dataset.link || '';
-        var time = el.dataset.time || '';
-        var icon = el.dataset.icon || 'fa-bell text-secondary';
-        var id   = el.dataset.id;
-
-        document.getElementById('notifModalMessage').textContent = full;
-        document.getElementById('notifModalTime').textContent = time;
-        document.getElementById('notifModalIcon').className = 'fas ' + icon + ' me-2';
-
-        var viewBtn = document.getElementById('notifModalViewBtn');
-        if (link) {
-            viewBtn.classList.remove('d-none');
-            viewBtn.onclick = function () {
-                fetch('mark_notification.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'action=mark_read&id=' + id + '&csrf_token=' + encodeURIComponent(_csrfToken)
-                }).then(function () { window.location.href = link; });
-            };
+    function toggleNotifMsg(link) {
+        var wrap = link.previousElementSibling;
+        var shortEl = wrap.querySelector('.notif-msg-short');
+        var fullEl = wrap.querySelector('.notif-msg-full');
+        var expanded = !fullEl.classList.contains('d-none');
+        if (expanded) {
+            fullEl.classList.add('d-none');
+            shortEl.classList.remove('d-none');
+            link.textContent = 'Read more';
         } else {
-            viewBtn.classList.add('d-none');
-            viewBtn.onclick = null;
+            fullEl.classList.remove('d-none');
+            shortEl.classList.add('d-none');
+            link.textContent = 'Show less';
         }
-
-        bootstrap.Modal.getOrCreateInstance(document.getElementById('notifDetailModal')).show();
     }
 
     function markAllRead() {
