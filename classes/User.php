@@ -88,7 +88,7 @@ class User
             // Commit Transaction
             $this->conn->commit();
 
-            return true;
+            return $userId;
         } catch (Exception $e) {
             // Rollback
             $this->conn->rollback();
@@ -185,7 +185,7 @@ class User
             // Commit Transaction
             $this->conn->commit();
 
-            return true;
+            return $userId;
         } catch (Exception $e) {
             // Rollback
             $this->conn->rollback();
