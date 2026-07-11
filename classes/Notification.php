@@ -29,6 +29,7 @@ class Notification
         'new_complaint_in_rep_scope' => 'New Complaint in Your Department',
         'endorsed_complaint_updated' => 'An Endorsed Complaint Has Been Updated',
         'filed_on_behalf' => 'A Complaint Was Filed On Your Behalf',
+        'account_created' => 'Welcome to SCMRS',
     ];
 
     public function __construct($db)
@@ -277,6 +278,7 @@ class Notification
             'new_complaint_in_rep_scope' => 'fa-building text-primary',
             'endorsed_complaint_updated' => 'fa-thumbs-up text-success',
             'filed_on_behalf' => 'fa-user-edit text-info',
+            'account_created' => 'fa-user-plus text-success',
             'system' => 'fa-shield-alt text-secondary',
             'password_reset_admin' => 'fa-key text-warning',
         ];
