@@ -39,6 +39,14 @@ document.addEventListener("DOMContentLoaded", function () {
     sidebar.classList.remove("active");
     overlay.classList.remove("active");
   });
+
+  const sidebarClose = document.getElementById("sidebarClose");
+  if (sidebarClose) {
+    sidebarClose.addEventListener("click", function () {
+      sidebar.classList.remove("active");
+      overlay.classList.remove("active");
+    });
+  }
 });
 
 // Active menu highlighting

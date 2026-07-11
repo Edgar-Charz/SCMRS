@@ -450,12 +450,45 @@ h6 {
   }
 }
 
+.sidebar-close-btn {
+  display: none;
+}
+
 @media (max-width: 767.98px) {
   /* Allow natural page scrolling on mobile instead of fixed-height viewport */
   body,
   html {
     overflow-y: auto !important;
     height: auto !important;
+  }
+
+  .sidebar-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    margin: 0;
+    line-height: 1;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-size: 1rem;
+    z-index: 1;
+  }
+
+  .sidebar-close-btn i {
+    display: block;
+    line-height: 1;
+  }
+
+  .sidebar-close-btn:hover {
+    background: rgba(255, 255, 255, 0.22);
   }
 
   /* Pin topbar to viewport top on mobile */

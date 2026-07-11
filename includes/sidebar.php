@@ -1,4 +1,5 @@
 <?php
+/** @var mysqli $conn */
 $sidebarRole = $_SESSION['user_role'] ?? 'student';
 require_once __DIR__ . '/../classes/Settings.php';
 $_sidebarBranding = (new Settings($conn))->get();
@@ -6,6 +7,9 @@ $_sidebarBranding = (new Settings($conn))->get();
 
 <!-- Sidebar -->
 <nav id="sidebar">
+    <button type="button" id="sidebarClose" class="sidebar-close-btn" aria-label="Close menu">
+        <i class="fas fa-times"></i>
+    </button>
     <div class="sidebar-header d-flex align-items-center">
         <div class="logo-container me-2">
             <img src="<?= htmlspecialchars($_sidebarBranding['institution_logo_path']) ?>?v=<?= @filemtime(dirname(__DIR__) . '/' . $_sidebarBranding['institution_logo_path']) ?: 0 ?>" alt="<?= htmlspecialchars($_sidebarBranding['institution_name']) ?> Logo" class="img-fluid rounded circle"
