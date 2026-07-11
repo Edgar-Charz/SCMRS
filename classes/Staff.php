@@ -270,6 +270,25 @@ class Staff
             }
             $targetLevel = $currentLevel + 1;
 
+            // The destination staff must actually belong to this complaint's department
+            // (university-wide roles are exempt - they aren't tied to any single department)
+            $toDeptStmt = $this->conn->prepare(
+                "SELECT s.staff_department_id, sr.is_department_scoped
+                 FROM staffs s LEFT JOIN staff_roles sr ON s.staff_role_id = sr.role_id
+                 WHERE s.staff_id = ?"
+            );
+            $toDeptStmt->bind_param('s', $toStaffId);
+            $toDeptStmt->execute();
+            $toDeptRow = $toDeptStmt->get_result()->fetch_assoc();
+            $toDeptStmt->close();
+            $toIsDeptScoped = $toDeptRow ? (bool) ($toDeptRow['is_department_scoped'] ?? true) : true;
+            if (
+                $toIsDeptScoped && !empty($complaintRow['department_id'])
+                && (int) ($toDeptRow['staff_department_id'] ?? 0) !== (int) $complaintRow['department_id']
+            ) {
+                throw new Exception("Can only escalate to a staff member within this complaint's department.");
+            }
+
             $router = new ComplaintRouter($this->conn);
             $pathRoleId = $router->getCategoryEscalationRoleId((int) $complaintRow['category_id'], $targetLevel);
 
@@ -840,7 +859,7 @@ class Staff
 
             // Block if already resolved or rejected
             $statusStmt = $this->conn->prepare(
-                "SELECT complaint_status, category_id, subcategory_id, escalation_level FROM complaints WHERE complaint_id = ? LIMIT 1"
+                "SELECT complaint_status, category_id, subcategory_id, department_id, escalation_level FROM complaints WHERE complaint_id = ? LIMIT 1"
             );
             $statusStmt->bind_param('i', $complaintId);
             $statusStmt->execute();
@@ -856,6 +875,25 @@ class Staff
                 throw new Exception("This complaint is already at Level 1 - it cannot be delegated further down.");
             }
             $targetLevel = $currentLevel - 1;
+
+            // The destination staff must actually belong to this complaint's department
+            // (university-wide roles are exempt - they aren't tied to any single department)
+            $toDeptStmt = $this->conn->prepare(
+                "SELECT s.staff_department_id, sr.is_department_scoped
+                 FROM staffs s LEFT JOIN staff_roles sr ON s.staff_role_id = sr.role_id
+                 WHERE s.staff_id = ?"
+            );
+            $toDeptStmt->bind_param('s', $toStaffId);
+            $toDeptStmt->execute();
+            $toDeptRow = $toDeptStmt->get_result()->fetch_assoc();
+            $toDeptStmt->close();
+            $toIsDeptScoped = $toDeptRow ? (bool) ($toDeptRow['is_department_scoped'] ?? true) : true;
+            if (
+                $toIsDeptScoped && !empty($complaintRow['department_id'])
+                && (int) ($toDeptRow['staff_department_id'] ?? 0) !== (int) $complaintRow['department_id']
+            ) {
+                throw new Exception("Can only delegate to a staff member within this complaint's department.");
+            }
 
             $router = new ComplaintRouter($this->conn);
             $pathRoleId = $router->getRoleIdForLevel((int) $complaintRow['category_id'], $complaintRow['subcategory_id'], $targetLevel);
