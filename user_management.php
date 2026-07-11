@@ -489,14 +489,12 @@ if (isset($_SESSION['message'])) {
                             Students List
                         </button>
                     </li>
-
                     <li class="nav-item me-2" role="presentation">
                         <button class="nav-link fw-bold" onclick="switchTab('staff')" id="tab-staff">
                             <i class="fas fa-user me-2"></i>
                             Staffs List
                         </button>
                     </li>
-
                     <li class="nav-item me-2" role="presentation">
                         <button class="nav-link fw-bold position-relative" onclick="switchTab('approval')"
                             id="tab-approval">
