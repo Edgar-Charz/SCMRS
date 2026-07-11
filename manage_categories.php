@@ -199,8 +199,7 @@ $staffRoles = $admin->getAllStaffRoles();
                                 <tr>
                                     <th>#</th>
                                     <th>NAME</th>
-                                    <th>DESCRIPTION</th>
-                                    <th class="text-center">DEFAULT DEPT</th>
+                                    <th class="text-center">LEVEL 1</th>
                                     <th class="text-center">LEVEL 2</th>
                                     <th class="text-center">LEVEL 3</th>
                                     <th class="text-center">PRIORITY</th>
@@ -218,13 +217,10 @@ $staffRoles = $admin->getAllStaffRoles();
                                         <tr>
                                             <td><?= $n++ ?></td>
                                             <td><?= htmlspecialchars($cat['category_name']) ?></td>
-                                            <td class="text-muted small">
-                                                <?= htmlspecialchars($cat['category_description'] ?? '-') ?>
-                                            </td>
                                             <td class="text-center">
-                                                <?php if (!empty($cat['default_dept_name'])): ?>
-                                                    <span class="badge bg-info text-white" style="font-size:0.75rem;">
-                                                        <?= htmlspecialchars($cat['default_dept_name']) ?>
+                                                <?php if (!empty($cat['default_role_name'])): ?>
+                                                    <span class="badge bg-primary text-white" style="font-size:0.75rem;">
+                                                        <?= htmlspecialchars($cat['default_role_name']) ?>
                                                     </span>
                                                 <?php else: ?>
                                                     <span class="text-muted small">-</span>
@@ -289,6 +285,11 @@ $staffRoles = $admin->getAllStaffRoles();
                                             <td class="text-center">
                                                 <div class="d-flex justify-content-center">
                                                     <button type="button" class="btn btn-status btn-outline-secondary me-2"
+                                                        onclick="openViewCategory(<?= htmlspecialchars(json_encode($cat)) ?>)"
+                                                        data-bs-toggle="modal" data-bs-target="#viewCategoryModal" title="view">
+                                                        <i class="fas fa-eye text-dark"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-status btn-outline-secondary me-2"
                                                         onclick="openEditCategory(<?= htmlspecialchars(json_encode($cat)) ?>)"
                                                         data-bs-toggle="modal" data-bs-target="#editCategoryModal" title="edit">
                                                         <i class="fas fa-edit text-dark"></i>
@@ -304,7 +305,7 @@ $staffRoles = $admin->getAllStaffRoles();
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="12" class="text-center py-4 text-muted">No categories found. Add one to
+                                        <td colspan="11" class="text-center py-4 text-muted">No categories found. Add one to
                                             get started.</td>
                                     </tr>
                                 <?php endif; ?>
@@ -447,6 +448,80 @@ $staffRoles = $admin->getAllStaffRoles();
                     </div>
                 </div>
             </div>
+
+            <!-- View Category Modal -->
+            <div class="modal fade" id="viewCategoryModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-centered">
+                    <div class="modal-content border-0 shadow-lg" style="border-radius: 5px;">
+                        <div class="modal-header text-white"
+                            style="background:linear-gradient(135deg,#1e3a5f,#2d6a9f);">
+                            <h5 class="modal-title fw-bold text-white">
+                                <i class="fas fa-eye me-2"></i>
+                                <span id="view_cat_name"></span>
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body px-4 py-3">
+                            <div class="mb-3">
+                                <div class="fw-bold small text-muted">Description</div>
+                                <div id="view_cat_desc">-</div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-6 mb-3">
+                                    <div class="fw-bold small text-muted">Status</div>
+                                    <div id="view_cat_status">-</div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <div class="fw-bold small text-muted">Default Priority</div>
+                                    <div id="view_cat_priority">-</div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <div class="fw-bold small text-muted">Default Department</div>
+                                    <div id="view_cat_dept">-</div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <div class="fw-bold small text-muted">Requires Department Selection</div>
+                                    <div id="view_cat_reqdept">-</div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <div class="fw-bold small text-muted">Leader Endorsable</div>
+                                    <div id="view_cat_endorsable">-</div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <div class="fw-bold small text-muted">Complaints</div>
+                                    <div id="view_cat_count">-</div>
+                                </div>
+                            </div>
+
+                            <hr>
+                            <h6 class="fw-bold mb-3">Escalation Path</h6>
+                            <div class="row">
+                                <div class="col-4 mb-3">
+                                    <div class="fw-bold small text-muted">Level 1</div>
+                                    <div id="view_cat_level1">-</div>
+                                </div>
+                                <div class="col-4 mb-3">
+                                    <div class="fw-bold small text-muted">Level 2</div>
+                                    <div id="view_cat_level2">-</div>
+                                </div>
+                                <div class="col-4 mb-3">
+                                    <div class="fw-bold small text-muted">Level 3</div>
+                                    <div id="view_cat_level3">-</div>
+                                </div>
+                            </div>
+
+                            <hr>
+                            <h6 class="fw-bold mb-2">Subcategories</h6>
+                            <div id="view_cat_subcategories" class="d-flex flex-wrap gap-2">-</div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- /View Category Modal -->
 
             <!-- Edit Category Modal -->
             <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-hidden="true">
@@ -780,7 +855,47 @@ $staffRoles = $admin->getAllStaffRoles();
             document.getElementById('edit_cat_priority').value = cat.default_priority || 'medium';
         }
 
-        // Subcategory helpers 
+        function openViewCategory(cat) {
+            const yesNoBadge = (val) => parseInt(val)
+                ? '<span class="badge bg-success"><i class="fas fa-check"></i> Yes</span>'
+                : '<span class="badge bg-secondary">No</span>';
+            const roleBadge = (name, cls) => name
+                ? `<span class="badge ${cls}">${escHtml(name)}</span>`
+                : '<span class="text-muted small">-</span>';
+            const priorityMap = { low: 'bg-success', medium: 'bg-warning text-dark', high: 'bg-danger' };
+
+            document.getElementById('view_cat_name').textContent = cat.category_name;
+            document.getElementById('view_cat_desc').textContent = cat.category_description || 'No description provided.';
+            document.getElementById('view_cat_status').innerHTML = cat.status === 'active'
+                ? '<span class="badge bg-success">Active</span>'
+                : '<span class="badge bg-secondary">Inactive</span>';
+            document.getElementById('view_cat_priority').innerHTML =
+                `<span class="badge ${priorityMap[cat.default_priority] || 'bg-secondary'}">${escHtml((cat.default_priority || 'medium').charAt(0).toUpperCase() + (cat.default_priority || 'medium').slice(1))}</span>`;
+            document.getElementById('view_cat_dept').innerHTML = cat.default_dept_name
+                ? `<span class="badge bg-info text-white">${escHtml(cat.default_dept_name)}</span>`
+                : '<span class="text-muted small">-</span>';
+            document.getElementById('view_cat_reqdept').innerHTML = yesNoBadge(cat.requires_department_selection);
+            document.getElementById('view_cat_endorsable').innerHTML = yesNoBadge(cat.leader_endorsable);
+            document.getElementById('view_cat_count').innerHTML = `<span class="badge bg-primary">${cat.complaint_count}</span>`;
+
+            document.getElementById('view_cat_level1').innerHTML = roleBadge(cat.default_role_name, 'bg-primary text-white');
+            document.getElementById('view_cat_level2').innerHTML = roleBadge(cat.level2_role_name, 'bg-warning text-dark');
+            document.getElementById('view_cat_level3').innerHTML = roleBadge(cat.level3_role_name, 'bg-danger text-white');
+
+            const subs = allSubcategories[cat.category_id] || [];
+            const subsWrap = document.getElementById('view_cat_subcategories');
+            if (!subs.length) {
+                subsWrap.innerHTML = '<span class="text-muted small">No subcategories.</span>';
+            } else {
+                subsWrap.innerHTML = subs.map(s => `
+                    <span class="badge ${s.status === 'active' ? 'bg-light text-dark border' : 'bg-secondary'}">
+                        ${escHtml(s.subcategory_name)}
+                    </span>
+                `).join('');
+            }
+        }
+
+        // Subcategory helpers
         const allSubcategories = <?= json_encode($subcategories_grouped) ?>;
         const subById = {};
         Object.values(allSubcategories).forEach(arr => arr.forEach(s => { subById[s.subcategory_id] = s; }));
