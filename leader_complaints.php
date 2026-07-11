@@ -10,6 +10,7 @@ $userId = (int)$_SESSION['user_id'];
 
 require_once 'config/Database.php';
 require_once 'classes/StudentLeader.php';
+require_once 'includes/csrf.php';
 
 $db     = new Database();
 $conn   = $db->connect();
@@ -19,6 +20,7 @@ $message = $error = '';
 
 // Handle endorse / remove-endorsement from this list
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    csrf_verify();
     $cid  = (int)($_POST['complaint_id'] ?? 0);
     $note = trim($_POST['note'] ?? '');
     if ($cid > 0) {
@@ -108,7 +110,7 @@ $depts      = $leader->getDepartments();
                                 <option value="">All Statuses</option>
                                 <option value="pending">Pending</option>
                                 <option value="in_progress">In Progress</option>
-                                <option value="awaiting_response">Awaiting Response</option>
+                                <option value="awaiting_student_response">Awaiting Response</option>
                                 <option value="resolved">Resolved</option>
                                 <option value="rejected">Rejected</option>
                                 <option value="reopened">Reopened</option>
@@ -240,6 +242,7 @@ $depts      = $leader->getDepartments();
                                                     </button>
                                                 <?php elseif ($c['i_endorsed']): ?>
                                                     <form method="POST" style="display:inline;">
+                                                        <?= csrf_field() ?>
                                                         <input type="hidden" name="action" value="remove_endorsement">
                                                         <input type="hidden" name="complaint_id" value="<?= $c['complaint_id'] ?>">
                                                         <button type="submit"
@@ -293,6 +296,7 @@ $depts      = $leader->getDepartments();
                 </div>
                 <form method="POST" id="endorseForm">
                     <div class="modal-body">
+                        <?= csrf_field() ?>
                         <input type="hidden" name="action" value="endorse">
                         <input type="hidden" name="complaint_id" id="endorse_complaint_id">
                         <p class="mb-3 text-muted small">

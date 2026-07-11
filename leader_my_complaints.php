@@ -12,6 +12,7 @@ require_once 'config/Database.php';
 require_once 'classes/User.php';
 require_once 'classes/StudentLeader.php';
 require_once 'classes/Student.php';
+require_once 'includes/csrf.php';
 
 $db      = new Database();
 $conn    = $db->connect();
@@ -22,6 +23,7 @@ $studentId = $leader->getStudentId();
 
 // Handle DELETE
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_complaint') {
+    csrf_verify();
     $comp_id = (int)($_POST['complaint_id'] ?? 0);
     $reason  = trim($_POST['delete_reason'] ?? '');
     if ($comp_id > 0 && $studentId && $student->deleteComplaint($comp_id, $studentId, $reason)) {
@@ -239,6 +241,7 @@ $statusMap = [
 
     <!-- Hidden delete form -->
     <form id="deleteForm" method="POST" action="leader_my_complaints.php" style="display:none;">
+        <?= csrf_field() ?>
         <input type="hidden" name="action" value="delete_complaint">
         <input type="hidden" name="complaint_id" id="deleteComplaintId" value="">
         <input type="hidden" name="delete_reason" id="deleteReason" value="">

@@ -178,7 +178,7 @@ function deptStatusBadge($status)
                                 <option value="">All Statuses</option>
                                 <option value="pending">Pending</option>
                                 <option value="in_progress">In Progress</option>
-                                <option value="awaiting_response">Awaiting Response</option>
+                                <option value="awaiting_student_response">Awaiting Response</option>
                                 <option value="resolved">Resolved</option>
                                 <option value="rejected">Rejected</option>
                                 <option value="reopened">Reopened</option>

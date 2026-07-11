@@ -16,6 +16,7 @@ if ($complaintId <= 0) {
 
 require_once 'config/Database.php';
 require_once 'classes/StudentLeader.php';
+require_once 'includes/csrf.php';
 
 $db     = new Database();
 $conn   = $db->connect();
@@ -31,6 +32,7 @@ $message = $error = '';
 
 // Handle endorse / remove / update note
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    csrf_verify();
     $action = $_POST['action'];
 
     if ($action === 'endorse') {
@@ -236,6 +238,7 @@ $priClass = $priorityMap[$complaint['priority']] ?? 'bg-secondary';
                                     </p>
                                 <?php else: ?>
                                     <form method="POST">
+                                        <?= csrf_field() ?>
                                         <input type="hidden" name="action" value="remove_endorsement">
                                         <button type="submit" class="btn btn-outline-danger w-100">
                                             <i class="fas fa-times me-1"></i>Remove My Endorsement
@@ -253,6 +256,7 @@ $priClass = $priorityMap[$complaint['priority']] ?? 'bg-secondary';
                                     and needs attention from your department.
                                 </p>
                                 <form method="POST">
+                                    <?= csrf_field() ?>
                                     <input type="hidden" name="action" value="endorse">
                                     <div class="mb-3">
                                         <label class="form-label fw-bold small">Note <span class="text-muted">(optional)</span></label>
