@@ -134,7 +134,7 @@ function fmtHours($val): string
                         <div class="row g-3">
                             <div class="col-12 col-md-6 col-lg-3">
                                 <label class="form-label fw-bold small">Department</label>
-                                <select class="form-select p-3 shadow-sm" name="department" style="border-radius:10px;border:1px solid #e0e6ed;">
+                                <select class="form-select p-3 shadow-sm" name="department" id="filterDepartment" style="border-radius:10px;border:1px solid #e0e6ed;">
                                     <option value="">All Departments</option>
                                     <?php foreach ($departments as $dept): ?>
                                         <option value="<?= $dept['department_id'] ?>" <?= $filterDept == $dept['department_id'] ? 'selected' : '' ?>>
@@ -145,7 +145,7 @@ function fmtHours($val): string
                             </div>
                             <div class="col-12 col-md-6 col-lg-3">
                                 <label class="form-label fw-bold small">Category</label>
-                                <select class="form-select p-3 shadow-sm" name="category" style="border-radius:10px;border:1px solid #e0e6ed;">
+                                <select class="form-select p-3 shadow-sm" name="category" id="filterCategory" style="border-radius:10px;border:1px solid #e0e6ed;">
                                     <option value="">All Categories</option>
                                     <?php foreach ($categories as $cat): ?>
                                         <option value="<?= $cat['category_id'] ?>" <?= $filterCategory == $cat['category_id'] ? 'selected' : '' ?>>
@@ -156,29 +156,27 @@ function fmtHours($val): string
                             </div>
                             <div class="col-12 col-md-6 col-lg-3">
                                 <label class="form-label fw-bold small">Date From</label>
-                                <input type="date" name="date_from" class="form-control p-3 shadow-sm"
+                                <input type="date" name="date_from" id="filterDateFrom" class="form-control p-3 shadow-sm"
                                     style="border-radius:10px;border:1px solid #e0e6ed;"
                                     value="<?= htmlspecialchars($filterDateFrom ?? '') ?>">
                             </div>
                             <div class="col-12 col-md-6 col-lg-3">
                                 <label class="form-label fw-bold small">Date To</label>
-                                <input type="date" name="date_to" class="form-control p-3 shadow-sm"
+                                <input type="date" name="date_to" id="filterDateTo" class="form-control p-3 shadow-sm"
                                     style="border-radius:10px;border:1px solid #e0e6ed;"
                                     value="<?= htmlspecialchars($filterDateTo ?? '') ?>">
                             </div>
                         </div>
                         <div class="d-flex gap-2 mt-3 flex-wrap align-items-center">
-                            <button type="submit" class="btn btn-primary p-3 fw-bold" style="border-radius:10px;">
-                                <i class="fas fa-search me-1"></i> Apply Filter
+                            <button type="submit" id="applyFilterBtn" class="btn btn-primary p-3 fw-bold" style="border-radius:10px;">
+                                <i class="fas fa-search me-1"></i> <span class="btn-label">Apply Filter</span>
                             </button>
-                            <a href="reports.php?tab=<?= $activeTab ?>" class="btn btn-secondary p-3 fw-bold" style="border-radius:10px;">
+                            <a href="reports.php?tab=<?= $activeTab ?>" id="resetFilterBtn" class="btn btn-secondary p-3 fw-bold" style="border-radius:10px;">
                                 <i class="fas fa-undo me-1"></i> Reset
                             </a>
-                            <?php if ($isFiltered): ?>
-                                <span class="badge bg-info text-dark align-self-center ms-1 p-2">
-                                    <i class="fas fa-info-circle me-1"></i>Filtered results
-                                </span>
-                            <?php endif; ?>
+                            <span id="filteredBadge" class="badge bg-info text-dark align-self-center ms-1 p-2 <?= $isFiltered ? '' : 'd-none' ?>">
+                                <i class="fas fa-info-circle me-1"></i>Filtered results
+                            </span>
                             <div class="ms-auto">
                                 <div class="dropdown">
                                     <button class="btn btn-success fw-bold dropdown-toggle p-3" type="button"
@@ -249,37 +247,37 @@ function fmtHours($val): string
                 <div class="row g-3 mb-4">
                     <div class="col-6 col-md-4 col-lg-2">
                         <div class="stat-card bg-stat p-3 text-center shadow-sm">
-                            <h3 class="mb-0 fw-bold"><?= $total ?></h3>
+                            <h3 class="mb-0 fw-bold" id="statTotal"><?= $total ?></h3>
                             <p class="mb-0 small fw-bold">Total</p>
                         </div>
                     </div>
                     <div class="col-6 col-md-4 col-lg-2">
                         <div class="stat-card bg-stat p-3 text-center shadow-sm">
-                            <h3 class="mb-0 fw-bold text-warning"><?= $stats['pending'] ?></h3>
+                            <h3 class="mb-0 fw-bold text-warning" id="statPending"><?= $stats['pending'] ?></h3>
                             <p class="mb-0 small fw-bold">Pending</p>
                         </div>
                     </div>
                     <div class="col-6 col-md-4 col-lg-2">
                         <div class="stat-card bg-stat p-3 text-center shadow-sm">
-                            <h3 class="mb-0 fw-bold text-info"><?= $stats['in_progress'] ?></h3>
+                            <h3 class="mb-0 fw-bold text-info" id="statInProgress"><?= $stats['in_progress'] ?></h3>
                             <p class="mb-0 small fw-bold">In Progress</p>
                         </div>
                     </div>
                     <div class="col-6 col-md-4 col-lg-2">
                         <div class="stat-card bg-stat p-3 text-center shadow-sm">
-                            <h3 class="mb-0 fw-bold text-success"><?= $stats['resolved'] ?></h3>
+                            <h3 class="mb-0 fw-bold text-success" id="statResolved"><?= $stats['resolved'] ?></h3>
                             <p class="mb-0 small fw-bold">Resolved</p>
                         </div>
                     </div>
                     <div class="col-6 col-md-4 col-lg-2">
                         <div class="stat-card bg-stat p-3 text-center shadow-sm">
-                            <h3 class="mb-0 fw-bold text-danger"><?= $stats['rejected'] ?></h3>
+                            <h3 class="mb-0 fw-bold text-danger" id="statRejected"><?= $stats['rejected'] ?></h3>
                             <p class="mb-0 small fw-bold">Rejected</p>
                         </div>
                     </div>
                     <div class="col-6 col-md-4 col-lg-2">
                         <div class="stat-card bg-stat p-3 text-center shadow-sm">
-                            <h3 class="mb-0 fw-bold" style="color:var(--udsm-blue);"><?= $resolutionRate ?>%</h3>
+                            <h3 class="mb-0 fw-bold" style="color:var(--udsm-blue);" id="statResolveRate"><?= $resolutionRate ?>%</h3>
                             <p class="mb-0 small fw-bold">Resolve Rate</p>
                         </div>
                     </div>
@@ -322,7 +320,7 @@ function fmtHours($val): string
                                         <th class="text-center">AVG RESOLUTION</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody id="tbody_department">
                                     <?php if (empty($byDept)): ?>
                                         <tr><td colspan="7" class="text-center text-muted py-4">No data for the selected filters.</td></tr>
                                     <?php else: ?>
@@ -363,7 +361,7 @@ function fmtHours($val): string
                                         <th class="text-center">AVG RESOLUTION</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody id="tbody_category">
                                     <?php if (empty($byCategory)): ?>
                                         <tr><td colspan="7" class="text-center text-muted py-4">No data for the selected filters.</td></tr>
                                     <?php else: ?>
@@ -388,6 +386,7 @@ function fmtHours($val): string
                     <div class="container-card shadow-sm mb-4">
                         <h5 class="mb-1 fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>Complaints by Priority</h5>
                         <p class="text-muted small mb-3">Distribution across priority levels</p>
+                        <div id="priorityBreakdown">
                         <?php if (empty($byPriority)): ?>
                             <p class="text-center text-muted py-3">No data for the selected filters.</p>
                         <?php else: ?>
@@ -430,6 +429,7 @@ function fmtHours($val): string
                                 <?php endforeach; ?>
                             </div>
                         <?php endif; ?>
+                        </div>
                     </div>
 
                     <!-- Staff Performance -->
@@ -455,7 +455,7 @@ function fmtHours($val): string
                                         <th class="text-center">RESOLVE RATE</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody id="tbody_staff">
                                     <?php if (empty($byStaff)): ?>
                                         <tr><td colspan="10" class="text-center text-muted py-4">No assigned complaints found.</td></tr>
                                     <?php else: ?>
@@ -490,7 +490,7 @@ function fmtHours($val): string
                     <!-- Monthly Trend -->
                     <div class="container-card shadow-sm mb-4">
                         <h5 class="mb-1 fw-bold"><i class="fas fa-chart-line me-2"></i>Monthly Trend</h5>
-                        <p class="text-muted small mb-3">
+                        <p class="text-muted small mb-3" id="monthlyTrendNote">
                             <?= ($filterDateFrom || $filterDateTo) ? 'Complaints within selected date range' : 'Complaints over the last 12 months' ?>
                         </p>
                         <div class="table-responsive">
@@ -505,7 +505,7 @@ function fmtHours($val): string
                                         <th class="text-center">REJECTED</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody id="tbody_monthly">
                                     <?php if (empty($monthlyTrend)): ?>
                                         <tr><td colspan="6" class="text-center text-muted py-4">No data available.</td></tr>
                                     <?php else: ?>
@@ -620,16 +620,16 @@ function fmtHours($val): string
                         <div class="col-12 col-md-2 d-flex flex-column gap-3">
                             <div class="container-card shadow-sm text-center flex-fill d-flex flex-column justify-content-center">
                                 <p class="text-muted small mb-1 fw-semibold">AVG RESOLUTION</p>
-                                <h2 class="fw-bold mb-0" style="color:var(--udsm-blue);">
+                                <h2 class="fw-bold mb-0" style="color:var(--udsm-blue);" id="statAvgResolution">
                                     <?= $stats['avg_resolution_hours'] !== null ? number_format((float)$stats['avg_resolution_hours'], 1) : '-' ?>
                                 </h2>
                                 <p class="text-muted small mb-0">hours</p>
                             </div>
                             <div class="container-card shadow-sm text-center flex-fill d-flex flex-column justify-content-center">
                                 <p class="text-muted small mb-1 fw-semibold">RESOLVE RATE</p>
-                                <h2 class="fw-bold mb-0 text-success"><?= $resolutionRate ?>%</h2>
+                                <h2 class="fw-bold mb-0 text-success" id="statResolveRateAnalytics"><?= $resolutionRate ?>%</h2>
                                 <div class="progress mt-2" style="height:6px;">
-                                    <div class="progress-bar bg-success" style="width:<?= $resolutionRate ?>%"></div>
+                                    <div class="progress-bar bg-success" id="resolveRateBar" style="width:<?= $resolutionRate ?>%"></div>
                                 </div>
                             </div>
                         </div>
@@ -647,15 +647,12 @@ function fmtHours($val): string
                     <div class="container-card shadow-sm mb-4">
                         <h6 class="fw-bold mb-3">
                             <i class="fas fa-chart-line me-2"></i>Monthly Trend
-                            <small class="text-muted fw-normal ms-2">
+                            <small class="text-muted fw-normal ms-2" id="monthlyTrendNoteAnalytics">
                                 <?= ($filterDateFrom || $filterDateTo) ? '(filtered range)' : '(last 12 months)' ?>
                             </small>
                         </h6>
-                        <?php if (empty($monthlyTrend)): ?>
-                            <p class="text-center text-muted py-4">No data for the selected period.</p>
-                        <?php else: ?>
-                            <canvas id="chartMonthly" style="max-height:280px;"></canvas>
-                        <?php endif; ?>
+                        <p class="text-center text-muted py-4" id="chartMonthlyEmpty" <?= empty($monthlyTrend) ? '' : 'style="display:none;"' ?>>No data for the selected period.</p>
+                        <canvas id="chartMonthly" style="max-height:280px; <?= empty($monthlyTrend) ? 'display:none;' : '' ?>"></canvas>
                     </div>
 
                     <!-- Row 3: Department bar + Category bar -->
@@ -663,32 +660,24 @@ function fmtHours($val): string
                         <div class="col-12 col-md-6">
                             <div class="container-card shadow-sm h-100">
                                 <h6 class="fw-bold mb-3"><i class="fas fa-building me-2"></i>Top Departments</h6>
-                                <?php if (empty($byDept)): ?>
-                                    <p class="text-center text-muted py-4">No data.</p>
-                                <?php else: ?>
-                                    <canvas id="chartDept" style="max-height:320px;"></canvas>
-                                <?php endif; ?>
+                                <p class="text-center text-muted py-4" id="chartDeptEmpty" <?= empty($byDept) ? '' : 'style="display:none;"' ?>>No data.</p>
+                                <canvas id="chartDept" style="max-height:320px; <?= empty($byDept) ? 'display:none;' : '' ?>"></canvas>
                             </div>
                         </div>
                         <div class="col-12 col-md-6">
                             <div class="container-card shadow-sm h-100">
                                 <h6 class="fw-bold mb-3"><i class="fas fa-tags me-2"></i>Top Categories</h6>
-                                <?php if (empty($byCategory)): ?>
-                                    <p class="text-center text-muted py-4">No data.</p>
-                                <?php else: ?>
-                                    <canvas id="chartCat" style="max-height:320px;"></canvas>
-                                <?php endif; ?>
+                                <p class="text-center text-muted py-4" id="chartCatEmpty" <?= empty($byCategory) ? '' : 'style="display:none;"' ?>>No data.</p>
+                                <canvas id="chartCat" style="max-height:320px; <?= empty($byCategory) ? 'display:none;' : '' ?>"></canvas>
                             </div>
                         </div>
                     </div>
 
                     <!-- Row 4: Staff performance bar -->
-                    <?php if (!empty($byStaff)): ?>
-                    <div class="container-card shadow-sm mb-4">
+                    <div class="container-card shadow-sm mb-4" id="staffChartWrap" <?= empty($byStaff) ? 'style="display:none;"' : '' ?>>
                         <h6 class="fw-bold mb-3"><i class="fas fa-user-tie me-2"></i>Staff Performance - Resolved vs Total (top 10)</h6>
                         <canvas id="chartStaff" style="max-height:300px;"></canvas>
                     </div>
-                    <?php endif; ?>
 
                 </div><!-- /tab-analytics -->
 
@@ -703,7 +692,42 @@ function fmtHours($val): string
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
     <script>
-    // Tab switching 
+    // ---- Live data model (initialized from PHP, refreshed via AJAX on filter apply) ----
+    var reportData = {
+        stats:          <?= json_encode($stats) ?>,
+        resolutionRate: <?= json_encode($resolutionRate) ?>,
+        byDept:         <?= json_encode($byDept) ?>,
+        byCategory:     <?= json_encode($byCategory) ?>,
+        byPriority:     <?= json_encode($byPriority) ?>,
+        byStaff:        <?= json_encode($byStaff) ?>,
+        monthlyTrend:   <?= json_encode($monthlyTrend) ?>,
+        isFiltered:     <?= json_encode($isFiltered) ?>,
+        filters: {
+            department: <?= json_encode($filterDept) ?>,
+            category:   <?= json_encode($filterCategory) ?>,
+            date_from:  <?= json_encode($filterDateFrom) ?>,
+            date_to:    <?= json_encode($filterDateTo) ?>
+        }
+    };
+
+    var priorityConfig = {
+        high:   { bg: 'bg-danger',  icon: 'fa-arrow-up',   label: 'High Priority' },
+        medium: { bg: 'bg-warning', icon: 'fa-minus',      label: 'Medium Priority' },
+        low:    { bg: 'bg-success', icon: 'fa-arrow-down', label: 'Low Priority' }
+    };
+
+    function escapeHtml(str) {
+        var d = document.createElement('div');
+        d.textContent = str === null || str === undefined ? '' : String(str);
+        return d.innerHTML;
+    }
+
+    function fmtHours(val) {
+        if (val === null || val === undefined || val === '') return '<span class="text-muted">-</span>';
+        return Number(val).toFixed(1) + ' hrs';
+    }
+
+    // Tab switching
     function switchReportTab(tab) {
         document.getElementById('tab-reports').style.display   = tab === 'reports'   ? '' : 'none';
         document.getElementById('tab-analytics').style.display = tab === 'analytics' ? '' : 'none';
@@ -720,199 +744,400 @@ function fmtHours($val): string
         if (tab === 'analytics') renderCharts();
     }
 
-    // DataTables
-    $(document).ready(function () {
-        function dtInitComplete(settings) {
-            $(settings.nTableWrapper).find('.dataTables_filter')
-                .appendTo($(settings.nTable).closest('.container-card').find('.search-input'));
-        }
-        var dtOpts = {
-            destroy: true, bFilter: true, sDom: 'fBtlpi', pagingType: 'numbers', ordering: true,
-            language: { search: ' ', sLengthMenu: '_MENU_', searchPlaceholder: 'Search...', info: '_START_ - _END_ of _TOTAL_ items', emptyTable: 'No data available' },
-            initComplete: dtInitComplete
-        };
+    // ---- DataTables ----
+    function dtInitComplete(settings) {
+        $(settings.nTableWrapper).find('.dataTables_filter')
+            .appendTo($(settings.nTable).closest('.container-card').find('.search-input'));
+    }
+    var dtOpts = {
+        destroy: true, bFilter: true, sDom: 'fBtlpi', pagingType: 'numbers', ordering: true,
+        language: { search: ' ', sLengthMenu: '_MENU_', searchPlaceholder: 'Search...', info: '_START_ - _END_ of _TOTAL_ items', emptyTable: 'No data available' },
+        initComplete: dtInitComplete
+    };
+    function initFilterableTables() {
         $('#tbl_department').DataTable($.extend({}, dtOpts, { language: { search: ' ', sLengthMenu: '_MENU_', info: '_START_ - _END_ of _TOTAL_ items', searchPlaceholder: 'Search department...' } }));
         $('#tbl_category').DataTable($.extend({}, dtOpts, { language: { search: ' ', sLengthMenu: '_MENU_', info: '_START_ - _END_ of _TOTAL_ items', searchPlaceholder: 'Search category...' } }));
         $('#tbl_staff').DataTable($.extend({}, dtOpts, { language: { search: ' ', sLengthMenu: '_MENU_', info: '_START_ - _END_ of _TOTAL_ items', searchPlaceholder: 'Search staff...' }, order: [[3, 'desc']] }));
         $('#tbl_monthly').DataTable($.extend({}, dtOpts, { paging: false, bFilter: false, sDom: 'tip', ordering: false, initComplete: null }));
+    }
+    function initOldestTable() {
         $('#tbl_oldest').DataTable($.extend({}, dtOpts, { language: { search: ' ', sLengthMenu: '_MENU_', info: '_START_ - _END_ of _TOTAL_ items', searchPlaceholder: 'Search complaints...' }, paging: false, order: [[6, 'desc']] }));
+    }
+    $(document).ready(function () {
+        initFilterableTables();
+        initOldestTable();
     });
 
-    // Chart.js 
-    var chartsRendered = false;
+    // ---- Table renderers (rebuild tbody HTML from reportData, then re-init DataTables) ----
+    function renderDeptTable() {
+        var rows = reportData.byDept, html = '';
+        if (!rows.length) {
+            html = '<tr><td colspan="7" class="text-center text-muted py-4">No data for the selected filters.</td></tr>';
+        } else {
+            rows.forEach(function (r) {
+                html += '<tr>' +
+                    '<td class="fw-semibold">' + escapeHtml(r.department_name) + '</td>' +
+                    '<td class="text-center"><span class="badge bg-secondary">' + r.total + '</span></td>' +
+                    '<td class="text-center"><span class="badge bg-warning text-dark">' + r.pending + '</span></td>' +
+                    '<td class="text-center"><span class="badge bg-info text-white">' + r.in_progress + '</span></td>' +
+                    '<td class="text-center"><span class="badge bg-success">' + r.resolved + '</span></td>' +
+                    '<td class="text-center"><span class="badge bg-danger">' + r.rejected + '</span></td>' +
+                    '<td class="text-center">' + fmtHours(r.avg_resolution_hours) + '</td>' +
+                    '</tr>';
+            });
+        }
+        document.getElementById('tbody_department').innerHTML = html;
+    }
+
+    function renderCategoryTable() {
+        var rows = reportData.byCategory, html = '';
+        if (!rows.length) {
+            html = '<tr><td colspan="7" class="text-center text-muted py-4">No data for the selected filters.</td></tr>';
+        } else {
+            rows.forEach(function (r) {
+                html += '<tr>' +
+                    '<td class="fw-semibold">' + escapeHtml(r.category_name) + '</td>' +
+                    '<td class="text-center"><span class="badge bg-secondary">' + r.total + '</span></td>' +
+                    '<td class="text-center"><span class="badge bg-warning text-dark">' + r.pending + '</span></td>' +
+                    '<td class="text-center"><span class="badge bg-info text-white">' + r.in_progress + '</span></td>' +
+                    '<td class="text-center"><span class="badge bg-success">' + r.resolved + '</span></td>' +
+                    '<td class="text-center"><span class="badge bg-danger">' + r.rejected + '</span></td>' +
+                    '<td class="text-center">' + fmtHours(r.avg_resolution_hours) + '</td>' +
+                    '</tr>';
+            });
+        }
+        document.getElementById('tbody_category').innerHTML = html;
+    }
+
+    function renderStaffTable() {
+        var rows = reportData.byStaff, html = '';
+        if (!rows.length) {
+            html = '<tr><td colspan="10" class="text-center text-muted py-4">No assigned complaints found.</td></tr>';
+        } else {
+            rows.forEach(function (r) {
+                var rate = parseFloat(r.resolution_rate || 0);
+                html += '<tr>' +
+                    '<td class="fw-semibold">' + escapeHtml(r.staff_name) + '</td>' +
+                    '<td><span class="badge bg-secondary">' + escapeHtml(r.role_name) + '</span></td>' +
+                    '<td>' + escapeHtml(r.department_name) + '</td>' +
+                    '<td class="text-center"><span class="badge bg-dark">' + r.total + '</span></td>' +
+                    '<td class="text-center"><span class="badge bg-warning text-dark">' + r.pending + '</span></td>' +
+                    '<td class="text-center"><span class="badge bg-info text-white">' + r.in_progress + '</span></td>' +
+                    '<td class="text-center"><span class="badge bg-success">' + r.resolved + '</span></td>' +
+                    '<td class="text-center"><span class="badge bg-danger">' + r.rejected + '</span></td>' +
+                    '<td class="text-center">' + fmtHours(r.avg_resolution_hours) + '</td>' +
+                    '<td class="text-center"><div class="d-flex align-items-center gap-1 justify-content-center">' +
+                        '<div class="progress flex-grow-1" style="height:8px;min-width:50px;"><div class="progress-bar bg-success" style="width:' + rate + '%"></div></div>' +
+                        '<small>' + rate.toFixed(1) + '%</small>' +
+                        '</div></td>' +
+                    '</tr>';
+            });
+        }
+        document.getElementById('tbody_staff').innerHTML = html;
+    }
+
+    function renderMonthlyTable() {
+        var rows = reportData.monthlyTrend, html = '';
+        if (!rows.length) {
+            html = '<tr><td colspan="6" class="text-center text-muted py-4">No data available.</td></tr>';
+        } else {
+            rows.forEach(function (r) {
+                html += '<tr>' +
+                    '<td class="fw-semibold">' + escapeHtml(r.month_label) + '</td>' +
+                    '<td class="text-center"><span class="badge bg-dark">' + r.total + '</span></td>' +
+                    '<td class="text-center"><span class="badge bg-warning text-dark">' + r.pending + '</span></td>' +
+                    '<td class="text-center"><span class="badge bg-info text-white">' + r.in_progress + '</span></td>' +
+                    '<td class="text-center"><span class="badge bg-success">' + r.resolved + '</span></td>' +
+                    '<td class="text-center"><span class="badge bg-danger">' + r.rejected + '</span></td>' +
+                    '</tr>';
+            });
+        }
+        document.getElementById('tbody_monthly').innerHTML = html;
+    }
+
+    function rebuildTables() {
+        renderDeptTable();
+        renderCategoryTable();
+        renderStaffTable();
+        renderMonthlyTable();
+        initFilterableTables();
+    }
+
+    // ---- Stat cards / badges / notes ----
+    function renderStats() {
+        var s = reportData.stats;
+        document.getElementById('statTotal').textContent       = s.total;
+        document.getElementById('statPending').textContent     = s.pending;
+        document.getElementById('statInProgress').textContent  = s.in_progress;
+        document.getElementById('statResolved').textContent    = s.resolved;
+        document.getElementById('statRejected').textContent    = s.rejected;
+        document.getElementById('statResolveRate').textContent = reportData.resolutionRate + '%';
+        document.getElementById('statAvgResolution').textContent =
+            (s.avg_resolution_hours !== null && s.avg_resolution_hours !== undefined) ? Number(s.avg_resolution_hours).toFixed(1) : '-';
+        document.getElementById('statResolveRateAnalytics').textContent = reportData.resolutionRate + '%';
+        document.getElementById('resolveRateBar').style.width = reportData.resolutionRate + '%';
+        document.getElementById('filteredBadge').classList.toggle('d-none', !reportData.isFiltered);
+
+        var hasDateRange = !!(reportData.filters.date_from || reportData.filters.date_to);
+        document.getElementById('monthlyTrendNote').textContent = hasDateRange ? 'Complaints within selected date range' : 'Complaints over the last 12 months';
+        document.getElementById('monthlyTrendNoteAnalytics').textContent = hasDateRange ? '(filtered range)' : '(last 12 months)';
+    }
+
+    // ---- Priority breakdown cards ----
+    function renderPriorityCards() {
+        var map = {};
+        reportData.byPriority.forEach(function (p) { map[p.priority] = p; });
+        var container = document.getElementById('priorityBreakdown');
+        var present = ['high', 'medium', 'low'].filter(function (l) { return map[l]; });
+
+        if (!present.length) {
+            container.innerHTML = '<p class="text-center text-muted py-3">No data for the selected filters.</p>';
+            return;
+        }
+
+        var html = '<div class="row g-3">';
+        present.forEach(function (level) {
+            var pr  = map[level];
+            var cfg = priorityConfig[level];
+            var rate = pr.total > 0 ? Math.round((pr.resolved / pr.total) * 1000) / 10 : 0;
+            html += '<div class="col-12 col-md-4">' +
+                '<div class="p-3 rounded border h-100" style="background:#fff;">' +
+                    '<div class="d-flex align-items-center mb-2">' +
+                        '<span class="badge ' + cfg.bg + ' me-2 p-2"><i class="fas ' + cfg.icon + '"></i></span>' +
+                        '<span class="fw-bold">' + cfg.label + '</span>' +
+                        '<span class="badge bg-secondary ms-auto">' + pr.total + ' total</span>' +
+                    '</div>' +
+                    '<div class="d-flex justify-content-between small mb-1"><span>Resolved</span><strong>' + pr.resolved + '</strong></div>' +
+                    '<div class="progress mb-2" style="height:6px;"><div class="progress-bar bg-success" style="width:' + rate + '%"></div></div>' +
+                    '<div class="row text-center small mt-2">' +
+                        '<div class="col"><div class="fw-bold text-warning">' + pr.pending + '</div><div class="text-muted">Pending</div></div>' +
+                        '<div class="col"><div class="fw-bold text-info">' + pr.in_progress + '</div><div class="text-muted">In Progress</div></div>' +
+                        '<div class="col"><div class="fw-bold text-danger">' + pr.rejected + '</div><div class="text-muted">Rejected</div></div>' +
+                        '<div class="col"><div class="fw-bold text-success">' + rate + '%</div><div class="text-muted">Resolve Rate</div></div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    // ---- Chart.js ----
+    var chartInstances = {};
     var BLUE   = '#0062cc';
     var GREEN  = '#16a34a';
     var YELLOW = '#f59e0b';
     var RED    = '#dc2626';
     var GREY   = '#94a3b8';
 
-    function renderCharts() {
-        if (chartsRendered) return;
-        chartsRendered = true;
+    function destroyChart(id) {
+        if (chartInstances[id]) {
+            chartInstances[id].destroy();
+            delete chartInstances[id];
+        }
+    }
 
-        // Status doughnut
-        new Chart(document.getElementById('chartStatus'), {
+    function toggleChartEmpty(emptyId, canvasId, isEmpty) {
+        var emptyEl  = document.getElementById(emptyId);
+        var canvasEl = document.getElementById(canvasId);
+        if (emptyEl)  emptyEl.style.display  = isEmpty ? '' : 'none';
+        if (canvasEl) canvasEl.style.display = isEmpty ? 'none' : '';
+    }
+
+    function renderCharts() {
+        // Only render when the analytics tab is actually visible; canvases with
+        // zero size otherwise produce blank/broken Chart.js instances.
+        if (document.getElementById('tab-analytics').style.display === 'none') return;
+
+        var s = reportData.stats;
+
+        destroyChart('chartStatus');
+        chartInstances.chartStatus = new Chart(document.getElementById('chartStatus'), {
             type: 'doughnut',
             data: {
-                labels: <?= json_encode($chartStatus['labels']) ?>,
-                datasets: [{ data: <?= json_encode($chartStatus['data']) ?>, 
-                backgroundColor: [YELLOW, BLUE, GREEN, RED], 
-                borderWidth: 2 }]
+                labels: ['Pending', 'In Progress', 'Resolved', 'Rejected'],
+                datasets: [{ data: [s.pending, s.in_progress, s.resolved, s.rejected], backgroundColor: [YELLOW, BLUE, GREEN, RED], borderWidth: 2 }]
             },
             options: { plugins: { legend: { position: 'bottom' } }, cutout: '60%' }
         });
 
-        // Priority pie
-        new Chart(document.getElementById('chartPriority'), {
+        var prMap = {};
+        reportData.byPriority.forEach(function (p) { prMap[p.priority] = p.total; });
+        destroyChart('chartPriority');
+        chartInstances.chartPriority = new Chart(document.getElementById('chartPriority'), {
             type: 'pie',
             data: {
-                labels: <?= json_encode($chartPriority['labels']) ?>,
-                datasets: [{ data: <?= json_encode($chartPriority['data']) ?>, 
-                backgroundColor: [RED, YELLOW, GREEN], 
-                borderWidth: 2 }]
+                labels: ['High', 'Medium', 'Low'],
+                datasets: [{ data: [prMap.high || 0, prMap.medium || 0, prMap.low || 0], backgroundColor: [RED, YELLOW, GREEN], borderWidth: 2 }]
             },
             options: { plugins: { legend: { position: 'bottom' } } }
         });
 
-        <?php if (!empty($monthlyTrend)): ?>
-        // Monthly line
-        new Chart(document.getElementById('chartMonthly'), {
-            type: 'line',
-            data: {
-                labels: <?= json_encode($monthlyLabels) ?>,
-                datasets: [
-                    { 
-                        label: 'Submitted', 
-                        data: <?= json_encode($monthlyTotal) ?>, 
-                        borderColor: BLUE, 
-                        backgroundColor: 'rgba(0,98,204,0.08)', 
-                        fill: true, 
-                        tension: 0.35, 
-                        pointRadius: 4 
-                    },
-                    { 
-                        label: 'Resolved',  
-                        data: <?= json_encode($monthlyResolved) ?>, 
-                        borderColor: GREEN, 
-                        backgroundColor: 'rgba(22,163,74,0.08)', 
-                        fill: true, 
-                        tension: 0.35, 
-                        pointRadius: 4 
-                    },
-                    { 
-                        label: 'Pending',   
-                        data: <?= json_encode($monthlyPending) ?>, 
-                        borderColor: YELLOW, 
-                        backgroundColor: 'rgba(245,158,11,0.08)', 
-                        fill: true, 
-                        tension: 0.35, 
-                        pointRadius: 4 
-                    }
-                ]
-            },
-            options: { 
-                plugins: { legend: { position: 'top' } }, 
-                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, 
-                responsive: true }
-        });
-        <?php endif; ?>
+        destroyChart('chartMonthly');
+        var mt = reportData.monthlyTrend;
+        toggleChartEmpty('chartMonthlyEmpty', 'chartMonthly', !mt.length);
+        if (mt.length) {
+            chartInstances.chartMonthly = new Chart(document.getElementById('chartMonthly'), {
+                type: 'line',
+                data: {
+                    labels: mt.map(function (r) { return r.month_label; }),
+                    datasets: [
+                        { label: 'Submitted', data: mt.map(function (r) { return +r.total; }),    borderColor: BLUE,   backgroundColor: 'rgba(0,98,204,0.08)',  fill: true, tension: 0.35, pointRadius: 4 },
+                        { label: 'Resolved',  data: mt.map(function (r) { return +r.resolved; }), borderColor: GREEN,  backgroundColor: 'rgba(22,163,74,0.08)', fill: true, tension: 0.35, pointRadius: 4 },
+                        { label: 'Pending',   data: mt.map(function (r) { return +r.pending; }),  borderColor: YELLOW, backgroundColor: 'rgba(245,158,11,0.08)', fill: true, tension: 0.35, pointRadius: 4 }
+                    ]
+                },
+                options: { plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, responsive: true }
+            });
+        }
 
-        <?php if (!empty($byDept)): ?>
-        // Department horizontal bar
-        new Chart(document.getElementById('chartDept'), {
-            type: 'bar',
-            data: {
-                labels: <?= json_encode($deptLabels) ?>,
-                datasets: [
-                    { 
-                        label: 'Total',    
-                        data: <?= json_encode($deptTotals) ?>,   
-                        backgroundColor: 'rgba(0,98,204,0.7)' 
-                    },
-                    { 
-                        label: 'Resolved', 
-                        data: <?= json_encode($deptResolved) ?>, 
-                        backgroundColor: 'rgba(22,163,74,0.7)' 
-                    }
-                ]
-            },
-            options: { 
-                indexAxis: 'y', 
-                plugins: { legend: { position: 'top' } }, 
-                scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }, 
-                responsive: true 
-            }
-        });
-        <?php endif; ?>
+        destroyChart('chartDept');
+        var deptSlice = reportData.byDept.slice(0, 10);
+        toggleChartEmpty('chartDeptEmpty', 'chartDept', !deptSlice.length);
+        if (deptSlice.length) {
+            chartInstances.chartDept = new Chart(document.getElementById('chartDept'), {
+                type: 'bar',
+                data: {
+                    labels: deptSlice.map(function (r) { return r.department_name; }),
+                    datasets: [
+                        { label: 'Total',    data: deptSlice.map(function (r) { return +r.total; }),    backgroundColor: 'rgba(0,98,204,0.7)' },
+                        { label: 'Resolved', data: deptSlice.map(function (r) { return +r.resolved; }), backgroundColor: 'rgba(22,163,74,0.7)' }
+                    ]
+                },
+                options: { indexAxis: 'y', plugins: { legend: { position: 'top' } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }, responsive: true }
+            });
+        }
 
-        <?php if (!empty($byCategory)): ?>
-        // Category bar
-        new Chart(document.getElementById('chartCat'), {
-            type: 'bar',
-            data: {
-                labels: <?= json_encode($catLabels) ?>,
-                datasets: [{ 
-                    label: 'Complaints', 
-                    data: <?= json_encode($catTotals) ?>, 
-                    backgroundColor: 'rgba(245,158,11,0.75)', 
-                    borderRadius: 4 
-                }]
-            },
-            options: { 
-                indexAxis: 'y', 
-                plugins: { legend: { display: false } }, 
-                scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }, 
-                responsive: true 
-            }
-        });
-        <?php endif; ?>
+        destroyChart('chartCat');
+        var catSlice = reportData.byCategory.slice(0, 10);
+        toggleChartEmpty('chartCatEmpty', 'chartCat', !catSlice.length);
+        if (catSlice.length) {
+            chartInstances.chartCat = new Chart(document.getElementById('chartCat'), {
+                type: 'bar',
+                data: {
+                    labels: catSlice.map(function (r) { return r.category_name; }),
+                    datasets: [{ label: 'Complaints', data: catSlice.map(function (r) { return +r.total; }), backgroundColor: 'rgba(245,158,11,0.75)', borderRadius: 4 }]
+                },
+                options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }, responsive: true }
+            });
+        }
 
-        <?php if (!empty($byStaff)): ?>
-        // Staff grouped bar
-        new Chart(document.getElementById('chartStaff'), {
-            type: 'bar',
-            data: {
-                labels: <?= json_encode($staffLabels) ?>,
-                datasets: [
-                    { 
-                        label: 'Total',    
-                        data: <?= json_encode($staffTotal) ?>,   
-                        backgroundColor: 'rgba(0,98,204,0.6)', 
-                        borderRadius: 4 
-                    },
-                    { 
-                        label: 'Resolved', 
-                        data: <?= json_encode($staffResolved) ?>, 
-                        backgroundColor: 'rgba(22,163,74,0.7)', 
-                        borderRadius: 4 
-                    }
-                ]
-            },
-            options: { 
-                plugins: { legend: { position: 'top' } }, 
-                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, 
-                responsive: true 
-            }
-        });
-        <?php endif; ?>
+        destroyChart('chartStaff');
+        var staffSlice = reportData.byStaff.slice(0, 10);
+        document.getElementById('staffChartWrap').style.display = staffSlice.length ? '' : 'none';
+        if (staffSlice.length) {
+            chartInstances.chartStaff = new Chart(document.getElementById('chartStaff'), {
+                type: 'bar',
+                data: {
+                    labels: staffSlice.map(function (r) { return r.staff_name; }),
+                    datasets: [
+                        { label: 'Total',    data: staffSlice.map(function (r) { return +r.total; }),    backgroundColor: 'rgba(0,98,204,0.6)', borderRadius: 4 },
+                        { label: 'Resolved', data: staffSlice.map(function (r) { return +r.resolved; }), backgroundColor: 'rgba(22,163,74,0.7)', borderRadius: 4 }
+                    ]
+                },
+                options: { plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, responsive: true }
+            });
+        }
     }
 
-    // Auto-render if analytics tab is active on load
-    <?php if ($activeTab === 'analytics'): ?>
+    // Render charts immediately if analytics tab is active on load
     document.addEventListener('DOMContentLoaded', renderCharts);
-    <?php endif; ?>
 
-    // Export helpers 
+    // ---- AJAX filtering (no page reload) ----
+    function buildFilterParams() {
+        var params = new URLSearchParams();
+        var dept = document.getElementById('filterDepartment').value;
+        var cat  = document.getElementById('filterCategory').value;
+        var from = document.getElementById('filterDateFrom').value;
+        var to   = document.getElementById('filterDateTo').value;
+        if (dept) params.set('department', dept);
+        if (cat)  params.set('category', cat);
+        if (from) params.set('date_from', from);
+        if (to)   params.set('date_to', to);
+        return params;
+    }
+
+    function applyFilters() {
+        var params   = buildFilterParams();
+        var btn      = document.getElementById('applyFilterBtn');
+        var btnLabel = btn.querySelector('.btn-label');
+        btn.disabled = true;
+        if (btnLabel) btnLabel.textContent = 'Applying...';
+
+        fetch('ajax/get_report_data.php?' + params.toString())
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data.success) throw new Error('Request failed');
+
+                reportData.stats          = data.stats;
+                reportData.resolutionRate = data.resolutionRate;
+                reportData.byDept         = data.byDept;
+                reportData.byCategory     = data.byCategory;
+                reportData.byPriority     = data.byPriority;
+                reportData.byStaff        = data.byStaff;
+                reportData.monthlyTrend   = data.monthlyTrend;
+                reportData.isFiltered     = data.isFiltered;
+                reportData.filters        = data.filters;
+
+                renderStats();
+                renderPriorityCards();
+                rebuildTables();
+                renderCharts();
+
+                var url = new URL(window.location.href);
+                ['department', 'category', 'date_from', 'date_to'].forEach(function (k) { url.searchParams.delete(k); });
+                params.forEach(function (v, k) { url.searchParams.set(k, v); });
+                history.replaceState(null, '', url.toString());
+            })
+            .catch(function () {
+                Swal.fire({ icon: 'error', title: 'Failed to apply filters', text: 'Please try again.' });
+            })
+            .finally(function () {
+                btn.disabled = false;
+                if (btnLabel) btnLabel.textContent = 'Apply Filter';
+            });
+    }
+
+    document.getElementById('filterForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        applyFilters();
+    });
+
+    document.getElementById('resetFilterBtn').addEventListener('click', function (e) {
+        e.preventDefault();
+        document.getElementById('filterDepartment').value = '';
+        document.getElementById('filterCategory').value   = '';
+        document.getElementById('filterDateFrom').value   = '';
+        document.getElementById('filterDateTo').value     = '';
+        applyFilters();
+    });
+
+    // Auto-apply as soon as a filter changes (debounced so a quick run of
+    // changes - e.g. typing a date - only fires one request).
+    var _autoApplyTimer = null;
+    function scheduleAutoApply() {
+        clearTimeout(_autoApplyTimer);
+        _autoApplyTimer = setTimeout(applyFilters, 300);
+    }
+    ['filterDepartment', 'filterCategory', 'filterDateFrom', 'filterDateTo'].forEach(function (id) {
+        document.getElementById(id).addEventListener('change', scheduleAutoApply);
+    });
+
+    // Export helpers
 
     var _REPORT_TITLE   = 'SCMRS - Complaints Report';
     var _HEAD_COLOR     = [30, 58, 95];
     var _ALT_ROW        = [245, 248, 252];
-    var _FILTER_LABEL   = <?= json_encode(
-        ($filterDept     ? 'Dept #'.$filterDept     : '') .
-        ($filterCategory ? ' | Cat #'.$filterCategory : '') .
-        ($filterDateFrom ? ' | From: '.$filterDateFrom : '') .
-        ($filterDateTo   ? ' | To: '.$filterDateTo   : '') ?: 'No filters applied'
-    ) ?>;
+
+    function _filterLabel() {
+        var f = reportData.filters;
+        var parts = [];
+        if (f.department) parts.push('Dept #' + f.department);
+        if (f.category)   parts.push('Cat #' + f.category);
+        if (f.date_from)  parts.push('From: ' + f.date_from);
+        if (f.date_to)    parts.push('To: ' + f.date_to);
+        return parts.length ? parts.join(' | ') : 'No filters applied';
+    }
 
     function _stripCell(html) {
         var d = document.createElement('div');
@@ -945,22 +1170,23 @@ function fmtHours($val): string
         }
         doc.setFontSize(8);
         doc.setTextColor(130);
-        doc.text('Generated: ' + new Date().toLocaleString() + '   |   Filters: ' + _FILTER_LABEL,
+        doc.text('Generated: ' + new Date().toLocaleString() + '   |   Filters: ' + _filterLabel(),
             14, subtitle ? 27 : 21);
         doc.setTextColor(0);
         return subtitle ? 33 : 27;
     }
 
     function _summaryTable(doc, startY) {
+        var s = reportData.stats;
         doc.autoTable({
             head: [['Total', 'Pending', 'In Progress', 'Resolved', 'Rejected', 'Resolution Rate']],
             body: [[
-                '<?= $total ?>',
-                '<?= $stats['pending'] ?>',
-                '<?= $stats['in_progress'] ?>',
-                '<?= $stats['resolved'] ?>',
-                '<?= $stats['rejected'] ?>',
-                '<?= $resolutionRate ?>%'
+                String(s.total),
+                String(s.pending),
+                String(s.in_progress),
+                String(s.resolved),
+                String(s.rejected),
+                reportData.resolutionRate + '%'
             ]],
             startY: startY,
             styles: { fontSize: 9, halign: 'center', fontStyle: 'bold' },
