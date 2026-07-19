@@ -325,7 +325,7 @@ CREATE TABLE `notifications` (
   `user_id` int(11) NOT NULL,
   `complaint_id` int(11) DEFAULT NULL,
   `message` varchar(255) NOT NULL,
-  `type` enum('status_change','new_assignment','request_info','new_complaint','new_registration','staff_approved','info_responded','complaint_rejected','complaint_resolved','staff_rejected','complaint_deleted','complaint_reopened','complaint_delegated','complaint_delegated_resolved','complaint_overdue','new_complaint_in_rep_scope','endorsed_complaint_updated','system','password_reset_admin','filed_on_behalf') NOT NULL DEFAULT 'status_change',
+  `type` enum('status_change','new_assignment','request_info','new_complaint','new_registration','staff_approved','info_responded','complaint_rejected','complaint_resolved','staff_rejected','complaint_deleted','complaint_reopened','complaint_delegated','complaint_delegated_resolved','complaint_escalation_resolved','complaint_overdue','new_complaint_in_rep_scope','endorsed_complaint_updated','system','password_reset_admin','filed_on_behalf') NOT NULL DEFAULT 'status_change',
   `link` varchar(255) DEFAULT NULL,
   `is_read` tinyint(1) DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
