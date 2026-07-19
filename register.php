@@ -729,7 +729,7 @@ $staffPost   = isset($_POST['registerStaffBTN']);
                             <div class="field-wrap">
                                 <i class="fas fa-envelope field-icon"></i>
                                 <input type="email" id="s_email" class="form-control icon-input" name="student_email"
-                                    placeholder="email@udsm.ac.tz"
+                                    placeholder="username@email.com"
                                     value="<?= $studentPost ? htmlspecialchars($_POST['student_email'] ?? '') : '' ?>" required>
                                 <div class="invalid-feedback"></div>
                             </div>
@@ -855,7 +855,7 @@ $staffPost   = isset($_POST['registerStaffBTN']);
                             <div class="field-wrap">
                                 <i class="fas fa-envelope field-icon"></i>
                                 <input type="email" id="st_email" class="form-control icon-input" name="staff_email"
-                                    placeholder="staff@udsm.ac.tz"
+                                    placeholder="username@email.com"
                                     value="<?= $staffPost ? htmlspecialchars($_POST['staff_email'] ?? '') : '' ?>" required>
                                 <div class="invalid-feedback"></div>
                             </div>

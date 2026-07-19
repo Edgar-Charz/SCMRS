@@ -228,7 +228,7 @@ if (isset($_POST['submitBtn'])) {
                     <?= csrf_field() ?>
                     <div class="mb-3 text-start">
                         <label class="form-label small fw-bold">Email Address</label>
-                        <input type="email" name="email" class="form-control" placeholder="name@example.com"
+                        <input type="email" name="email" class="form-control" placeholder="username@email.com"
                             value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" required>
                     </div>
                     <button type="submit" name="submitBtn" class="btn btn-primary w-100 mb-3">

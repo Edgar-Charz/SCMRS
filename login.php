@@ -264,7 +264,7 @@ if (isset($_POST["loginBTN"])) {
                 <?= csrf_field() ?>
                 <div class="mb-2 text-start">
                     <label for="" class="form-label small fw-bold">Email Address</label>
-                    <input type="email" name="email" class="form-control" placeholder="name@example.com" autocomplete
+                    <input type="email" name="email" class="form-control" placeholder="username@email.com" autocomplete
                         required>
                 </div>
                 <div class="mb-2 text-start">
