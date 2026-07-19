@@ -8,6 +8,7 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once 'config/Database.php';
 require_once 'classes/Notification.php';
+require_once 'includes/csrf.php';
 
 $db = new Database();
 $conn = $db->connect();
@@ -17,7 +18,8 @@ $userId = (int) $_SESSION['user_id'];
 $role = $_SESSION['user_role'] ?? 'student';
 
 // Mark all read if requested
-if (isset($_GET['mark_all'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_all'])) {
+    csrf_verify();
     $notif->markAllRead($userId);
     header('Location: notifications.php');
     exit;
@@ -82,9 +84,12 @@ $roleLabel = match ($role) {
                         <li class="breadcrumb-item active">Notifications</li>
                     </ol>
                     <?php if (!empty($notifications)): ?>
-                        <a href="?mark_all=1" class="btn btn-sm btn-outline-secondary">
-                            <i class="fas fa-check-double me-1"></i>Mark all as read
-                        </a>
+                        <form method="POST" class="m-0">
+                            <?= csrf_field() ?>
+                            <button type="submit" name="mark_all" value="1" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-check-double me-1"></i>Mark all as read
+                            </button>
+                        </form>
                     <?php endif; ?>
                 </nav>
 
@@ -142,6 +147,8 @@ $roleLabel = match ($role) {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
+        var _csrfToken = <?= json_encode(csrf_token()) ?>;
+
         document.querySelectorAll('.notif-row').forEach(function (el) {
             el.addEventListener('click', function (e) {
                 var id = this.dataset.id;
@@ -151,7 +158,7 @@ $roleLabel = match ($role) {
                 fetch('mark_notification.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'action=mark_read&id=' + id
+                    body: 'action=mark_read&id=' + id + '&csrf_token=' + encodeURIComponent(_csrfToken)
                 }).then(function () {
                     window.location.href = href;
                 });

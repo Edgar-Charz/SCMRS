@@ -274,10 +274,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_role'])) {
     exit;
 }
 
-// Handle Delete Role
-if (isset($_GET['delete_role']) && is_numeric($_GET['delete_role'])) {
+// Handle Delete Role (POST-only for CSRF protection)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_role']) && is_numeric($_POST['delete_role'])) {
     try {
-        $admin->deleteStaffRole((int) $_GET['delete_role']);
+        $admin->deleteStaffRole((int) $_POST['delete_role']);
         $_SESSION['message'] = "Role deleted successfully.";
     } catch (Exception $e) {
         $_SESSION['message_error'] = $e->getMessage();
@@ -2377,7 +2377,8 @@ if (isset($_SESSION['message'])) {
                 cancelButtonText: 'Cancel'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    window.location.href = 'user_management.php?delete_role=' + id;
+                    document.getElementById('deleteRoleId').value = id;
+                    document.getElementById('deleteRoleForm').submit();
                 }
             });
         }
@@ -2604,6 +2605,12 @@ if (isset($_SESSION['message'])) {
         <?= csrf_field() ?>
         <input type="hidden" name="danger_action" id="dangerActionName" value="">
         <input type="hidden" name="danger_id" id="dangerActionId" value="">
+    </form>
+
+    <!-- Hidden form for POST-based role deletion (CSRF protection) -->
+    <form id="deleteRoleForm" method="POST" action="user_management.php#roles" style="display:none;">
+        <?= csrf_field() ?>
+        <input type="hidden" name="delete_role" id="deleteRoleId" value="">
     </form>
 </body>
 

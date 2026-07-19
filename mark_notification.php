@@ -11,16 +11,18 @@ require_once 'config/Database.php';
 require_once 'classes/Notification.php';
 require_once 'includes/csrf.php';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    csrf_verify();
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    echo json_encode(['success' => false]);
+    exit;
 }
+csrf_verify();
 
 $db = new Database();
 $conn = $db->connect();
 $notif = new Notification($conn);
 
 $userId = (int) $_SESSION['user_id'];
-$action = $_POST['action'] ?? $_GET['action'] ?? '';
+$action = $_POST['action'] ?? '';
 
 if ($action === 'mark_all') {
     $notif->markAllRead($userId);
@@ -29,7 +31,7 @@ if ($action === 'mark_all') {
 }
 
 if ($action === 'mark_read') {
-    $id = (int) ($_POST['id'] ?? $_GET['id'] ?? 0);
+    $id = (int) ($_POST['id'] ?? 0);
     if ($id > 0) {
         $notif->markRead($id, $userId);
         $link = $notif->getLink($id, $userId);
