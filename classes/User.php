@@ -257,6 +257,25 @@ class User
                 ];
             }
 
+            // Staff accounts must be admin-approved before they can log in
+            if ($user['user_role'] === 'staff') {
+                $staffStmt = $this->conn->prepare("SELECT staff_approval_status FROM staffs WHERE staff_user_id = ?");
+                $staffStmt->bind_param("i", $user['user_id']);
+                $staffStmt->execute();
+                $staffRow = $staffStmt->get_result()->fetch_assoc();
+                $staffStmt->close();
+
+                $approvalStatus = (int) ($staffRow['staff_approval_status'] ?? 0);
+                if ($approvalStatus !== 1) {
+                    return [
+                        "status" => false,
+                        "message" => $approvalStatus === 2
+                            ? "Your staff registration was not approved. Please contact an administrator."
+                            : "Your account is pending admin approval. Please wait for approval before logging in."
+                    ];
+                }
+            }
+
             // Verify password
             if (password_verify($password, $user['user_password'])) {
 
