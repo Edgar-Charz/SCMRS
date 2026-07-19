@@ -1278,6 +1278,16 @@ class Admin extends User
             throw new Exception("Cannot delete: department still has assigned staff members.");
         }
         $chk->close();
+
+        $chkComplaints = $this->conn->prepare("SELECT COUNT(*) AS cnt FROM complaints WHERE department_id = ?");
+        $chkComplaints->bind_param("i", $id);
+        $chkComplaints->execute();
+        if ((int) $chkComplaints->get_result()->fetch_assoc()['cnt'] > 0) {
+            $chkComplaints->close();
+            throw new Exception("Cannot delete: department still has associated complaints.");
+        }
+        $chkComplaints->close();
+
         $stmt = $this->conn->prepare("DELETE FROM departments WHERE department_id = ?");
         $stmt->bind_param("i", $id);
         $ok = $stmt->execute();
